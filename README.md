@@ -4,9 +4,9 @@
 
 Native, movable glass panels for your Codex quota. One desktop panel, three layouts, shared live controls.
 
-> **版本提示：此首页介绍新的面板开发版（build 39，尚未发布 Release）。**
-> [当前公开正式版 v0.5.1](https://github.com/tonig0709/codex-quota-widget/releases/tag/v0.5.1) 仍是旧的小组件版本，不包含下述三尺寸面板。
-> v0.5.6 目前是草稿，不是面向所有用户的公开下载。请勿把旧 DMG 当作本次更新的安装包。
+> **当前面板版本：v0.5.7（build 41）。**
+> [下载与版本说明](https://github.com/tonig0709/codex-quota-widget/releases/tag/v0.5.7)。
+> v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 
 ## 三种尺寸，一个桌面面板
 
@@ -32,11 +32,11 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 
 ## 下载与安装
 
-新面板版暂未公开发布。本机测试包和 GitHub Actions 测试产物不等同于正式 Release。
+请在 v0.5.7 的 Release 页面下载 **Codex-Quota-v0.5.7-macOS.dmg**，不要下载旧版或 Source code。
 
-- 普通用户请访问 [公开 Releases](https://github.com/tonig0709/codex-quota-widget/releases)，核对版本说明与附件；旧版不包含新面板。
+- 普通用户请访问 [v0.5.7 Release](https://github.com/tonig0709/codex-quota-widget/releases/tag/v0.5.7)，核对版本说明与附件；旧版不包含新面板。
 - 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
-- 新版发布后：打开其 DMG，将 **Codex Quota.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
+- 打开 DMG，将 **Codex Quota.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
 - 仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证。Ad-hoc 测试版未公证，可能仍需系统首次打开确认。
 
 面板版使用方式：
@@ -54,6 +54,9 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 主 App 是唯一的 Codex 连接所有者。面板直接观察同一份账户快照，不经过 WidgetKit 时间线或系统刷新预算。
 App 每 15 秒轮询，并响应额度变化通知；额度和趋势尽量作为同一快照提交。
 若趋势响应超时，新的额度仍会更新，并保留最后有效趋势。实际新鲜度仍受 Codex 服务、网络和账户数据可用性影响，不承诺逐秒刷新。
+
+大型面板右上角单独显示 Mac 系统时钟，每秒更新并显示秒数；它不是额度刷新频率。
+悬停可查看额度数据的实际更新时间，时钟走动不代表账户数据已经重新获取。
 
 ## 隐私与安全
 

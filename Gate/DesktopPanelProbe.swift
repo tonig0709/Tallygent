@@ -48,22 +48,37 @@ struct DesktopPanelProbe {
         precondition(window.level.rawValue > Int(CGWindowLevelForKey(.desktopIconWindow)), "desktop panel is hidden behind Finder's event layer")
         precondition(window.level.rawValue < NSWindow.Level.normal.rawValue, "desktop panel covers normal application windows")
 
-        let dragRegion = DesktopPanelDragRegion.DragView(frame: NSRect(x: 36, y: 278, width: 608, height: 22))
+        let dragRegion = DesktopPanelDragRegion.DragView(frame: NSRect(origin: .zero, size: window.frame.size))
         window.contentView?.addSubview(dragRegion)
         precondition(dragRegion.acceptsFirstMouse(for: nil), "inactive panel requires an extra click before dragging")
-        precondition(window.contentView?.hitTest(NSPoint(x: 100, y: 290)) === dragRegion, "drag region does not receive header mouse events")
-        let event = NSEvent.mouseEvent(
-            with: .leftMouseDown, location: NSPoint(x: 100, y: 290), modifierFlags: [],
-            timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1,
-            clickCount: 1, pressure: 1
-        )!
-        dragRegion.mouseDown(with: event)
-        precondition(window.forwardedEvent === event, "header does not forward the original mouse event to native window dragging")
+        for mode in DesktopPanelMode.allCases {
+            DesktopPanelWindowConfigurator(size: mode.size).configure(window)
+            dragRegion.frame = NSRect(origin: .zero, size: mode.size)
+            dragRegion.cornerRadius = 64
+            for point in [NSPoint(x: mode.size.width / 2, y: mode.size.height / 2), NSPoint(x: mode.size.width / 2, y: 20), NSPoint(x: 20, y: mode.size.height / 2)] {
+                precondition(window.contentView?.hitTest(point) === dragRegion, "body content cannot initiate native dragging")
+                let event = NSEvent.mouseEvent(
+                    with: .leftMouseDown, location: point, modifierFlags: [],
+                    timestamp: 0, windowNumber: window.windowNumber, context: nil, eventNumber: 1,
+                    clickCount: 1, pressure: 1
+                )!
+                dragRegion.mouseDown(with: event)
+                precondition(window.forwardedEvent === event, "body drag lost the original mouse event")
+            }
+            precondition(dragRegion.hitTest(NSPoint(x: 1, y: 1)) == nil, "transparent corners intercept desktop clicks")
+        }
         window.close()
         let controller = DesktopPanelController.shared
         let server = CodexAppServer()
         controller.show(server: server)
         let first = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+        first.contentView?.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        func dragViews(in view: NSView) -> [DesktopPanelDragRegion.DragView] {
+            (view as? DesktopPanelDragRegion.DragView).map { [$0] } ?? view.subviews.flatMap { dragViews(in: $0) }
+        }
+        let productionDrag = first.contentView.flatMap { dragViews(in: $0).first }
+        precondition(productionDrag?.bounds.size == DesktopPanelMode.stored().size, "production drag region is still limited to the header")
         controller.show(server: server)
         precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1, "show created a second desktop panel")
         precondition(controller.isVisible, "desktop panel did not open")

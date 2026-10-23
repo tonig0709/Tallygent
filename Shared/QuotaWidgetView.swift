@@ -54,17 +54,18 @@ private struct QuotaMediumPanelView: View {
     private var isLight: Bool { snapshot.resolvedAppearance == .light }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
                 Image("CodexMark")
-                    .resizable().scaledToFit().frame(width: 24, height: 24)
+                    .resizable().scaledToFit().frame(width: 22, height: 22)
                     .accessibilityHidden(true)
                 Text("Codex").font(.headline.weight(.semibold)).tracking(-0.3)
             }
             quotaBar("5h额度", window: snapshot.fiveHour)
             quotaBar("周额度", window: snapshot.weekly)
         }
-        .padding(16)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(isLight ? Color(red: 0.08, green: 0.1, blue: 0.14) : .white)
         .accessibilityElement(children: .contain)
@@ -82,7 +83,7 @@ private struct QuotaMediumPanelView: View {
                 Text(title).font(.system(size: 13, weight: .semibold))
                 Spacer()
                 Text(remaining.map { "\($0)%" } ?? "—")
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .font(.system(size: 20, weight: .semibold, design: .rounded))
                     .monospacedDigit().tracking(-0.6)
             }
             GeometryReader { proxy in
@@ -92,7 +93,7 @@ private struct QuotaMediumPanelView: View {
                         .frame(width: proxy.size.width * CGFloat(remaining ?? 0) / 100)
                 }
             }
-            .frame(height: 7)
+            .frame(height: 6)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(title)，\(remaining.map { "剩余 \($0)%" } ?? "等待账户数据")")
@@ -309,6 +310,7 @@ public struct LiquidGlassSurface: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var resolvedOpacity: Double { reduceTransparency ? 1 : WidgetGlassOpacity.clamped(opacity) }
+    private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
     private var darkFilmOpacity: Double { WidgetGlassOpacity.darkFilmOpacity(resolvedOpacity) }
     private var darkGlassTintOpacity: Double { WidgetGlassOpacity.darkGlassTintOpacity(resolvedOpacity) }
 
@@ -418,7 +420,9 @@ public struct LiquidGlassSurface: View {
     private var innerRimWidth: CGFloat { CGFloat(0.5 + displacement * 2.5) }
 
     private var frostColor: Color {
-        (isLight ? Color.white : Color.black).opacity(blurAmount * (isLight ? 0.28 : 0.16))
+        // Haze density, not a private or simulated backdrop blur radius.
+        (isLight ? Color.white : Color(white: 0.28))
+            .opacity(optics.frostOpacity * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
     }
 
     private var toneOpacity: Double {
@@ -468,14 +472,16 @@ public struct LiquidGlassSurface: View {
     }
 
     private func chromaticEdge(shape: RoundedRectangle) -> some View {
-        let offset = CGFloat(dispersion * 3)
+        let offset = CGFloat(optics.edgeOffset)
+        let width = CGFloat(optics.edgeWidth)
+        let rim = shape.inset(by: offset + width / 2)
         return ZStack {
-            shape
-                .strokeBorder(.red.opacity(dispersion * 0.18), lineWidth: 0.65)
-                .offset(x: -offset)
-            shape
-                .strokeBorder(.cyan.opacity(dispersion * 0.18), lineWidth: 0.65)
-                .offset(x: offset)
+            rim
+                .strokeBorder(.red.opacity(optics.edgeOpacity), lineWidth: width)
+                .offset(x: -offset, y: offset * 0.4)
+            rim
+                .strokeBorder(.cyan.opacity(optics.edgeOpacity), lineWidth: width)
+                .offset(x: offset, y: -offset * 0.4)
         }
     }
 }

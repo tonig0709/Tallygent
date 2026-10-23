@@ -13,6 +13,24 @@ public enum GlassRefractionMode: String, Codable, CaseIterable, Identifiable, Se
     public var id: Self { self }
 }
 
+/// Shared visual response for the App preview and the native desktop surface.
+/// Frost is a haze overlay; macOS owns the actual backdrop blur radius.
+public struct GlassOptics: Sendable {
+    public let dispersionStrength: Double
+    public let edgeOffset: Double
+    public let edgeOpacity: Double
+    public let edgeWidth: Double
+    public let frostOpacity: Double
+
+    public init(blurAmount: Double, dispersion: Double) {
+        dispersionStrength = dispersion.isFinite ? min(1, max(0, dispersion / 0.30)) : 0
+        edgeOffset = 3 * dispersionStrength
+        edgeOpacity = 0.55 * dispersionStrength
+        edgeWidth = 0.7 + 1.3 * dispersionStrength
+        frostOpacity = 0.45 * (blurAmount.isFinite ? min(1, max(0, blurAmount)) : 0)
+    }
+}
+
 /// A target-neutral description of the glass surface. The app persists this
 /// alongside the quota snapshot; every panel uses the same persisted values.
 public struct GlassRenderSettings: Codable, Equatable, Sendable {

@@ -44,6 +44,25 @@ precondition(DesktopPanelMode.stored(in: modeDefaults) == .large)
 modeDefaults.removeObject(forKey: DesktopPanelMode.defaultsKey)
 precondition(SnapshotHTTPClient.endpoint.absoluteString == "http://127.0.0.1:48193/snapshot")
 
+let clearOptics = GlassOptics(blurAmount: 0, dispersion: 0)
+let fullOptics = GlassOptics(blurAmount: 1, dispersion: 0.30)
+precondition(clearOptics.dispersionStrength == 0 && clearOptics.edgeOffset == 0 && clearOptics.edgeOpacity == 0)
+precondition(clearOptics.frostOpacity == 0 && fullOptics.frostOpacity == 0.45)
+precondition(fullOptics.dispersionStrength == 1 && fullOptics.edgeOffset == 3 && fullOptics.edgeOpacity == 0.55)
+precondition(fullOptics.edgeWidth == 2, "color separation must remain visible at full strength")
+var previousOptics = clearOptics
+for step in 1...10 {
+    let amount = Double(step) / 10
+    let optics = GlassOptics(blurAmount: amount, dispersion: amount * 0.30)
+    precondition(optics.edgeOffset > previousOptics.edgeOffset && optics.edgeOpacity > previousOptics.edgeOpacity)
+    precondition(optics.edgeWidth > previousOptics.edgeWidth && optics.frostOpacity > previousOptics.frostOpacity)
+    previousOptics = optics
+}
+let invalidOptics = GlassOptics(blurAmount: .nan, dispersion: .infinity)
+precondition(invalidOptics.frostOpacity == 0 && invalidOptics.dispersionStrength == 0)
+precondition(GlassOptics(blurAmount: -1, dispersion: -1).edgeOpacity == 0)
+precondition(GlassOptics(blurAmount: 2, dispersion: 2).frostOpacity == fullOptics.frostOpacity)
+
 #if canImport(AppKit)
 @MainActor
 func render<V: View>(_ view: V, width: CGFloat, height: CGFloat) -> NSBitmapImageRep {
@@ -222,21 +241,47 @@ await MainActor.run {
         let after = render(QuotaPanelContent(mode: mode, snapshot: boundary, glassOpacity: 1), width: mode.size.width, height: mode.size.height)
         precondition(changedPixels(before, after, in: fullFrame) > 100, "\(mode.rawValue) panel ignores updated quota content")
     }
+    for snapshot in [boundary, boundaryLight] {
+        checkRender(
+            QuotaPanelContent(mode: .medium, snapshot: snapshot, glassOpacity: 0.35)
+                .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous)),
+            on: LiquidGlassSurface(isLight: snapshot.resolvedAppearance == .light, opacity: 0.35, accent: .blue, cornerRadius: 64),
+            width: 344,
+            height: 164,
+            label: "maximum-radius medium panel",
+            regions: [
+                ("5h quota", CGRect(x: 0.10, y: 0.34, width: 0.80, height: 0.23)),
+                ("weekly quota", CGRect(x: 0.10, y: 0.60, width: 0.80, height: 0.23))
+            ]
+        )
+    }
 
     let plainEdge = render(
-        LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, dispersion: 0),
+        LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, dispersion: 0)
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)),
         width: 240,
         height: 120
     )
     let dispersedEdge = render(
-        LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, dispersion: 0.3),
+        LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, dispersion: 0.3)
+            .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous)),
         width: 240,
         height: 120
     )
     precondition(
-        changedPixels(plainEdge, dispersedEdge, in: fullFrame) > 20,
-        "glass dispersion setting has no visible render effect"
+        changedPixels(plainEdge, dispersedEdge, in: fullFrame) > 100,
+        "glass dispersion is imperceptible or clipped outside the glass"
     )
+    let interior = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+    precondition(changedPixels(plainEdge, dispersedEdge, in: interior) == 0, "edge color separation tints panel content")
+    for isLight in [false, true] {
+        let clear = render(LiquidGlassSurface(isLight: isLight, opacity: 0.35, accent: .blue, blurAmount: 0), width: 240, height: 120)
+        let frosted = render(LiquidGlassSurface(isLight: isLight, opacity: 0.35, accent: .blue, blurAmount: 1), width: 240, height: 120)
+        precondition(changedPixels(clear, frosted, in: interior) > 1_000, "frost-depth control has no visible interior haze effect")
+        let opaque = render(LiquidGlassSurface(isLight: isLight, opacity: 1, accent: .blue, blurAmount: 0), width: 240, height: 120)
+        let opaqueFrosted = render(LiquidGlassSurface(isLight: isLight, opacity: 1, accent: .blue, blurAmount: 1), width: 240, height: 120)
+        precondition(changedPixels(opaque, opaqueFrosted, in: interior) == 0, "frost changes the fully opaque surface tone")
+    }
 
     let tightCorner = render(
         LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, cornerRadius: 10),
@@ -322,7 +367,6 @@ await MainActor.run {
         width: 240,
         height: 120
     )
-    let interior = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
     precondition(changedPixels(weakEdge, strongEdge, in: interior) == 0, "glass edge strength changes the interior tone")
 
 }

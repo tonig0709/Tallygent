@@ -2,8 +2,8 @@
 set -eu
 cd "$(dirname "$0")/.."
 # Keep the official bundled binary in the shared discovery path.
-rg -q '"/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"' App/CodexAppServer.swift
-rg -q '"/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"' App/CodexAppServer.swift
+grep -Fq '"/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex"' App/CodexAppServer.swift
+grep -Fq '"/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex"' App/CodexAppServer.swift
 python3 - <<'PY'
 from pathlib import Path
 source = Path('App/CodexAppServer.swift').read_text()

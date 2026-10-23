@@ -80,3 +80,7 @@ publishing that draft:
       verify the window moves, then close using X. Reopen it, confirm settings
       still respond, and close using the menu-bar action. Closing the panel must
       not quit the App or stop widget synchronization.
+- [ ] Move the pointer into the panel center and outside the panel: no native
+      title-bar strip, traffic-light buttons, or extra empty window area may
+      remain. Move to each edge to reveal controls, open settings, and verify
+      controls stay visible while the popover is open.

@@ -19,16 +19,28 @@ struct CodexQuotaApp: App {
         }
         .windowResizability(.contentSize)
 
-        Window("Codex Quota 桌面玻璃面板", id: DesktopGlassPanelView.windowID) {
-            DesktopGlassPanelView(server: server)
-        }
-        .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
+        desktopPanelScene
 
         MenuBarExtra("Codex Quota", image: "CodexMark") {
             CodexQuotaMenuBarContent(server: server, menuSummary: menuSummary)
         }
+    }
+
+    @SceneBuilder
+    private var desktopPanelScene: some Scene {
+        if #available(macOS 15.0, *) {
+            desktopPanelWindow.windowStyle(.plain)
+        } else {
+            desktopPanelWindow.windowStyle(.hiddenTitleBar)
+        }
+    }
+
+    private var desktopPanelWindow: some Scene {
+        Window("Codex Quota 桌面玻璃面板", id: DesktopGlassPanelView.windowID) {
+            DesktopGlassPanelView(server: server)
+        }
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
     }
 
     private var menuSummary: String {

@@ -66,6 +66,13 @@ struct DesktopPanelProbe {
                 precondition(window.forwardedEvent === event, "body drag lost the original mouse event")
             }
             precondition(dragRegion.hitTest(NSPoint(x: 1, y: 1)) == nil, "transparent corners intercept desktop clicks")
+            let outline = RoundedRectangle(cornerRadius: 64, style: .continuous).path(in: dragRegion.bounds)
+            for x in stride(from: 0.0, through: 64.0, by: 8) {
+                for y in stride(from: 0.0, through: 64.0, by: 8) {
+                    let point = NSPoint(x: x, y: y)
+                    precondition((dragRegion.hitTest(point) != nil) == outline.contains(point), "drag hit area differs from the visible continuous corner")
+                }
+            }
         }
         window.close()
         let controller = DesktopPanelController.shared

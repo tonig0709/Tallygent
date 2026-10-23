@@ -65,7 +65,6 @@ struct DesktopGlassPanelView: View {
                 // The content is read-only; native window dragging can cover it all.
                 // Controls below remain above this layer and keep their own clicks.
                 DesktopPanelDragRegion(cornerRadius: cornerRadius)
-                    .help("按住面板任意位置拖动")
             }
             .overlay(alignment: .topLeading) {
                 Button(action: closePanel) {
@@ -197,7 +196,7 @@ struct DesktopPanelDragRegion: NSViewRepresentable {
             let local = convert(point, from: superview)
             let radius = min(CGFloat(cornerRadius), min(bounds.width, bounds.height) / 2)
             // Transparent rounded corners must not intercept desktop clicks.
-            return NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).contains(local) ? self : nil
+            return RoundedRectangle(cornerRadius: radius, style: .continuous).path(in: bounds).contains(local) ? self : nil
         }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func resetCursorRects() {

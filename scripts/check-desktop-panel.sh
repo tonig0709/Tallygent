@@ -8,7 +8,7 @@ if [ -f App/GlassSettingsView.swift ]; then
     set -- -D CODEX_QUOTA_ADVANCED_GLASS App/GlassSettingsView.swift
 fi
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
-    "$@" Gate/DesktopPanelProbe.swift App/DesktopGlassPanelView.swift \
+    "$@" Gate/DesktopPanelProbe.swift App/DesktopGlassPanelView.swift App/DashboardView.swift \
     Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
     -framework AppKit -framework Charts -framework SwiftUI \
     -o "$probe_dir/panel-probe"

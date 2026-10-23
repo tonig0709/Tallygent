@@ -4,7 +4,7 @@
 
 Native, movable glass panels for your Codex quota. One desktop panel, three layouts, shared live controls.
 
-> **版本提示：此首页介绍新的面板开发版（build 38，尚未发布 Release）。**
+> **版本提示：此首页介绍新的面板开发版（build 39，尚未发布 Release）。**
 > [当前公开正式版 v0.5.1](https://github.com/tonig0709/codex-quota-widget/releases/tag/v0.5.1) 仍是旧的小组件版本，不包含下述三尺寸面板。
 > v0.5.6 目前是草稿，不是面向所有用户的公开下载。请勿把旧 DMG 当作本次更新的安装包。
 

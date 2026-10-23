@@ -16,7 +16,7 @@ struct DashboardView: View {
     @AppStorage(GlassSettingKeys.refractionMode) private var refractionModeRaw = GlassRefractionMode.standard.rawValue
     @State private var showsGlassInspector = true
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
-    @State private var selectedMode: DesktopPanelMode? = .stored()
+    @State private var selectedMode: DesktopPanelMode?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -35,12 +35,13 @@ struct DashboardView: View {
                     .accessibilityLabel("下一个面板")
                     .disabled(mode == .large)
             }
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
-                    ForEach(DesktopPanelMode.allCases) { page in
-                        QuotaPanelContent(mode: page, snapshot: previewSnapshot, glassOpacity: glassOpacity)
-                            .frame(width: page.size.width, height: page.size.height)
-                            .background {
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        ForEach(DesktopPanelMode.allCases) { page in
+                            QuotaPanelContent(mode: page, snapshot: previewSnapshot, glassOpacity: glassOpacity)
+                                .frame(width: page.size.width, height: page.size.height)
+                                .background {
                                 LiquidGlassSurface(
                                     isLight: isLight,
                                     opacity: glassOpacity,
@@ -55,16 +56,21 @@ struct DashboardView: View {
                                     saturation: saturation,
                                     refractionMode: refractionMode
                                 )
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
-                            .frame(width: 680, height: 300)
-                            .id(page)
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
+                                .frame(width: 680, height: 300)
+                                .id(page)
+                        }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollTargetBehavior(.viewAligned)
+                .scrollPosition(id: $selectedMode)
+                .onAppear {
+                    selectedMode = mode
+                    proxy.scrollTo(mode, anchor: .center)
+                }
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollPosition(id: $selectedMode)
             .frame(width: 680, height: 300)
 
             HStack(spacing: 16) {
@@ -110,7 +116,7 @@ struct DashboardView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .padding(24)
-        .frame(minWidth: 730, minHeight: 400)
+        .frame(minWidth: 730, minHeight: 560)
         .inspector(isPresented: $showsGlassInspector) {
             ScrollView {
                 GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings)

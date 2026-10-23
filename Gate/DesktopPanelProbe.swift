@@ -4,7 +4,12 @@ import SwiftUI
 // No account connection or persistent settings are needed for this window probe.
 @MainActor
 final class CodexAppServer: ObservableObject {
+    enum State: Equatable {
+        case disconnected, connecting, signingIn, connected(String?), failed(String)
+    }
+    @Published var state = State.connected(nil)
     @Published var snapshot = UsageSnapshot.placeholder
+    func connect() {}
     func refresh() {}
     #if CODEX_QUOTA_ADVANCED_GLASS
     func updateGlassSettings(_ settings: GlassRenderSettings) {}
@@ -67,6 +72,24 @@ struct DesktopPanelProbe {
         controller.show(server: server)
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
+        let dashboard = NSHostingView(rootView: DashboardView(server: server))
+        dashboard.frame = NSRect(x: 0, y: 0, width: 1030, height: 560)
+        let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        dashboardWindow.isReleasedWhenClosed = false
+        dashboardWindow.contentView = dashboard
+        dashboardWindow.makeKeyAndOrderFront(nil)
+        dashboard.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+        func scrollViews(in view: NSView) -> [NSScrollView] {
+            (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
+        }
+        guard let gallery = scrollViews(in: dashboard).first(where: { ($0.documentView?.frame.width ?? 0) > 1800 }) else {
+            preconditionFailure("native panel gallery scroll view is missing")
+        }
+        let expectedOffset = CGFloat(DesktopPanelMode.allCases.firstIndex(of: .stored())!) * 680
+        precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 2, "initial gallery page does not match the persisted panel mode")
+        precondition(dashboard.fittingSize.height >= 560, "restored dashboard height clips panel selector controls")
+        dashboardWindow.close()
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 }

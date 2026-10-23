@@ -21,6 +21,9 @@ Local non-destructive checks are `swift run quota-self-check` and `./scripts/che
   Small reuses both quota rings, medium omits the trend, large retains it.
 - **One panel:** repeated show calls do not create a second window; close/reopen works.
   Resizing preserves the top-left position, accepts keyboard focus, and keeps the panel below normal apps but above Finder.
+- **Selector restoration:** a hosted production Dashboard must position its native scroll
+  view on the persisted mode, not just mark a mode button selected. Its minimum height
+  must accommodate the complete selector and action row after restoring an old window.
 - **Non-black content:** all three layouts × light/dark × minimum/maximum opacity are
   compared against their empty glass surface, including individual quota/trend regions.
   Solid-black negative controls must fail. Updated quota snapshots must change every layout.

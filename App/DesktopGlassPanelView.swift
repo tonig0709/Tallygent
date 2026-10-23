@@ -23,7 +23,6 @@ struct DesktopGlassPanelView: View {
     @State private var isHovering = false
     @State private var showsChrome = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.dismissWindow) private var dismissWindow
 
     private var panelSnapshot: UsageSnapshot {
         var value = server.snapshot
@@ -132,7 +131,7 @@ struct DesktopGlassPanelView: View {
 
     private func closePanel() {
         showsControls = false
-        dismissWindow(id: Self.windowID)
+        DesktopPanelController.shared.close()
     }
 
     private var glassTone: GlassTone {
@@ -422,8 +421,13 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        // Fill the native title-bar area instead of leaving an empty frame above glass.
+        // Remove title-bar layout as well as paint; the panel subclass provides focus.
+        window.styleMask.remove(.titled)
         window.styleMask.insert(.fullSizeContentView)
+        let size = NSSize(width: 680, height: 300)
+        window.contentMinSize = size
+        window.contentMaxSize = size
+        if window.frame.size != size { window.setContentSize(size) }
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window.standardWindowButton(button)?.isHidden = true
         }
@@ -432,4 +436,40 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.invalidateShadow()
     }
+}
+
+@MainActor
+final class DesktopPanelController {
+    static let shared = DesktopPanelController()
+    private var panel: DesktopGlassWindow?
+
+    func show(server: CodexAppServer) {
+        if panel == nil {
+            let window = DesktopGlassWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 680, height: 300),
+                styleMask: [.borderless], backing: .buffered, defer: false
+            )
+            window.title = "Codex Quota 桌面玻璃面板"
+            window.identifier = NSUserInterfaceItemIdentifier(DesktopGlassPanelView.windowID)
+            window.isReleasedWhenClosed = false
+            window.hidesOnDeactivate = false
+            window.contentView = NSHostingView(rootView: DesktopGlassPanelView(server: server))
+            if !window.setFrameUsingName(DesktopGlassPanelView.windowID) { window.center() }
+            DesktopPanelWindowConfigurator().configure(window)
+            window.setFrameAutosaveName(DesktopGlassPanelView.windowID)
+            panel = window
+        }
+        panel?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func close() {
+        panel?.close()
+        panel = nil
+    }
+}
+
+class DesktopGlassWindow: NSPanel {
+    override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { false }
 }

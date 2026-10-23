@@ -19,28 +19,9 @@ struct CodexQuotaApp: App {
         }
         .windowResizability(.contentSize)
 
-        desktopPanelScene
-
         MenuBarExtra("Codex Quota", image: "CodexMark") {
             CodexQuotaMenuBarContent(server: server, menuSummary: menuSummary)
         }
-    }
-
-    @SceneBuilder
-    private var desktopPanelScene: some Scene {
-        if #available(macOS 15.0, *) {
-            desktopPanelWindow.windowStyle(.plain)
-        } else {
-            desktopPanelWindow.windowStyle(.hiddenTitleBar)
-        }
-    }
-
-    private var desktopPanelWindow: some Scene {
-        Window("Codex Quota 桌面玻璃面板", id: DesktopGlassPanelView.windowID) {
-            DesktopGlassPanelView(server: server)
-        }
-        .windowResizability(.contentSize)
-        .defaultPosition(.center)
     }
 
     private var menuSummary: String {
@@ -52,8 +33,6 @@ struct CodexQuotaApp: App {
 private struct CodexQuotaMenuBarContent: View {
     @ObservedObject var server: CodexAppServer
     let menuSummary: String
-    @Environment(\.openWindow) private var openWindow
-    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         if WidgetRepairService.requiresInstalledCopy {
@@ -65,11 +44,10 @@ private struct CodexQuotaMenuBarContent: View {
             Button("立即刷新") { server.refresh() }
             Button("修复桌面小组件") { WidgetRepairService.repair() }
             Button("打开桌面玻璃面板") {
-                openWindow(id: DesktopGlassPanelView.windowID)
-                NSApp.activate(ignoringOtherApps: true)
+                DesktopPanelController.shared.show(server: server)
             }
             Button("关闭桌面玻璃面板") {
-                dismissWindow(id: DesktopGlassPanelView.windowID)
+                DesktopPanelController.shared.close()
             }
         }
         Divider()

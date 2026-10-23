@@ -15,6 +15,6 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
 "$probe_dir/panel-probe"
 # Actual WindowServer dragging/closing still needs the desktop smoke test.
 grep -q 'Button(action: closePanel)' App/DesktopGlassPanelView.swift
-grep -q 'dismissWindow(id: Self.windowID)' App/DesktopGlassPanelView.swift
+grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift
 grep -q 'Button("关闭桌面玻璃面板")' App/CodexQuotaApp.swift
-grep -q 'desktopPanelWindow.windowStyle(.plain)' App/CodexQuotaApp.swift
+grep -q 'window.styleMask.remove(.titled)' App/DesktopGlassPanelView.swift

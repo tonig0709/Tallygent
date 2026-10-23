@@ -23,6 +23,9 @@ struct DesktopPanelProbe {
         window.isReleasedWhenClosed = false
         DesktopPanelWindowConfigurator().configure(window)
         precondition(window.styleMask.contains(.fullSizeContentView), "native title bar leaves a permanent strip above the glass")
+        precondition(!window.styleMask.contains(.titled), "native title-bar reservation is still present")
+        precondition(window.frame.size == NSSize(width: 680, height: 300), "panel has extra empty area outside glass")
+        precondition(window.canBecomeKey, "borderless panel cannot receive keyboard focus")
         let size = CGSize(width: 680, height: 300)
         precondition(!DesktopGlassPanelView.isNearEdge(CGPoint(x: 340, y: 150), size: size), "chrome stays visible at panel center")
         for point in [CGPoint(x: 5, y: 150), CGPoint(x: 675, y: 150), CGPoint(x: 340, y: 5), CGPoint(x: 340, y: 295)] {
@@ -50,7 +53,7 @@ struct DesktopPanelProbe {
 }
 
 @MainActor
-private final class DragProbeWindow: NSWindow {
+private final class DragProbeWindow: DesktopGlassWindow {
     var forwardedEvent: NSEvent?
     override func performDrag(with event: NSEvent) { forwardedEvent = event }
 }

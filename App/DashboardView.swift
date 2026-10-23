@@ -2,7 +2,6 @@ import SwiftUI
 
 struct DashboardView: View {
     @ObservedObject var server: CodexAppServer
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
@@ -51,7 +50,7 @@ struct DashboardView: View {
                     showsGlassInspector.toggle()
                 }
                 Button("桌面玻璃面板") {
-                    openWindow(id: DesktopGlassPanelView.windowID)
+                    DesktopPanelController.shared.show(server: server)
                 }
                 .help("打开一个独立透明、不会改变其他图标外观的桌面面板")
                 Button("刷新") { server.refresh() }

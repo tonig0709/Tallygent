@@ -1,86 +1,62 @@
-# Release checklist
+# Release checklist — panel-only product
 
-Every push and pull request, every version tag, and the final signed release
-payload run the same gate:
+The user requested removal of WidgetKit in favor of three movable desktop panel modes.
+The project must build only the App target; legacy extension bundles and AppIntent metadata must not ship.
+
+Every push/PR, version tag and final signed payload runs:
 
 ```sh
 CODEX_QUOTA_ISOLATED_REGISTRY=1 \
   ./scripts/release-preflight.sh "/path/to/Codex Quota.app" "/path/to/Codex-Quota.dmg"
 ```
 
-The full gate intentionally mutates the current user's PlugInKit registry. Run
-it only in a clean CI user with no existing Codex Quota registration. Local
-development can run the non-destructive parser and render checks with
-`swift run quota-self-check`.
+Run the full gate only in an isolated CI user: it installs a temporary candidate,
+launches a deterministic fake account server and reserves the local snapshot port.
+It must never mutate a real user's PlugInKit registry.
+Local non-destructive checks are `swift run quota-self-check` and `./scripts/check-desktop-panel.sh`.
 
-The gate blocks release unless all of these pass:
+## Automated gate
 
-- **Widget discovery:** the gate seeds an enabled lower-version/build registration,
-  launches the installed candidate without registering it from the script, and
-  requires the App to remove only the verified obsolete extension path and elect
-  exactly one enabled current extension. The newer-build decision branch is
-  checked to return before every app-controlled registration write; macOS may
-  independently elect an App when its executable is launched. AppIntent metadata, both
-  sizes, assets, ATS, and signed network entitlements are checked on the built
-  extension.
-- **No black or blank widget:** SwiftUI renders small/large × light/dark into
-  all eight family × appearance × opacity-boundary bitmaps. Each result is
-  compared with the same empty glass background, including separate quota and
-  trend regions; a solid-black negative control must fail the same readable-
-  contrast predicate, so a visible border or black surface cannot pass.
-- **Live synchronization:** a deterministic fake Codex app-server proves the
-  full initialize/account/rate-limit/usage path, a deliberately delayed trend
-  response plus a refresh notification while work is in flight, forced port-
-  collision recovery, candidate process ownership of the bridge, and A→B→C
-  refresh of 5h, weekly, and seven-day data. C deliberately omits trend data to
-  prove quota liveness without erasing B's valid trend. An unchanged follow-up
-  proves polling cannot invalidate the widget editor, and configuration
-  snapshots use the immediate cache instead of waiting on the live bridge. The
-  production `CodexQuotaProvider` is compiled into the probe and executed
-  against A, B, and C, including its default HTTP endpoint, cache prevention,
-  unexpected-route rejection, and identity removal.
-- **Update safety:** the bundle build is greater than every existing release
-  tag; temporary DMG/build copies cannot run registration repair or occupy
-  port 48193.
-- **Release artifact:** app/widget signatures and `arm64` + `x86_64` slices are
-  valid. After any notarization/stapling mutation, the DMG is verified and its
-  App paths, link targets, permission modes, and file bytes must equal the exact
-  candidate that passed the gate. Both mounted executables and the two-
-  architecture slices are checked again.
+- **Three layouts:** small 164×164, medium 344×164 and existing large 680×300 logical points.
+  Small reuses both quota rings, medium omits the trend, large retains it.
+- **One panel:** repeated show calls do not create a second window; close/reopen works.
+  Resizing preserves the top-left position, accepts keyboard focus, and keeps the panel below normal apps but above Finder.
+- **Non-black content:** all three layouts × light/dark × minimum/maximum opacity are
+  compared against their empty glass surface, including individual quota/trend regions.
+  Solid-black negative controls must fail. Updated quota snapshots must change every layout.
+- **Shared settings:** opacity boundaries, thresholds, settings serialization and visible
+  optical parameter changes remain covered. Mode selection has a safe large-mode fallback.
+- **Live data:** fake Codex A→B→C data proves initialization, account read, notifications,
+  delayed and queued refreshes, quota progress despite missing trend, preservation of
+  last valid trend, unchanged snapshot stability and port-collision recovery.
+  Every mode renders the production snapshot client output. Identity is removed from the local endpoint.
+- **Update safety:** non-installed copies cannot connect an account or occupy the local port.
+  Tagged builds are monotonic and match their marketing version.
+- **Exact artifact:** full Xcode universal arm64+x86_64 build, valid app signature,
+  original Codex icon, no embedded extension, no old widget intents, verified DMG,
+  correct Applications shortcut, no unexpected payloads, and identical app bytes/modes.
 
-The push/PR workflow and the tag workflow's required preflight both run this
-behavioral gate on macOS 14, macOS 15, and macOS 26. Universal slices are built
-and inspected on every runner; runtime behavior is executed on each runner's native
-CPU architecture.
+CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
 
-## Final desktop smoke test
+## Required real-desktop smoke test before publishing
 
-The tag workflow now creates a **draft** Release. Automated checks use Apple's
-registration database and off-screen rendering, but a headless GitHub runner
-cannot click the widget gallery or inspect the live desktop compositor. Before
-publishing that draft:
-
-- [ ] Remove every existing **Codex Quota** desktop widget and prior test build,
-      drag the new app into **Applications**, eject the DMG, and launch only
-      that copy.
-- [ ] Open **Edit Widgets**, search **Codex Quota**, and add both **小型** and
-      **大型**.
-- [ ] Confirm neither size is black or blank in light and dark appearance.
-- [ ] Edit both sizes, enter opacity values `0.35`, `0.44`, and `1.00`, and
-      confirm the configuration sheet remains loaded after each change.
-- [ ] In dark appearance over a colorful wallpaper, confirm `0.35` visibly
-      transmits the wallpaper's colors/details while text stays readable, and
-      `1.00` remains uniformly near-black. A gray opaque `0.35` is a failure.
-- [ ] Confirm the small widget shows separate 5h and weekly rings and the large
-      widget shows 5h above weekly quota.
-- [ ] Generate new Codex usage and confirm quota plus seven-day trend update
-      within one minute.
-- [ ] Only after every item passes, publish the draft Release on GitHub.
-- [ ] Open the desktop glass panel while Finder is active; drag its top strip,
-      verify the window moves, then close using X. Reopen it, confirm settings
-      still respond, and close using the menu-bar action. Closing the panel must
-      not quit the App or stop widget synchronization.
-- [ ] Move the pointer into the panel center and outside the panel: no native
-      title-bar strip, traffic-light buttons, or extra empty window area may
-      remain. Move to each edge to reveal controls, open settings, and verify
-      controls stay visible while the popover is open.
+- [ ] Install only the checked candidate in Applications; eject its DMG.
+- [ ] In the App, swipe left/right through all three modes, including a fast reversal.
+      Arrows and mode-name buttons must also work; reduced motion must remain usable.
+- [ ] Open the desktop panel, repeatedly switch modes, and verify exactly one panel remains.
+      Dimensions match the table, no native title bar/extra blank area appears, and its top-left position stays fixed.
+- [ ] Confirm small dual rings, medium two bars without a trend, and the unchanged large layout.
+- [ ] In every mode, test dark/light and opacity 0.35, 0.44 and 1.00 without crashes or blank content.
+      At 0.35, wallpaper must remain visible; 1.00 dark must stay near-black.
+- [ ] Adjust all sliders in the App and in the panel popover. The placed panel follows continuously;
+      mode changes preserve all current values.
+- [ ] With Finder active, reveal edge controls, drag the top region, close with X, reopen,
+      and close via the menu bar. Moving to the center/outside hides chrome.
+      Controls stay available while the settings popover is open.
+- [ ] Generate usage; verify 5h, weekly and large-panel trend refresh within the expected polling cycle.
+      Closing a panel must not stop the App's connection.
+- [ ] Verify the installed bundle contains no WidgetKit extension. Old desktop widgets are manually removed;
+      do not clear global system caches.
+- [ ] Homepage/download instructions clearly identify which published DMG contains this panel-only product.
+      Do not advertise a draft or older widget release as the new build.
+- [ ] Publish the draft only after all checks above pass.

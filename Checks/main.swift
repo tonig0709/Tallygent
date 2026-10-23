@@ -33,8 +33,15 @@ precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.minimum) == 0
 precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.maximum) == 0.94)
 precondition(WidgetGlassOpacity.darkFilmOpacity(0.5) < WidgetGlassOpacity.darkFilmOpacity(0.86))
 precondition(UsageSnapshot.placeholder.resolvedAppearance == .dark)
-precondition(SnapshotStore.smallWidgetKind == "dev.codexquota.widget.small.v5")
-precondition(SnapshotStore.largeWidgetKind == "dev.codexquota.widget.large.v5")
+precondition(DesktopPanelMode.small.size == CGSize(width: 164, height: 164))
+precondition(DesktopPanelMode.medium.size == CGSize(width: 344, height: 164))
+precondition(DesktopPanelMode.large.size == CGSize(width: 680, height: 300))
+precondition(DesktopPanelMode.small.size.height == DesktopPanelMode.medium.size.height)
+let modeDefaults = UserDefaults(suiteName: "dev.codexquota.mode-check.\(UUID().uuidString)")!
+precondition(DesktopPanelMode.stored(in: modeDefaults) == .large)
+modeDefaults.set("invalid", forKey: DesktopPanelMode.defaultsKey)
+precondition(DesktopPanelMode.stored(in: modeDefaults) == .large)
+modeDefaults.removeObject(forKey: DesktopPanelMode.defaultsKey)
 precondition(SnapshotHTTPClient.endpoint.absoluteString == "http://127.0.0.1:48193/snapshot")
 
 #if canImport(AppKit)
@@ -172,22 +179,20 @@ await MainActor.run {
 
     for appearance in appearances {
         for opacity in opacities {
-            checkRender(
-                QuotaRingWidgetView(snapshot: appearance.snapshot, glassOpacity: opacity.value),
-                on: LiquidGlassSurface(isLight: appearance.isLight, opacity: opacity.value, accent: .green),
-                width: 164,
-                height: 164,
-                label: "small \(appearance.name) \(opacity.name)-opacity widget",
-                regions: smallRegions
-            )
-            checkRender(
-                QuotaWidgetView(snapshot: appearance.snapshot, glassOpacity: opacity.value),
-                on: LiquidGlassSurface(isLight: appearance.isLight, opacity: opacity.value, accent: .blue),
-                width: 704,
-                height: 344,
-                label: "large \(appearance.name) \(opacity.name)-opacity widget",
-                regions: largeRegions
-            )
+            for mode in DesktopPanelMode.allCases {
+                let regions = mode == .small ? smallRegions : mode == .large ? largeRegions : [
+                    ("5h quota", CGRect(x: 0.06, y: 0.30, width: 0.88, height: 0.28)),
+                    ("weekly quota", CGRect(x: 0.06, y: 0.59, width: 0.88, height: 0.28))
+                ]
+                checkRender(
+                    QuotaPanelContent(mode: mode, snapshot: appearance.snapshot, glassOpacity: opacity.value),
+                    on: LiquidGlassSurface(isLight: appearance.isLight, opacity: opacity.value, accent: .blue),
+                    width: mode.size.width,
+                    height: mode.size.height,
+                    label: "\(mode.rawValue) \(appearance.name) \(opacity.name)-opacity panel",
+                    regions: regions
+                )
+            }
         }
     }
 
@@ -210,6 +215,13 @@ await MainActor.run {
     let fullFrame = CGRect(x: 0, y: 0, width: 1, height: 1)
     precondition(!hasReadableContrast(solidSmall, in: fullFrame), "solid-black small-widget negative control passed")
     precondition(!hasReadableContrast(solidLarge, in: fullFrame), "solid-black large-widget negative control passed")
+    let solidMedium = render(Color.black, width: 344, height: 164)
+    precondition(!hasReadableContrast(solidMedium, in: fullFrame), "solid-black medium-panel negative control passed")
+    for mode in DesktopPanelMode.allCases {
+        let before = render(QuotaPanelContent(mode: mode, snapshot: emptyDark, glassOpacity: 1), width: mode.size.width, height: mode.size.height)
+        let after = render(QuotaPanelContent(mode: mode, snapshot: boundary, glassOpacity: 1), width: mode.size.width, height: mode.size.height)
+        precondition(changedPixels(before, after, in: fullFrame) > 100, "\(mode.rawValue) panel ignores updated quota content")
+    }
 
     let plainEdge = render(
         LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, dispersion: 0),

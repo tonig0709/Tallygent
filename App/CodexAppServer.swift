@@ -2,7 +2,6 @@ import AppKit
 import Combine
 import Foundation
 import Network
-import WidgetKit
 
 private final class SnapshotServer: @unchecked Sendable {
     static let port: NWEndpoint.Port = 48_193
@@ -91,7 +90,6 @@ final class CodexAppServer: ObservableObject {
     private var pendingRefresh: PendingRefresh?
     private var refreshQueued = false
     private var refreshTimeout: DispatchWorkItem?
-    private var glassReloadWorkItem: DispatchWorkItem?
     private var nextRequestID = 3
     private let snapshotServer = SnapshotServer()
 
@@ -238,13 +236,6 @@ final class CodexAppServer: ObservableObject {
         snapshot.appearance = settings.appearance
         SnapshotStore.save(snapshot)
         snapshotServer.start()
-        glassReloadWorkItem?.cancel()
-        let reload = DispatchWorkItem {
-            WidgetCenter.shared.reloadTimelines(ofKind: SnapshotStore.smallWidgetKind)
-            WidgetCenter.shared.reloadTimelines(ofKind: SnapshotStore.largeWidgetKind)
-        }
-        glassReloadWorkItem = reload
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: reload)
     }
 
     private func consume(_ data: Data) {
@@ -329,8 +320,6 @@ final class CodexAppServer: ObservableObject {
         if markDataRefresh { snapshot.updatedAt = .now }
         SnapshotStore.save(snapshot)
         snapshotServer.start()
-        WidgetCenter.shared.reloadTimelines(ofKind: SnapshotStore.smallWidgetKind)
-        WidgetCenter.shared.reloadTimelines(ofKind: SnapshotStore.largeWidgetKind)
     }
 
     private func commitPendingRefreshIfReady() {

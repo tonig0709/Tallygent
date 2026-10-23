@@ -14,8 +14,7 @@ public enum GlassRefractionMode: String, Codable, CaseIterable, Identifiable, Se
 }
 
 /// A target-neutral description of the glass surface. The app persists this
-/// alongside the quota snapshot so an already-placed WidgetKit instance reads
-/// the same values without relying on process-local UserDefaults.
+/// alongside the quota snapshot; every panel uses the same persisted values.
 public struct GlassRenderSettings: Codable, Equatable, Sendable {
     public var appearance: WidgetAppearance
     public var opacity: Double
@@ -207,10 +206,6 @@ public enum SnapshotHTTPClient {
 }
 
 public enum SnapshotStore {
-    // A new kind is required when the configuration intent identity changes.
-    // Otherwise existing desktop instances keep editing the cached V3 schema.
-    public static let smallWidgetKind = "dev.codexquota.widget.small.v5"
-    public static let largeWidgetKind = "dev.codexquota.widget.large.v5"
     private static let key = "usageSnapshot"
 
     public static func load(defaults: UserDefaults = sharedDefaults) -> UsageSnapshot {

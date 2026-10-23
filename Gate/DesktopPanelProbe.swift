@@ -26,6 +26,13 @@ struct DesktopPanelProbe {
         precondition(!window.styleMask.contains(.titled), "native title-bar reservation is still present")
         precondition(window.frame.size == NSSize(width: 680, height: 300), "panel has extra empty area outside glass")
         precondition(window.canBecomeKey, "borderless panel cannot receive keyboard focus")
+        let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
+        for mode in DesktopPanelMode.allCases {
+            DesktopPanelWindowConfigurator(size: mode.size).configure(window)
+            precondition(window.frame.size == mode.size, "selected mode does not resize the native panel")
+            precondition(window.frame.minX == topLeft.x && window.frame.maxY == topLeft.y, "mode change moved the panel anchor")
+            precondition(!DesktopGlassPanelView.isNearEdge(CGPoint(x: mode.size.width / 2, y: mode.size.height / 2), size: mode.size), "compact panel chrome never hides")
+        }
         let size = CGSize(width: 680, height: 300)
         precondition(!DesktopGlassPanelView.isNearEdge(CGPoint(x: 340, y: 150), size: size), "chrome stays visible at panel center")
         for point in [CGPoint(x: 5, y: 150), CGPoint(x: 675, y: 150), CGPoint(x: 340, y: 5), CGPoint(x: 340, y: 295)] {
@@ -48,6 +55,18 @@ struct DesktopPanelProbe {
         dragRegion.mouseDown(with: event)
         precondition(window.forwardedEvent === event, "header does not forward the original mouse event to native window dragging")
         window.close()
+        let controller = DesktopPanelController.shared
+        let server = CodexAppServer()
+        controller.show(server: server)
+        let first = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+        controller.show(server: server)
+        precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1, "show created a second desktop panel")
+        precondition(controller.isVisible, "desktop panel did not open")
+        controller.close()
+        precondition(!first.isVisible && !controller.isVisible, "close left the desktop panel visible")
+        controller.show(server: server)
+        precondition(controller.isVisible, "desktop panel failed to reopen")
+        controller.close()
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 }

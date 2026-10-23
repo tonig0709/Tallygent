@@ -6,6 +6,7 @@ struct DesktopGlassPanelView: View {
     static let windowID = "desktop-glass-panel"
 
     @ObservedObject var server: CodexAppServer
+    @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
@@ -30,9 +31,11 @@ struct DesktopGlassPanelView: View {
         return value
     }
 
+    private var mode: DesktopPanelMode { DesktopPanelMode(rawValue: modeRaw) ?? .large }
+
     var body: some View {
-        QuotaWidgetView(snapshot: panelSnapshot, glassOpacity: glassOpacity)
-            .frame(width: 680, height: 300)
+        QuotaPanelContent(mode: mode, snapshot: panelSnapshot, glassOpacity: glassOpacity)
+            .frame(width: mode.size.width, height: mode.size.height)
             .background {
                 DesktopGlassSurface(
                     isLight: isLight,
@@ -101,7 +104,7 @@ struct DesktopGlassPanelView: View {
             .onContinuousHover(perform: updateHover)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsChrome)
             .onDisappear { showsChrome = false }
-            .background(DesktopPanelWindowConfigurator())
+            .background(DesktopPanelWindowConfigurator(size: mode.size))
             .ignoresSafeArea()
     }
 
@@ -149,11 +152,11 @@ struct DesktopGlassPanelView: View {
     private func updateHover(_ phase: HoverPhase) {
         switch phase {
         case .active(let location):
-            showsChrome = Self.isNearEdge(location, size: CGSize(width: 680, height: 300))
+            showsChrome = Self.isNearEdge(location, size: mode.size)
             isHovering = true
             hoverVector = CGSize(
-                width: min(1, max(-1, location.x / 340 - 1)),
-                height: min(1, max(-1, location.y / 150 - 1))
+                width: min(1, max(-1, location.x / mode.size.width * 2 - 1)),
+                height: min(1, max(-1, location.y / mode.size.height * 2 - 1))
             )
         case .ended:
             showsChrome = false
@@ -401,6 +404,7 @@ private struct DesktopVisualEffectView: NSViewRepresentable {
 }
 
 struct DesktopPanelWindowConfigurator: NSViewRepresentable {
+    var size = DesktopPanelMode.large.size
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async { configure(view.window) }
@@ -424,10 +428,15 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         // Remove title-bar layout as well as paint; the panel subclass provides focus.
         window.styleMask.remove(.titled)
         window.styleMask.insert(.fullSizeContentView)
-        let size = NSSize(width: 680, height: 300)
+        if window.frame.size != size {
+            let topLeft = NSPoint(x: window.frame.minX, y: window.frame.maxY)
+            window.contentMinSize = .zero
+            window.contentMaxSize = NSSize(width: 10_000, height: 10_000)
+            window.setContentSize(size)
+            window.setFrameTopLeftPoint(topLeft)
+        }
         window.contentMinSize = size
         window.contentMaxSize = size
-        if window.frame.size != size { window.setContentSize(size) }
         for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
             window.standardWindowButton(button)?.isHidden = true
         }
@@ -442,11 +451,13 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
 final class DesktopPanelController {
     static let shared = DesktopPanelController()
     private var panel: DesktopGlassWindow?
+    var isVisible: Bool { panel?.isVisible == true }
 
     func show(server: CodexAppServer) {
         if panel == nil {
+            let size = DesktopPanelMode.stored().size
             let window = DesktopGlassWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 680, height: 300),
+                contentRect: NSRect(origin: .zero, size: size),
                 styleMask: [.borderless], backing: .buffered, defer: false
             )
             window.title = "Codex Quota 桌面玻璃面板"
@@ -455,7 +466,7 @@ final class DesktopPanelController {
             window.hidesOnDeactivate = false
             window.contentView = NSHostingView(rootView: DesktopGlassPanelView(server: server))
             if !window.setFrameUsingName(DesktopGlassPanelView.windowID) { window.center() }
-            DesktopPanelWindowConfigurator().configure(window)
+            DesktopPanelWindowConfigurator(size: size).configure(window)
             window.setFrameAutosaveName(DesktopGlassPanelView.windowID)
             panel = window
         }

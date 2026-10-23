@@ -5,13 +5,9 @@ import SwiftUI
 struct CodexQuotaApp: App {
     @StateObject private var server = CodexAppServer()
 
-    init() {
-        WidgetRepairService.repair()
-    }
-
     var body: some Scene {
         WindowGroup {
-            if WidgetRepairService.requiresInstalledCopy {
+            if AppInstallation.requiresInstalledCopy {
                 InstallLocationView()
             } else {
                 DashboardView(server: server)
@@ -35,14 +31,13 @@ private struct CodexQuotaMenuBarContent: View {
     let menuSummary: String
 
     var body: some View {
-        if WidgetRepairService.requiresInstalledCopy {
+        if AppInstallation.requiresInstalledCopy {
             Text("请从“应用程序”启动")
-            Button("打开“应用程序”文件夹") { WidgetRepairService.revealApplicationsFolder() }
+            Button("打开“应用程序”文件夹") { AppInstallation.revealApplicationsFolder() }
         } else {
             Text(menuSummary)
             Divider()
             Button("立即刷新") { server.refresh() }
-            Button("修复桌面小组件") { WidgetRepairService.repair() }
             Button("打开桌面玻璃面板") {
                 DesktopPanelController.shared.show(server: server)
             }

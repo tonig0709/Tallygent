@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Build app and widget
+      - name: Build universal panel app
         run: |
           xcodebuild \
             -project CodexQuotaWidget.xcodeproj \
@@ -33,9 +33,6 @@ jobs:
       - name: Apply ad-hoc signature
         run: |
           app="$PWD/preflight-build/Build/Products/Release/Codex Quota.app"
-          widget="$app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
-          codesign --force --sign - \
-            --entitlements Widget/CodexQuotaWidget.entitlements "$widget"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
       - name: Release preflight checklist
@@ -80,7 +77,7 @@ jobs:
           security list-keychain -d user -s "$keychain"
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
 
-      - name: Build app and widget
+      - name: Build universal panel app
         run: |
           xcodebuild \
             -project CodexQuotaWidget.xcodeproj \
@@ -96,10 +93,6 @@ jobs:
         if: env.SIGNED_RELEASE == 'true'
         run: |
           app="$PWD/build/Build/Products/Release/Codex Quota.app"
-          widget="$app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
-          codesign --force --options runtime --timestamp \
-            --sign "$DEVELOPER_ID_APPLICATION" \
-            --entitlements Widget/CodexQuotaWidget.entitlements "$widget"
           codesign --force --options runtime --timestamp \
             --sign "$DEVELOPER_ID_APPLICATION" \
             --entitlements App/CodexQuota.entitlements "$app"
@@ -108,9 +101,6 @@ jobs:
         if: env.SIGNED_RELEASE != 'true'
         run: |
           app="$PWD/build/Build/Products/Release/Codex Quota.app"
-          widget="$app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
-          codesign --force --sign - \
-            --entitlements Widget/CodexQuotaWidget.entitlements "$widget"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
 

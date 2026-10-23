@@ -128,7 +128,7 @@ struct GlassSettingsView: View {
             if !compact {
                 Text("玻璃外观")
                     .font(.title3.weight(.semibold))
-                Text("App 与桌面小组件共用这些参数；将指针移入预览可查看高光与弹性。")
+                Text("三种桌面面板共用这些参数；将指针移入预览可查看高光与弹性。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

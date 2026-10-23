@@ -13,15 +13,8 @@ dmg_input="${2:-}"
 [ -z "$dmg_input" ] || [ -f "$dmg_input" ] || { echo "DMG not found: $dmg_input" >&2; exit 66; }
 
 app="$(cd "$(dirname "$app_input")" && pwd -P)/$(basename "$app_input")"
-widget="$app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
 app_executable="$app/Contents/MacOS/Codex Quota"
-widget_executable="$widget/Contents/MacOS/CodexQuotaWidgetExtension"
 app_info="$app/Contents/Info.plist"
-widget_info="$widget/Contents/Info.plist"
-app_metadata="$app/Contents/Resources/Metadata.appintents/extract.actionsdata"
-widget_metadata="$widget/Contents/Resources/Metadata.appintents/extract.actionsdata"
-widget_identifier="dev.codexquota.app.widget"
-launch_services_tool="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/codex-quota-release.XXXXXX")"
 app_pid=""
 blocker_pid=""
@@ -29,9 +22,6 @@ translocated_pid=""
 translocation_mount=""
 payload_mount=""
 runtime_app=""
-runtime_widget=""
-stale_app=""
-stale_widget=""
 
 cleanup() {
     if [ -n "$blocker_pid" ]; then kill "$blocker_pid" 2>/dev/null || true; fi
@@ -41,14 +31,9 @@ cleanup() {
         wait "$app_pid" 2>/dev/null || true
     fi
     if [ -n "$translocated_pid" ]; then kill "$translocated_pid" 2>/dev/null || true; fi
-    if [ -n "$runtime_widget" ]; then /usr/bin/pluginkit -r "$runtime_widget" >/dev/null 2>&1 || true; fi
-    if [ -n "$stale_widget" ]; then /usr/bin/pluginkit -r "$stale_widget" >/dev/null 2>&1 || true; fi
     if [ -n "$translocation_mount" ]; then hdiutil detach "$translocation_mount" -force >/dev/null 2>&1 || true; fi
     if [ -n "$payload_mount" ]; then hdiutil detach "$payload_mount" -force >/dev/null 2>&1 || true; fi
-    if [ -n "$runtime_app" ]; then "$launch_services_tool" -u "$runtime_app" >/dev/null 2>&1 || true; fi
-    if [ -n "$stale_app" ]; then "$launch_services_tool" -u "$stale_app" >/dev/null 2>&1 || true; fi
     if [ -n "$runtime_app" ] && [ -e "$runtime_app" ]; then rm -rf "$runtime_app"; fi
-    if [ -n "$stale_app" ] && [ -e "$stale_app" ]; then rm -rf "$stale_app"; fi
     rm -rf "$tmp"
 }
 trap cleanup EXIT
@@ -59,7 +44,6 @@ pass() { printf '    PASS  %s\n' "$1"; }
 fail() {
     printf '    FAIL  %s\n' "$1" >&2
     if [ -s "$tmp/app.log" ]; then tail -80 "$tmp/app.log" >&2; fi
-    if [ -s "$tmp/pluginkit.txt" ]; then cat "$tmp/pluginkit.txt" >&2; fi
     exit 1
 }
 require_text() {
@@ -67,24 +51,6 @@ require_text() {
 }
 forbid_text() {
     ! grep -Fq -- "$1" "$2" || fail "$3"
-}
-registration_count() {
-    /usr/bin/pluginkit -m -A -v -i "$widget_identifier" |
-        awk -v id="$widget_identifier" 'index($0, id "(") { count++ } END { print count + 0 }'
-}
-wait_for_empty_registry() {
-    local stable=0 count
-    for _ in {1..40}; do
-        count="$(registration_count)"
-        if [ "$count" -eq 0 ]; then
-            stable=$((stable + 1))
-            [ "$stable" -ge 2 ] && return 0
-        else
-            stable=0
-        fi
-        sleep 0.25
-    done
-    return 1
 }
 plist_value() {
     /usr/libexec/PlistBuddy -c "Print :$2" "$1"
@@ -155,135 +121,51 @@ raise "test gate runs before packaging" unless package_index < gate_index
 RUBY
 pass "the last mutable artifact is gated before a draft release can be created"
 
-section "Source, parser, and visual render checks"
+section "Panel source, parser, and visual render checks"
 sh scripts/check-codex-discovery.sh
 sh scripts/check-desktop-panel.sh
 swift run quota-self-check
-xcrun swiftc \
-    -parse-as-library \
-    -D CODEX_QUOTA_PROVIDER_PROBE \
-    -target "$(uname -m)-apple-macos14.0" \
-    Gate/WidgetProviderProbe.swift \
-    Widget/CodexQuotaWidget.swift \
-    Shared/AppearanceV3ConfigurationIntent.swift \
-    Shared/QuotaWidgetView.swift \
-    Shared/UsageSnapshot.swift \
-    -framework AppIntents \
-    -framework Charts \
-    -framework SwiftUI \
-    -framework WidgetKit \
-    -o "$tmp/widget-provider-probe"
-require_text 'SmallCodexQuotaWidget()' Widget/CodexQuotaWidget.swift "small widget is missing from WidgetBundle"
-require_text 'LargeCodexQuotaWidget()' Widget/CodexQuotaWidget.swift "large widget is missing from WidgetBundle"
-require_text '.supportedFamilies([.systemSmall])' Widget/CodexQuotaWidget.swift "small widget family is missing"
-require_text '.supportedFamilies([.systemExtraLarge])' Widget/CodexQuotaWidget.swift "large widget family is missing"
-require_text '.containerBackground(for: .widget)' Widget/CodexQuotaWidget.swift "widget container background is missing"
-forbid_text '.fill(.ultraThinMaterial)' Shared/QuotaWidgetView.swift "legacy material flattens minimum dark glass to gray"
-require_text '.codexWidgetSurface(' Widget/CodexQuotaWidget.swift "widget content is not attached to its glass surface"
-require_text 'WidgetTransparentDarkSurface' Widget/CodexQuotaWidget.swift "transparent dark widget background is missing"
-forbid_text '.glassEffect(' Widget/CodexQuotaWidget.swift "glassEffect on a WidgetKit snapshot can hide all foreground content"
-require_text 'WidgetGlassOpacity.darkFilmOpacity' Shared/QuotaWidgetView.swift "adjustable dark glass film is missing"
-require_text 'DesktopPanelController.shared.show(server: server)' App/CodexQuotaApp.swift "desktop glass panel entry is missing"
-require_text 'DesktopGlassPanelView(server: server)' App/DesktopGlassPanelView.swift "desktop glass panel content is missing"
-require_text 'NSVisualEffectView' App/DesktopGlassPanelView.swift "desktop panel lacks native wallpaper material"
-require_text 'view.blendingMode = .behindWindow' App/DesktopGlassPanelView.swift "desktop panel cannot sample wallpaper behind its window"
-require_text 'Slider(value: value' App/GlassSettingsView.swift "glass inspector lacks native live sliders"
-require_text 'QuotaWidgetView(snapshot: panelSnapshot' App/DesktopGlassPanelView.swift "desktop panel does not reuse the widget information layout"
-require_text '.inspector(isPresented:' App/DashboardView.swift "dashboard lacks the glass settings inspector"
-require_text 'GlassSettingsView(compact: true' App/DesktopGlassPanelView.swift "desktop panel does not reuse glass settings"
-require_text '.onContinuousHover(perform: updateHover)' App/DesktopGlassPanelView.swift "desktop glass lacks pointer-following feedback"
-require_text 'accessibilityReduceMotion' App/DesktopGlassPanelView.swift "desktop glass motion lacks reduced-motion fallback"
-require_text 'GlassSettingKeys.elasticity' App/DesktopGlassPanelView.swift "desktop glass does not apply its elasticity setting"
-require_text 'GlassSettingKeys.dispersion' App/DesktopGlassPanelView.swift "desktop glass does not apply its dispersion setting"
-require_text 'glass dispersion setting has no visible render effect' Checks/main.swift "glass dispersion lacks a render regression"
-require_text 'glass corner-radius setting has no visible render effect' Checks/main.swift "glass corner radius lacks a render regression"
-require_text 'glass elasticity setting has no visible render effect' Checks/main.swift "glass elasticity lacks a render regression"
-require_text 'glass displacement setting has no visible render effect' Checks/main.swift "glass displacement lacks a render regression"
-require_text 'glass edge strength changes the interior tone' Checks/main.swift "glass edge/tone isolation lacks a render regression"
-require_text 'polar refraction mode has no visible effect' Checks/main.swift "glass refraction modes lack a render regression"
-require_text 'ContainerRelativeShape()' Widget/CodexQuotaWidget.swift "widget background does not follow the system-owned container silhouette"
-require_text 'glass settings did not survive the app-to-widget snapshot round trip' Checks/main.swift "app-to-widget glass settings sync lacks a regression"
-require_text 'updateGlassSettings' App/CodexAppServer.swift "app does not persist glass settings for widgets"
-require_text 'glassReloadWorkItem?.cancel()' App/CodexAppServer.swift "glass slider updates are not coalesced to the final widget value"
-require_text 'snapshot.glassSettings' Widget/CodexQuotaWidget.swift "widget ignores app glass settings"
-require_text 'AppearanceV5ConfigurationIntent.self' Widget/CodexQuotaWidget.swift "widgets do not use the crash-safe V5 appearance intent"
-require_text 'controlStyle: .field' Shared/AppearanceV3ConfigurationIntent.swift "safe opacity field is missing"
-forbid_text 'struct AppearanceV4ConfigurationIntent' Shared/AppearanceV3ConfigurationIntent.swift "crash-prone V4 slider intent is still shipped"
-require_text 'SnapshotHTTPClient.load' Widget/CodexQuotaWidget.swift "widget does not use the checked snapshot client"
-require_text 'context.isPreview ? UsageSnapshot.placeholder : SnapshotStore.load()' Widget/CodexQuotaWidget.swift "configuration preview does not use an immediate cached snapshot"
-require_text 'reloadIgnoringLocalCacheData' Shared/UsageSnapshot.swift "widget HTTP cache bypass is missing"
-require_text 'addingTimeInterval(60)' Widget/CodexQuotaWidget.swift "one-minute WidgetKit fallback is missing"
-require_text 'withTimeInterval: 15' App/CodexAppServer.swift "15-second app refresh timer is missing"
-require_text 'if snapshotChanged' App/CodexAppServer.swift "unchanged polling can still invalidate widget configuration previews"
-require_text 'arguments: ["-r", staleWidget.path]' App/WidgetRepairService.swift "verified obsolete widget registrations are not removed"
-require_text 'private func retry()' App/CodexAppServer.swift "snapshot listener recovery is missing"
-require_text 'reloadTimelines(ofKind: SnapshotStore.smallWidgetKind)' App/CodexAppServer.swift "small widget reload is missing"
-require_text 'reloadTimelines(ofKind: SnapshotStore.largeWidgetKind)' App/CodexAppServer.swift "large widget reload is missing"
-require_text 'WidgetRepairService.repair()' App/CodexQuotaApp.swift "launch-time widget repair is missing"
-require_text 'isCurrentWidgetRegistered' App/WidgetRepairService.swift "installed widget registration check is missing"
-require_text 'registrationDecision' App/WidgetRepairService.swift "widget version election guard is missing"
-require_text '["-e", "use", "-i", extensionIdentifier]' App/WidgetRepairService.swift "widget enable repair is missing"
-python3 - App/WidgetRepairService.swift <<'PY'
-import pathlib
-import sys
+xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
+    Gate/PanelSnapshotProbe.swift Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
+    -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
+require_text 'NSVisualEffectView' App/DesktopGlassPanelView.swift "native desktop material is missing"
+require_text 'view.blendingMode = .behindWindow' App/DesktopGlassPanelView.swift "wallpaper sampling is missing"
+require_text 'Slider(value: value' App/GlassSettingsView.swift "native live sliders are missing"
+require_text '.onContinuousHover(perform: updateHover)' App/DesktopGlassPanelView.swift "pointer feedback is missing"
+require_text 'accessibilityReduceMotion' App/DesktopGlassPanelView.swift "reduced motion is missing"
+require_text 'withTimeInterval: 15' App/CodexAppServer.swift "15-second refresh timer is missing"
+require_text 'if snapshotChanged' App/CodexAppServer.swift "unchanged refreshes still rewrite snapshots"
+require_text 'private func retry()' App/CodexAppServer.swift "snapshot port recovery is missing"
+require_text 'reloadIgnoringLocalCacheData' Shared/UsageSnapshot.swift "snapshot cache bypass is missing"
+forbid_text 'import WidgetKit' App/CodexAppServer.swift "panel-only app still depends on WidgetKit"
+forbid_text 'CodexQuotaWidgetExtension' CodexQuotaWidget.xcodeproj/project.pbxproj "removed widget target is still built"
+forbid_text 'WidgetRepairService' App/CodexQuotaApp.swift "removed widget registration is still invoked"
+pass "three native panel sizes, single-window ownership, live settings, readable content, and glass regressions"
 
-source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
-start = source.index("case .newerBuildPresent:")
-end = source.index("case let .proceed", start)
-branch = source[start:end]
-if "return" not in branch or "run(" in branch:
-    raise SystemExit("newer-build guard must return before every registration write")
-PY
-pass "quota parsing, boundary renders, background-difference detection, and refresh contracts"
-
-section "Built app and WidgetKit extension"
+section "Built panel-only app"
 [ -x "$app_executable" ] || fail "app executable is missing"
-[ -x "$widget_executable" ] || fail "widget executable is missing"
-[ -f "$app_metadata" ] || fail "app intent metadata is missing"
-[ -f "$widget_metadata" ] || fail "widget intent metadata is missing"
-[ -f "$app/Contents/Resources/Assets.car" ] || fail "compiled widget assets are missing"
-[ -f "$widget/Contents/Resources/Assets.car" ] || fail "widget asset catalog is missing"
-
-app_identifier="$(plist_value "$app_info" CFBundleIdentifier)"
-extension_point="$(plist_value "$widget_info" NSExtension:NSExtensionPointIdentifier)"
-app_version="$(plist_value "$app_info" CFBundleShortVersionString)"
-widget_version="$(plist_value "$widget_info" CFBundleShortVersionString)"
-app_build="$(plist_value "$app_info" CFBundleVersion)"
-widget_build="$(plist_value "$widget_info" CFBundleVersion)"
-[ "$app_identifier" = "dev.codexquota.app" ] || fail "unexpected app bundle identifier: $app_identifier"
-[ "$(plist_value "$widget_info" CFBundleIdentifier)" = "$widget_identifier" ] || fail "unexpected widget bundle identifier"
-[ "$extension_point" = "com.apple.widgetkit-extension" ] || fail "invalid WidgetKit extension point"
-[ "$app_version" = "$widget_version" ] || fail "app and widget marketing versions differ"
-[ "$app_build" = "$widget_build" ] || fail "app and widget build numbers differ"
-[ "$(plist_value "$widget_info" NSAppTransportSecurity:NSAllowsLocalNetworking 2>/dev/null || true)" = "true" ] ||
-    fail "widget does not allow local networking"
-
-if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
-    tag_version="${GITHUB_REF_NAME#v}"
-    [ "$app_version" = "$tag_version" ] || fail "tag $GITHUB_REF_NAME does not match bundle version $app_version"
-    require_text "Latest release: [$GITHUB_REF_NAME]" README.md "README latest release does not match $GITHUB_REF_NAME"
-    require_text "Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg" README.md "README download does not match $GITHUB_REF_NAME"
+[ -f "$app/Contents/Resources/Assets.car" ] || fail "compiled assets are missing"
+[ ! -d "$app/Contents/PlugIns" ] || [ -z "$(find "$app/Contents/PlugIns" -name '*.appex' -print)" ] ||
+    fail "panel-only app still embeds a widget extension"
+if [ -f "$app/Contents/Resources/Metadata.appintents/extract.actionsdata" ]; then
+    strings "$app/Contents/Resources/Metadata.appintents/extract.actionsdata" > "$tmp/intent-strings.txt"
+    ! grep -Eq 'AppearanceV[345]ConfigurationIntent' "$tmp/intent-strings.txt" ||
+        fail "obsolete widget configuration metadata is still shipped"
 fi
-
+app_identifier="$(plist_value "$app_info" CFBundleIdentifier)"
+app_version="$(plist_value "$app_info" CFBundleShortVersionString)"
+app_build="$(plist_value "$app_info" CFBundleVersion)"
+[ "$app_identifier" = "dev.codexquota.app" ] || fail "unexpected bundle identifier"
+case "$app_build" in *[!0-9]*|'') fail "bundle build number is not numeric" ;; esac
 app_archs="$(lipo -archs "$app_executable")"
-widget_archs="$(lipo -archs "$widget_executable")"
 case " $app_archs " in *" arm64 "*) ;; *) fail "app is missing arm64" ;; esac
 case " $app_archs " in *" x86_64 "*) ;; *) fail "app is missing x86_64" ;; esac
-case " $widget_archs " in *" arm64 "*) ;; *) fail "widget is missing arm64" ;; esac
-case " $widget_archs " in *" x86_64 "*) ;; *) fail "widget is missing x86_64" ;; esac
-codesign --verify --deep --strict --verbose=2 "$app" >/dev/null 2>&1 || fail "app or embedded widget signature is invalid"
-codesign -d --entitlements :- "$widget" > "$tmp/widget-entitlements.plist" 2>/dev/null ||
-    fail "widget signature entitlements cannot be read"
-[ "$(plist_value "$tmp/widget-entitlements.plist" com.apple.security.app-sandbox 2>/dev/null || true)" = "true" ] ||
-    fail "widget lacks com.apple.security.app-sandbox entitlement"
-[ "$(plist_value "$tmp/widget-entitlements.plist" com.apple.security.network.client 2>/dev/null || true)" = "true" ] ||
-    fail "widget lacks com.apple.security.network.client entitlement"
-/usr/bin/assetutil --info "$widget/Contents/Resources/Assets.car" > "$tmp/widget-assets.json" ||
-    fail "widget asset catalog cannot be inspected"
-grep -Fq 'CodexMark' "$tmp/widget-assets.json" || fail "widget asset catalog lacks CodexMark"
-
-case "$app_build" in *[!0-9]*|'') fail "bundle build number is not numeric" ;; esac
+codesign --verify --deep --strict --verbose=2 "$app" >/dev/null 2>&1 || fail "app signature is invalid"
+/usr/bin/assetutil --info "$app/Contents/Resources/Assets.car" > "$tmp/assets.json" ||
+    fail "asset catalog cannot be inspected"
+require_text 'CodexMark' "$tmp/assets.json" "Codex mark asset is missing"
 if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+    [ "$app_version" = "${GITHUB_REF_NAME#v}" ] || fail "tag does not match bundle version"
     head_commit="$(git rev-parse HEAD)"
     max_previous_build=0
     for tag in $(git tag --list 'v*'); do
@@ -293,59 +175,16 @@ if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
         case "$tag_build" in *[!0-9]*|'') continue ;; esac
         [ "$tag_build" -gt "$max_previous_build" ] && max_previous_build="$tag_build"
     done
-    [ "$app_build" -gt "$max_previous_build" ] || fail "build $app_build must be greater than released build $max_previous_build"
+    [ "$app_build" -gt "$max_previous_build" ] || fail "build must be greater than every released build"
 fi
+pass "signed universal app, original icon, monotonic build, and no legacy widget payload"
 
-plutil -convert json -o "$tmp/app-intents.json" "$app_metadata"
-plutil -convert json -o "$tmp/widget-intents.json" "$widget_metadata"
-for token in AppearanceV5ConfigurationIntent useLightAppearance glassOpacity; do
-    grep -Fq "$token" "$tmp/app-intents.json" || fail "app intent metadata lacks $token"
-    grep -Fq "$token" "$tmp/widget-intents.json" || fail "widget intent metadata lacks $token"
-done
-python3 - "$tmp/app-intents.json" "$tmp/widget-intents.json" <<'PY'
-import json
-import sys
-
-for path in sys.argv[1:]:
-    with open(path, encoding="utf-8") as file:
-        actions = json.load(file)["actions"]
-        if "AppearanceV4ConfigurationIntent" in actions:
-            raise SystemExit(f"{path}: crash-prone V4 slider metadata is still present")
-        for name, candidate in actions.items():
-            for parameter in candidate.get("parameters", []):
-                if parameter.get("name") != "glassOpacity":
-                    continue
-                candidate_metadata = parameter.get("typeSpecificMetadata", [])
-                key = "LNValueTypeMetadataKeyNumberControlStyle"
-                if key in candidate_metadata:
-                    candidate_style = candidate_metadata[candidate_metadata.index(key) + 1]
-                    if candidate_style.get("int", {}).get("wrapper") == 2:
-                        raise SystemExit(f"{path}: {name} contains a crash-prone opacity slider")
-        action = actions["AppearanceV5ConfigurationIntent"]
-    opacity = next(item for item in action["parameters"] if item["name"] == "glassOpacity")
-    metadata = opacity["typeSpecificMetadata"]
-    style = metadata[metadata.index("LNValueTypeMetadataKeyNumberControlStyle") + 1]
-    if style.get("int", {}).get("wrapper") != 1:
-        raise SystemExit(f"{path}: V5 glass opacity is not the crash-safe field")
-    type_identifier = opacity["valueType"]["primitive"]["wrapper"]["typeIdentifier"]
-    if type_identifier != 7:
-        raise SystemExit(f"{path}: V5 glass opacity field is not Double-backed")
-PY
-strings "$widget_executable" > "$tmp/widget-strings.txt"
-grep -Fq 'dev.codexquota.widget.small.v5' "$tmp/widget-strings.txt" || fail "small widget kind is absent from binary"
-grep -Fq 'dev.codexquota.widget.large.v5' "$tmp/widget-strings.txt" || fail "large widget kind is absent from binary"
-pass "signed, version-matched app and extension with both widget configurations"
-
-section "Isolated WidgetKit registry"
+section "Isolated runtime user"
 [ "${CODEX_QUOTA_ISOLATED_REGISTRY:-}" = "1" ] ||
-    fail "widget self-registration probe requires CODEX_QUOTA_ISOLATED_REGISTRY=1 on a clean CI user"
-/usr/bin/pluginkit -m -A -v -i "$widget_identifier" > "$tmp/pluginkit-baseline.txt"
-baseline_count="$(registration_count)"
-if [ "$baseline_count" -eq 1 ] && grep -Fq "$widget" "$tmp/pluginkit-baseline.txt"; then
-    /usr/bin/pluginkit -r "$widget" >/dev/null 2>&1 || true
+    fail "runtime probes require an isolated CI user"
+if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
+    fail "snapshot port is already occupied; never run this gate against a live user session"
 fi
-wait_for_empty_registry || fail "isolated widget registry contains a registration unrelated to the checked build"
-pass "isolated WidgetKit registry starts empty"
 
 section "Non-installed copies stay inert"
 volume_name="Codex Quota Gate $$"
@@ -363,61 +202,17 @@ fi
 kill "$translocated_pid" 2>/dev/null || true
 wait "$translocated_pid" 2>/dev/null || true
 translocated_pid=""
-/usr/bin/pluginkit -r "$translocation_mount/Codex Quota.app/Contents/PlugIns/CodexQuotaWidgetExtension.appex" >/dev/null 2>&1 || true
 hdiutil detach "$translocation_mount" >/dev/null ||
     fail "translocated DMG remained mounted after its app terminated"
 translocation_mount=""
-/usr/bin/pluginkit -r "$widget" >/dev/null 2>&1 || true
-wait_for_empty_registry || fail "non-installed candidate remained registered after the inert-copy probe"
-pass "DMG/build copies do not run registration repair or occupy the live snapshot port"
+pass "DMG/build copies do not connect an account or occupy the live snapshot port"
 
-section "Widget self-registration fault injection"
+section "Installed app snapshot freshness"
 mkdir -p "$HOME/Applications"
 runtime_app="$HOME/Applications/Codex Quota Current Gate $$.app"
-stale_app="$HOME/Applications/Codex Quota Stale Gate $$.app"
-[ ! -e "$runtime_app" ] && [ ! -e "$stale_app" ] ||
-    fail "temporary installed-app path already exists"
-[ "$app_build" -gt 1 ] || fail "build number must permit a lower-build registration control"
-stale_build=$((app_build - 1))
-/usr/bin/ditto "$app" "$stale_app"
-stale_widget="$stale_app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.0.0" "$stale_app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.0.0" "$stale_widget/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $stale_build" "$stale_app/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $stale_build" "$stale_widget/Contents/Info.plist"
-codesign --force --sign - --entitlements Widget/CodexQuotaWidget.entitlements "$stale_widget"
-codesign --force --sign - --entitlements App/CodexQuota.entitlements "$stale_app"
-
-/usr/bin/pluginkit -a "$stale_widget" || fail "could not seed the stale widget registration"
-/usr/bin/pluginkit -e use -i "$widget_identifier" || fail "could not enable the stale widget registration"
-stale_seeded=0
-stale_stable=0
-for _ in {1..60}; do
-    /usr/bin/pluginkit -m -A -v -i "$widget_identifier" > "$tmp/pluginkit.txt"
-    registration_count="$(awk -v id="$widget_identifier" 'index($0, id "(") { count++ } END { print count + 0 }' "$tmp/pluginkit.txt")"
-    if [ "$registration_count" -eq 1 ] &&
-       grep -E '^\+.*dev\.codexquota\.app\.widget' "$tmp/pluginkit.txt" | grep -Fq "$stale_widget"; then
-        stale_stable=$((stale_stable + 1))
-        if [ "$stale_stable" -ge 2 ]; then
-            stale_seeded=1
-            break
-        fi
-    else
-        stale_stable=0
-    fi
-    sleep 0.25
-done
-[ "$stale_seeded" -eq 1 ] || fail "could not establish the stale-registration negative control"
-pass "a lower-version enabled extension was seeded without registering the candidate"
-
+[ ! -e "$runtime_app" ] || fail "temporary installed-app path already exists"
 /usr/bin/ditto "$app" "$runtime_app"
-runtime_widget="$runtime_app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
 runtime_executable="$runtime_app/Contents/MacOS/Codex Quota"
-
-section "Installed app self-repair and snapshot freshness"
-if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
-    fail "port 48193 is already occupied; quit old Codex Quota copies before release testing"
-fi
 
 cat > "$tmp/fake-codex" <<'PY'
 #!/usr/bin/env python3
@@ -488,27 +283,6 @@ app_pid=$!
 sleep 2
 kill -0 "$app_pid" 2>/dev/null || fail "installed candidate app exited during startup"
 
-auto_registered=0
-auto_registration_stable=0
-for _ in {1..80}; do
-    /usr/bin/pluginkit -m -A -v -i "$widget_identifier" > "$tmp/pluginkit.txt"
-    registration_count="$(awk -v id="$widget_identifier" 'index($0, id "(") { count++ } END { print count + 0 }' "$tmp/pluginkit.txt")"
-    if [ "$registration_count" -eq 1 ] &&
-       grep -E '^\+.*dev\.codexquota\.app\.widget' "$tmp/pluginkit.txt" | grep -Fq "$runtime_widget" &&
-       ! grep -Fq "$stale_widget" "$tmp/pluginkit.txt"; then
-        auto_registration_stable=$((auto_registration_stable + 1))
-        if [ "$auto_registration_stable" -ge 2 ]; then
-            auto_registered=1
-            break
-        fi
-    else
-        auto_registration_stable=0
-    fi
-    sleep 0.25
-done
-[ "$auto_registered" -eq 1 ] || fail "installed app did not remove the stale registration and auto-register its current widget"
-pass "installed app produced exactly one enabled current WidgetKit registration"
-
 kill "$blocker_pid" 2>/dev/null || true
 wait "$blocker_pid" 2>/dev/null || true
 blocker_pid=""
@@ -557,7 +331,7 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=12 \
 CODEX_QUOTA_EXPECT_WEEKLY=11 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=1111 \
-    "$tmp/widget-provider-probe"
+    "$tmp/panel-snapshot-probe"
 
 second_snapshot=0
 for _ in {1..25}; do
@@ -575,7 +349,7 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=47 \
 CODEX_QUOTA_EXPECT_WEEKLY=46 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=4646 \
-    "$tmp/widget-provider-probe"
+    "$tmp/panel-snapshot-probe"
 
 second_updated_at="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["updatedAt"])' "$tmp/snapshot.json")"
 partial_snapshot=0
@@ -594,7 +368,7 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=73 \
 CODEX_QUOTA_EXPECT_WEEKLY=72 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=4646 \
-    "$tmp/widget-provider-probe"
+    "$tmp/panel-snapshot-probe"
 third_updated_at="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["updatedAt"])' "$tmp/snapshot.json")"
 for _ in {1..20}; do
     [ -f "$tmp/stable-response" ] && break
@@ -606,8 +380,8 @@ curl --silent --show-error --fail --max-time 2 \
     http://127.0.0.1:48193/snapshot \
     -o "$tmp/snapshot.json"
 python3 -c 'import json,sys; current=float(json.load(open(sys.argv[1]))["updatedAt"]); expected=float(sys.argv[2]); raise SystemExit(0 if current == expected else 1)' "$tmp/snapshot.json" "$third_updated_at" ||
-    fail "unchanged polling invalidated the widget configuration preview"
-pass "candidate-owned port recovery, queued/delayed refreshes, partial quota liveness, Widget client A-to-B-to-C refresh, and privacy checks"
+    fail "unchanged polling invalidated the panel settings"
+pass "candidate-owned port recovery, queued/delayed refreshes, partial quota liveness, all-mode snapshot A-to-B-to-C refresh, and privacy checks"
 
 if [ -n "$dmg_input" ]; then
     section "DMG payload"
@@ -616,9 +390,7 @@ if [ -n "$dmg_input" ]; then
     mkdir -p "$payload_mount"
     hdiutil attach -quiet -nobrowse -readonly -mountpoint "$payload_mount" "$dmg_input"
     payload_app="$payload_mount/Codex Quota.app"
-    payload_widget="$payload_app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
     payload_app_executable="$payload_app/Contents/MacOS/Codex Quota"
-    payload_widget_executable="$payload_widget/Contents/MacOS/CodexQuotaWidgetExtension"
     [ -d "$payload_app" ] || fail "DMG does not contain Codex Quota.app"
     [ ! -L "$payload_app" ] || fail "DMG app is an unexpected symbolic link"
     [ -L "$payload_mount/Applications" ] && [ "$(readlink "$payload_mount/Applications")" = "/Applications" ] ||
@@ -626,11 +398,9 @@ if [ -n "$dmg_input" ]; then
     unexpected_payload_count="$(find "$payload_mount" -mindepth 1 -maxdepth 1 ! -name 'Codex Quota.app' ! -name Applications -print | wc -l | tr -d ' ')"
     [ "$unexpected_payload_count" -eq 0 ] || fail "DMG contains unexpected top-level payloads"
     [ -x "$payload_app_executable" ] || fail "DMG app executable lost its executable mode"
-    [ -x "$payload_widget_executable" ] || fail "DMG widget executable lost its executable mode"
     [ "$(plist_value "$payload_app/Contents/Info.plist" CFBundleShortVersionString)" = "$app_version" ] || fail "DMG app version differs from checked app"
     [ "$(plist_value "$payload_app/Contents/Info.plist" CFBundleVersion)" = "$app_build" ] || fail "DMG app build differs from checked app"
     [ "$(lipo -archs "$payload_app_executable")" = "$app_archs" ] || fail "DMG app architectures differ from checked app"
-    [ "$(lipo -archs "$payload_widget_executable")" = "$widget_archs" ] || fail "DMG widget architectures differ from checked app"
     codesign --verify --deep --strict --verbose=2 "$payload_app" >/dev/null 2>&1 || fail "DMG contains an invalid app signature"
     [ "$(bundle_digest "$payload_app")" = "$(bundle_digest "$app")" ] ||
         fail "DMG app bytes differ from the app that passed the release gate"

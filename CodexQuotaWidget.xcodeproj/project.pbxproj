@@ -13,35 +13,13 @@
 		A10000000000000000000005 /* AppServerParser.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* AppServerParser.swift */; };
 		A10000000000000000000006 /* QuotaWidgetView.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* QuotaWidgetView.swift */; };
 		A10000000000000000000007 /* Assets.xcassets in App Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* Assets.xcassets */; };
-		A10000000000000000000008 /* CodexQuotaWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* CodexQuotaWidget.swift */; };
-		A10000000000000000000009 /* UsageSnapshot.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* UsageSnapshot.swift */; };
-		A1000000000000000000000A /* AppServerParser.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* AppServerParser.swift */; };
-		A1000000000000000000000B /* QuotaWidgetView.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* QuotaWidgetView.swift */; };
-		A1000000000000000000000C /* Assets.xcassets in Widget Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* Assets.xcassets */; };
-		A1000000000000000000000D /* CodexQuotaWidgetExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000A /* CodexQuotaWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		A1000000000000000000000E /* AppearanceV3ConfigurationIntent.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* AppearanceV3ConfigurationIntent.swift */; };
-		A1000000000000000000000F /* AppearanceV3ConfigurationIntent.swift in Widget Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000D /* AppearanceV3ConfigurationIntent.swift */; };
-		A10000000000000000000010 /* WidgetRepairService.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* WidgetRepairService.swift */; };
+		A10000000000000000000010 /* AppInstallation.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000E /* AppInstallation.swift */; };
 		A10000000000000000000011 /* InstallLocationView.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000F /* InstallLocationView.swift */; };
 		A10000000000000000000012 /* DesktopGlassPanelView.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* DesktopGlassPanelView.swift */; };
 		A10000000000000000000013 /* GlassSettingsView.swift in App Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* GlassSettingsView.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		C10000000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = F10000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = E10000000000000000000002; remoteInfo = CodexQuotaWidgetExtension; };
-/* End PBXContainerItemProxy section */
 
-/* Begin PBXCopyFilesBuildPhase section */
-		D10000000000000000000001 /* Embed App Extensions */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 13;
-			files = (A1000000000000000000000D /* CodexQuotaWidgetExtension.appex in Embed App Extensions */, );
-			name = "Embed App Extensions";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		B10000000000000000000001 /* CodexQuotaApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuotaApp.swift; sourceTree = "<group>"; };
@@ -51,13 +29,9 @@
 		B10000000000000000000005 /* AppServerParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServerParser.swift; sourceTree = "<group>"; };
 		B10000000000000000000006 /* QuotaWidgetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaWidgetView.swift; sourceTree = "<group>"; };
 		B10000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B10000000000000000000008 /* CodexQuotaWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexQuotaWidget.swift; sourceTree = "<group>"; };
 		B10000000000000000000009 /* Codex Quota.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Codex Quota.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		B1000000000000000000000A /* CodexQuotaWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexQuotaWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B1000000000000000000000B /* CodexQuota.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CodexQuota.entitlements; sourceTree = "<group>"; };
-		B1000000000000000000000C /* CodexQuotaWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CodexQuotaWidget.entitlements; sourceTree = "<group>"; };
-		B1000000000000000000000D /* AppearanceV3ConfigurationIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceV3ConfigurationIntent.swift; sourceTree = "<group>"; };
-		B1000000000000000000000E /* WidgetRepairService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WidgetRepairService.swift; sourceTree = "<group>"; };
+		B1000000000000000000000E /* AppInstallation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInstallation.swift; sourceTree = "<group>"; };
 		B1000000000000000000000F /* InstallLocationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InstallLocationView.swift; sourceTree = "<group>"; };
 		B10000000000000000000010 /* DesktopGlassPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopGlassPanelView.swift; sourceTree = "<group>"; };
 		B10000000000000000000011 /* GlassSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSettingsView.swift; sourceTree = "<group>"; };
@@ -65,7 +39,6 @@
 
 /* Begin PBXFrameworksBuildPhase section */
 		D20000000000000000000001 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		D20000000000000000000002 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -74,48 +47,35 @@
 			children = (
 				F20000000000000000000002 /* App */,
 				F20000000000000000000003 /* Shared */,
-				F20000000000000000000004 /* Widget */,
 				F20000000000000000000005 /* Resources */,
 				F20000000000000000000006 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
 		F20000000000000000000002 /* App */ = {isa = PBXGroup; path = App; sourceTree = "<group>"; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000010, B10000000000000000000011, B1000000000000000000000B, B1000000000000000000000E, B1000000000000000000000F, ); };
-		F20000000000000000000003 /* Shared */ = {isa = PBXGroup; path = Shared; sourceTree = "<group>"; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006, B1000000000000000000000D, ); };
-		F20000000000000000000004 /* Widget */ = {isa = PBXGroup; path = Widget; sourceTree = "<group>"; children = (B10000000000000000000008, B1000000000000000000000C, ); };
+		F20000000000000000000003 /* Shared */ = {isa = PBXGroup; path = Shared; sourceTree = "<group>"; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006, ); };
 		F20000000000000000000005 /* Resources */ = {isa = PBXGroup; path = Resources; sourceTree = "<group>"; children = (B10000000000000000000007, ); };
-		F20000000000000000000006 /* Products */ = {isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (B10000000000000000000009, B1000000000000000000000A, ); };
+		F20000000000000000000006 /* Products */ = {isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (B10000000000000000000009, ); };
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
 		E10000000000000000000001 /* CodexQuota */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F30000000000000000000002;
-			buildPhases = (D30000000000000000000001, D20000000000000000000001, D40000000000000000000001, D10000000000000000000001, );
+			buildPhases = (D30000000000000000000001, D20000000000000000000001, D40000000000000000000001, );
 			buildRules = ();
-			dependencies = (C20000000000000000000001, );
+			dependencies = ();
 			name = CodexQuota;
 			productName = CodexQuota;
 			productReference = B10000000000000000000009;
 			productType = "com.apple.product-type.application";
-		};
-		E10000000000000000000002 /* CodexQuotaWidgetExtension */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = F30000000000000000000003;
-			buildPhases = (D30000000000000000000002, D20000000000000000000002, D40000000000000000000002, );
-			buildRules = ();
-			dependencies = ();
-			name = CodexQuotaWidgetExtension;
-			productName = CodexQuotaWidgetExtension;
-			productReference = B1000000000000000000000A;
-			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
 		F10000000000000000000001 /* Project object */ = {
 			isa = PBXProject;
-			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {E10000000000000000000001 = {CreatedOnToolsVersion = 16.0; }; E10000000000000000000002 = {CreatedOnToolsVersion = 16.0; }; }; };
+			attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {E10000000000000000000001 = {CreatedOnToolsVersion = 16.0; }; }; };
 			buildConfigurationList = F30000000000000000000001;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
@@ -125,37 +85,29 @@
 			productRefGroup = F20000000000000000000006;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (E10000000000000000000001, E10000000000000000000002, );
+			targets = (E10000000000000000000001, );
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		D40000000000000000000001 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000007, ); runOnlyForDeploymentPostprocessing = 0; };
-		D40000000000000000000002 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A1000000000000000000000C, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D30000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A1000000000000000000000E, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, ); runOnlyForDeploymentPostprocessing = 0; };
-		D30000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000008, A10000000000000000000009, A1000000000000000000000A, A1000000000000000000000B, A1000000000000000000000F, ); runOnlyForDeploymentPostprocessing = 0; };
+		D30000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
-/* Begin PBXTargetDependency section */
-		C20000000000000000000001 = {isa = PBXTargetDependency; target = E10000000000000000000002; targetProxy = C10000000000000000000001; };
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F40000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_OBJC_ARC = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Debug; };
 		F40000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_OBJC_ARC = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.0; }; name = Release; };
-		F40000000000000000000003 /* App Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 37; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codex Quota"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = "Codex Quota"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
-		F40000000000000000000004 /* App Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 37; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codex Quota"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = "Codex Quota"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
-		F40000000000000000000005 /* Widget Debug */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = Widget/CodexQuotaWidget.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 37; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Widget/Info.plist; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app.widget; PRODUCT_NAME = CodexQuotaWidgetExtension; SKIP_INSTALL = YES; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
-		F40000000000000000000006 /* Widget Release */ = {isa = XCBuildConfiguration; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_ENTITLEMENTS = Widget/CodexQuotaWidget.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 37; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Widget/Info.plist; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app.widget; PRODUCT_NAME = CodexQuotaWidgetExtension; SKIP_INSTALL = YES; }; name = Release; };
+		F40000000000000000000003 /* App Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 38; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codex Quota"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = "Codex Quota"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
+		F40000000000000000000004 /* App Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 38; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = "Codex Quota"; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.5.6; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = "Codex Quota"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
 		F30000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (F40000000000000000000001, F40000000000000000000002, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 		F30000000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (F40000000000000000000003, F40000000000000000000004, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		F30000000000000000000003 = {isa = XCConfigurationList; buildConfigurations = (F40000000000000000000005, F40000000000000000000006, ); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
 	};
 	rootObject = F10000000000000000000001 /* Project object */;

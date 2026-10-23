@@ -18,3 +18,9 @@ grep -q 'Button(action: closePanel)' App/DesktopGlassPanelView.swift
 grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift
 grep -q 'Button("关闭桌面玻璃面板")' App/CodexQuotaApp.swift
 grep -q 'window.styleMask.remove(.titled)' App/DesktopGlassPanelView.swift
+grep -q '.scrollTargetBehavior(.viewAligned)' App/DashboardView.swift
+grep -q 'QuotaPanelContent(mode: mode, snapshot: panelSnapshot' App/DesktopGlassPanelView.swift
+if grep -Eq 'import WidgetKit|WidgetCenter|WidgetRepairService' App/*.swift; then
+    echo 'Panel-only app still invokes WidgetKit' >&2
+    exit 1
+fi

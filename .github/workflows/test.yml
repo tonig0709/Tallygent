@@ -17,7 +17,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build universal app and widget
+      - name: Build universal panel app
         run: |
           xcodebuild \
             -project CodexQuotaWidget.xcodeproj \
@@ -32,9 +32,6 @@ jobs:
       - name: Apply ad-hoc signature
         run: |
           app="$PWD/build/Build/Products/Release/Codex Quota.app"
-          widget="$app/Contents/PlugIns/CodexQuotaWidgetExtension.appex"
-          codesign --force --sign - \
-            --entitlements Widget/CodexQuotaWidget.entitlements "$widget"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
 

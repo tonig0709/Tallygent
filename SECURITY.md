@@ -5,10 +5,14 @@ JSONL protocol. OAuth credentials are stored and refreshed by Codex itself.
 This project never reads `~/.codex/auth.json`, never stores access tokens, and
 never sends credentials to a third-party server.
 
-The widget reads a quota-only JSON snapshot from `127.0.0.1:48193`. The listener
+The current product uses native movable panels, not WidgetKit extensions.
+Panels observe the App's in-process snapshot directly. The existing read-only
+compatibility/diagnostic bridge serves quota-only JSON at `127.0.0.1:48193`. The listener
 binds only to loopback, accepts only `GET /snapshot`, sends `Cache-Control:
 no-store`, and removes the account email and plan before encoding the response.
 No OAuth credential or account identifier crosses this local bridge.
+The bridge is not required for panel rendering or synchronization. This build
+does not register extensions, invoke PlugInKit repair, or clear system widget caches.
 
 When the maintainer configures the credentials below, official GitHub Releases
 are signed with the maintainer's Apple Developer ID, notarized by Apple, and

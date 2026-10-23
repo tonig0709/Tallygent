@@ -11,8 +11,7 @@ let package = Package(
     targets: [
         .target(
             name: "CodexQuotaCore",
-            path: "Shared",
-            exclude: ["AppearanceV3ConfigurationIntent.swift"]
+            path: "Shared"
         ),
         .executableTarget(
             name: "QuotaSelfCheck",

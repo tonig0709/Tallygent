@@ -1,6 +1,104 @@
 import Charts
 import SwiftUI
 
+public enum DesktopPanelMode: String, CaseIterable, Identifiable {
+    case small, medium, large
+
+    public static let defaultsKey = "desktopPanelMode"
+    public var id: Self { self }
+    public var title: String {
+        switch self {
+        case .small: "小型 · 双圆环"
+        case .medium: "中型 · 双额度"
+        case .large: "大型 · 额度与趋势"
+        }
+    }
+
+    // Match the previous macOS widget footprint and its 16-point grid gap.
+    // Values are logical points, never Retina pixels; the large panel is unchanged.
+    public var size: CGSize {
+        switch self {
+        case .small: CGSize(width: 164, height: 164)
+        case .medium: CGSize(width: 344, height: 164)
+        case .large: CGSize(width: 680, height: 300)
+        }
+    }
+
+    public static func stored(in defaults: UserDefaults = .standard) -> Self {
+        Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .large
+    }
+}
+
+public struct QuotaPanelContent: View {
+    public let mode: DesktopPanelMode
+    public let snapshot: UsageSnapshot
+    public let glassOpacity: Double
+
+    public init(mode: DesktopPanelMode, snapshot: UsageSnapshot, glassOpacity: Double) {
+        self.mode = mode
+        self.snapshot = snapshot
+        self.glassOpacity = glassOpacity
+    }
+
+    public var body: some View {
+        switch mode {
+        case .small: QuotaRingWidgetView(snapshot: snapshot, glassOpacity: glassOpacity)
+        case .medium: QuotaMediumPanelView(snapshot: snapshot)
+        case .large: QuotaWidgetView(snapshot: snapshot, glassOpacity: glassOpacity)
+        }
+    }
+}
+
+private struct QuotaMediumPanelView: View {
+    let snapshot: UsageSnapshot
+    private var isLight: Bool { snapshot.resolvedAppearance == .light }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image("CodexMark")
+                    .resizable().scaledToFit().frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
+                Text("Codex").font(.headline.weight(.semibold)).tracking(-0.3)
+            }
+            quotaBar("5h额度", window: snapshot.fiveHour)
+            quotaBar("周额度", window: snapshot.weekly)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .foregroundStyle(isLight ? Color(red: 0.08, green: 0.1, blue: 0.14) : .white)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func quotaBar(_ title: String, window: UsageWindow?) -> some View {
+        let remaining = window?.remainingPercent
+        let color: Color = switch QuotaLevel(remainingPercent: remaining ?? 0) {
+        case .healthy: .green
+        case .warning: .orange
+        case .critical: .red
+        }
+        return VStack(spacing: 5) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                Spacer()
+                Text(remaining.map { "\($0)%" } ?? "—")
+                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .monospacedDigit().tracking(-0.6)
+            }
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(isLight ? .black.opacity(0.09) : .white.opacity(0.14))
+                    Capsule().fill(color.gradient)
+                        .frame(width: proxy.size.width * CGFloat(remaining ?? 0) / 100)
+                }
+            }
+            .frame(height: 7)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title)，\(remaining.map { "剩余 \($0)%" } ?? "等待账户数据")")
+    }
+}
+
 public struct QuotaWidgetView: View {
     public let snapshot: UsageSnapshot
     public let glassOpacity: Double

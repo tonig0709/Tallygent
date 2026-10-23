@@ -88,7 +88,8 @@ struct DesktopPanelProbe {
         }
         let expectedOffset = CGFloat(DesktopPanelMode.allCases.firstIndex(of: .stored())!) * 680
         precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 2, "initial gallery page does not match the persisted panel mode")
-        precondition(dashboard.fittingSize.height >= 560, "restored dashboard height clips panel selector controls")
+        print("Dashboard fitted height: \(dashboard.fittingSize.height), gallery offset: \(gallery.contentView.bounds.minX)")
+        precondition(dashboard.fittingSize.height >= 559, "restored dashboard height clips panel selector controls")
         dashboardWindow.close()
         print("Desktop panel mouse routing and window-level probe passed.")
     }

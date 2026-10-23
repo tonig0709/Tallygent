@@ -116,7 +116,6 @@ struct DashboardView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .padding(24)
-        .frame(minWidth: 730, minHeight: 560)
         .inspector(isPresented: $showsGlassInspector) {
             ScrollView {
                 GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings)
@@ -124,6 +123,7 @@ struct DashboardView: View {
                 .padding(20)
                 .inspectorColumnWidth(min: 260, ideal: 300, max: 340)
         }
+        .frame(minWidth: 730, minHeight: 560)
         .task { server.connect() }
         .onChange(of: selectedMode) { _, value in
             if let value { modeRaw = value.rawValue }

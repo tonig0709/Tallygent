@@ -22,6 +22,13 @@ struct DesktopPanelProbe {
         )
         window.isReleasedWhenClosed = false
         DesktopPanelWindowConfigurator().configure(window)
+        precondition(window.styleMask.contains(.fullSizeContentView), "native title bar leaves a permanent strip above the glass")
+        let size = CGSize(width: 680, height: 300)
+        precondition(!DesktopGlassPanelView.isNearEdge(CGPoint(x: 340, y: 150), size: size), "chrome stays visible at panel center")
+        for point in [CGPoint(x: 5, y: 150), CGPoint(x: 675, y: 150), CGPoint(x: 340, y: 5), CGPoint(x: 340, y: 295)] {
+            precondition(DesktopGlassPanelView.isNearEdge(point, size: size), "chrome fails to appear at a panel edge")
+        }
+        precondition(!DesktopGlassPanelView.isNearEdge(CGPoint(x: -1, y: 150), size: size), "chrome stays visible outside panel")
         precondition(window.isMovable && !window.ignoresMouseEvents, "desktop panel rejects mouse interaction")
         precondition(window.level.rawValue > Int(CGWindowLevelForKey(.desktopIconWindow)), "desktop panel is hidden behind Finder's event layer")
         precondition(window.level.rawValue < NSWindow.Level.normal.rawValue, "desktop panel covers normal application windows")

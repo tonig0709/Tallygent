@@ -21,6 +21,7 @@ struct DesktopGlassPanelView: View {
     @State private var showsControls = false
     @State private var hoverVector = CGSize.zero
     @State private var isHovering = false
+    @State private var showsChrome = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismissWindow) private var dismissWindow
 
@@ -52,6 +53,12 @@ struct DesktopGlassPanelView: View {
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+                    .strokeBorder(.white.opacity(0.5), lineWidth: 1)
+                    .opacity(showsChrome || showsControls ? 1 : 0)
+                    .allowsHitTesting(false)
+            }
             .overlay(alignment: .top) {
                 DesktopPanelDragRegion()
                     .frame(height: 22)
@@ -70,6 +77,8 @@ struct DesktopGlassPanelView: View {
                 .padding(6)
                 .help("关闭桌面玻璃面板")
                 .accessibilityLabel("关闭桌面玻璃面板")
+                .opacity(showsChrome || showsControls ? 1 : 0)
+                .allowsHitTesting(showsChrome || showsControls)
             }
             .overlay(alignment: .bottomTrailing) {
                 Button {
@@ -84,12 +93,17 @@ struct DesktopGlassPanelView: View {
                 .background(.thinMaterial, in: Circle())
                 .padding(12)
                 .help("调整桌面玻璃面板")
+                .opacity(showsChrome || showsControls ? 1 : 0)
+                .allowsHitTesting(showsChrome || showsControls)
                 .popover(isPresented: $showsControls, arrowEdge: .bottom) {
                     controls
                 }
             }
             .onContinuousHover(perform: updateHover)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsChrome)
+            .onDisappear { showsChrome = false }
             .background(DesktopPanelWindowConfigurator())
+            .ignoresSafeArea()
     }
 
     private var controls: some View {
@@ -136,12 +150,14 @@ struct DesktopGlassPanelView: View {
     private func updateHover(_ phase: HoverPhase) {
         switch phase {
         case .active(let location):
+            showsChrome = Self.isNearEdge(location, size: CGSize(width: 680, height: 300))
             isHovering = true
             hoverVector = CGSize(
                 width: min(1, max(-1, location.x / 340 - 1)),
                 height: min(1, max(-1, location.y / 150 - 1))
             )
         case .ended:
+            showsChrome = false
             isHovering = false
             if reduceMotion {
                 hoverVector = .zero
@@ -151,6 +167,12 @@ struct DesktopGlassPanelView: View {
                 }
             }
         }
+    }
+
+    static func isNearEdge(_ point: CGPoint, size: CGSize) -> Bool {
+        let edge: CGFloat = 40
+        return CGRect(origin: .zero, size: size).contains(point) &&
+            (point.x < edge || point.y < edge || point.x >= size.width - edge || point.y >= size.height - edge)
     }
 }
 
@@ -400,6 +422,11 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
+        // Fill the native title-bar area instead of leaving an empty frame above glass.
+        window.styleMask.insert(.fullSizeContentView)
+        for button in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            window.standardWindowButton(button)?.isHidden = true
+        }
         // Stay below ordinary app windows, above Finder's desktop/icon windows.
         window.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]

@@ -130,14 +130,19 @@ public struct QuotaWidgetView: View {
                 HStack(spacing: 6) {
                     Circle().fill(.green).frame(width: 6, height: 6)
                     Text("已同步")
-                    Text(snapshot.updatedAt, style: .time)
-                        .monospacedDigit()
+                    // Keep the clock independent of account polling and snapshot timestamps.
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        Text(Date(), format: .dateTime.hour().minute().second())
+                            .monospacedDigit()
+                            .accessibilityLabel("Mac 系统时间")
+                    }
                 }
                 .font(.caption.weight(.medium))
                 .foregroundStyle(secondaryText)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(trackColor, in: Capsule())
+                .help("系统时钟每秒更新；额度数据更新于 \(snapshot.updatedAt.formatted(date: .abbreviated, time: .standard))")
             }
 
             HStack(alignment: .bottom, spacing: 30) {

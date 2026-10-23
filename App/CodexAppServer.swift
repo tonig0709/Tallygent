@@ -189,6 +189,11 @@ final class CodexAppServer: ObservableObject {
 
     func refresh() {
         guard process != nil else { connect(); return }
+        if case .failed = state {
+            state = .connecting
+            requestAccount()
+            return
+        }
         guard pendingRefresh == nil else {
             refreshQueued = true
             return
@@ -300,7 +305,8 @@ final class CodexAppServer: ObservableObject {
 
     private func handleAccount(_ object: [String: Any]) {
         guard let account = try? AppServerParser.account(from: object) else {
-            state = .failed("无法读取 Codex 账户")
+            let message = (object["error"] as? [String: Any])?["message"] as? String
+            state = .failed(message.map { "无法读取 Codex 账户：\($0)" } ?? "无法读取 Codex 账户，请重试")
             return
         }
         if account.isLoggedIn {
@@ -393,7 +399,10 @@ final class CodexAppServer: ObservableObject {
         let environment = ProcessInfo.processInfo.environment["CODEX_BINARY"]
         let paths = [
             environment,
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+            "/Applications/ChatGPT.app/Contents/Resources/codex-cli/bin/codex",
             "/Applications/ChatGPT.app/Contents/Resources/codex",
+            "/Applications/Codex.app/Contents/Resources/codex",
             "/opt/homebrew/bin/codex",
             "/usr/local/bin/codex"
         ].compactMap { $0 }

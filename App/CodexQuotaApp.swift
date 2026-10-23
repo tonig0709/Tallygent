@@ -41,6 +41,7 @@ private struct CodexQuotaMenuBarContent: View {
     @ObservedObject var server: CodexAppServer
     let menuSummary: String
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
 
     var body: some View {
         if WidgetRepairService.requiresInstalledCopy {
@@ -54,6 +55,9 @@ private struct CodexQuotaMenuBarContent: View {
             Button("打开桌面玻璃面板") {
                 openWindow(id: DesktopGlassPanelView.windowID)
                 NSApp.activate(ignoringOtherApps: true)
+            }
+            Button("关闭桌面玻璃面板") {
+                dismissWindow(id: DesktopGlassPanelView.windowID)
             }
         }
         Divider()

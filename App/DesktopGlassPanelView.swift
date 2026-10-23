@@ -52,6 +52,25 @@ struct DesktopGlassPanelView: View {
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
+            .overlay(alignment: .top) {
+                DesktopPanelDragRegion()
+                    .frame(height: 22)
+                    .padding(.horizontal, 36)
+                    .help("按住顶部拖动面板")
+            }
+            .overlay(alignment: .topLeading) {
+                Button(action: closePanel) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .frame(width: 22, height: 22)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(isLight ? .black.opacity(0.62) : .white.opacity(0.72))
+                .background(.thinMaterial, in: Circle())
+                .padding(6)
+                .help("关闭桌面玻璃面板")
+                .accessibilityLabel("关闭桌面玻璃面板")
+            }
             .overlay(alignment: .bottomTrailing) {
                 Button {
                     showsControls.toggle()
@@ -86,9 +105,7 @@ struct DesktopGlassPanelView: View {
             HStack {
                 Button("立即刷新") { server.refresh() }
                 Spacer()
-                Button("关闭面板") {
-                    dismissWindow(id: Self.windowID)
-                }
+                Button("关闭面板", action: closePanel)
             }
         }
         .padding(16)
@@ -97,6 +114,11 @@ struct DesktopGlassPanelView: View {
 
     private var appearanceMode: GlassAppearanceMode {
         GlassAppearanceMode(rawValue: appearanceRaw) ?? .dark
+    }
+
+    private func closePanel() {
+        showsControls = false
+        dismissWindow(id: Self.windowID)
     }
 
     private var glassTone: GlassTone {
@@ -128,6 +150,22 @@ struct DesktopGlassPanelView: View {
                     hoverVector = .zero
                 }
             }
+        }
+    }
+}
+
+// Use AppKit's native window drag loop; SwiftUI content is not a window background.
+struct DesktopPanelDragRegion: NSViewRepresentable {
+    func makeNSView(context: Context) -> DragView { DragView() }
+    func updateNSView(_ view: DragView, context: Context) {}
+
+    final class DragView: NSView {
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        override func resetCursorRects() {
+            addCursorRect(bounds, cursor: .openHand)
+        }
+        override func mouseDown(with event: NSEvent) {
+            window?.performDrag(with: event)
         }
     }
 }
@@ -341,7 +379,7 @@ private struct DesktopVisualEffectView: NSViewRepresentable {
     }
 }
 
-private struct DesktopPanelWindowConfigurator: NSViewRepresentable {
+struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async { configure(view.window) }
@@ -352,15 +390,18 @@ private struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         DispatchQueue.main.async { configure(view.window) }
     }
 
-    private func configure(_ window: NSWindow?) {
+    func configure(_ window: NSWindow?) {
         guard let window else { return }
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = true
+        window.ignoresMouseEvents = false
+        window.isMovable = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.desktopIconWindow)))
+        // Stay below ordinary app windows, above Finder's desktop/icon windows.
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         window.invalidateShadow()
     }

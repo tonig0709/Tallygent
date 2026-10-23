@@ -76,3 +76,7 @@ publishing that draft:
 - [ ] Generate new Codex usage and confirm quota plus seven-day trend update
       within one minute.
 - [ ] Only after every item passes, publish the draft Release on GitHub.
+- [ ] Open the desktop glass panel while Finder is active; drag its top strip,
+      verify the window moves, then close using X. Reopen it, confirm settings
+      still respond, and close using the menu-bar action. Closing the panel must
+      not quit the App or stop widget synchronization.

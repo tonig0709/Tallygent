@@ -156,6 +156,8 @@ RUBY
 pass "the last mutable artifact is gated before a draft release can be created"
 
 section "Source, parser, and visual render checks"
+sh scripts/check-codex-discovery.sh
+sh scripts/check-desktop-panel.sh
 swift run quota-self-check
 xcrun swiftc \
     -parse-as-library \

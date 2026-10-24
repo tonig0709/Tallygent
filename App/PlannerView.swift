@@ -144,7 +144,6 @@ struct PlannerView: View {
                     .fixedSize()
                 Spacer()
                 Button("生成建议") {
-                    profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: profileIsManual)
                     override = nil; recommend()
                 }
                 .buttonStyle(.borderedProminent)
@@ -229,9 +228,9 @@ struct PlannerView: View {
                         notice = "已复制模型与 effort；请自行在 \(selected.model.provider.title) 中应用。"
                     }
                     Button("保存为计划") { save(selected, start: false) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500)
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Button("标记开始") { save(selected, start: true) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500)
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Spacer()
                 }
             } else {
@@ -364,8 +363,13 @@ struct PlannerView: View {
     }
 
     private func recommend() {
+        let resolved = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: profileIsManual)
+        if profile != resolved { profile = resolved }
         advice = PlannerEngine.advise(profile: effectiveProfile, preference: preference, models: models,
                                        quota: server.plannerQuota(), reserve: reserve, records: store.records, override: override)
+        if taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            advice?.warnings.insert("尚未填写任务描述；此时只能查看配置，不能评估适配性或保存任务。", at: 0)
+        }
     }
 
     private func save(_ configuration: PlannerConfiguration, start: Bool) {

@@ -8,7 +8,7 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 > [下载最新正式版](https://github.com/tonig0709/codex-quota-widget/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **待发布候选：v0.5.8（build 44）。** 保留 Codex Quota 名称，加入 Claude Code 实验性接入、面板正文拖动及玻璃细节调整。
+> **待发布候选：v0.5.9（build 45）。** 保留 Codex Quota 名称，加入 Claude Code 实验性接入、面板正文拖动及玻璃细节调整。
 > 候选源码和测试附件不代表正式版已经更新；草稿 Release 只有发布后才会公开，以上正式版下载入口仍指向已发布版本。
 
 ## 三种尺寸，一个桌面面板
@@ -24,7 +24,7 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 
 - **像翻照片一样选择**：在 App 预览区用触控板左右滑动，也可点击左右箭头或模式名称。
 - **始终只有一个**：已打开的桌面面板直接切换内容与尺寸，不会创建第二个窗口；保留面板左上角位置。
-- **自由移动**：当前公开版按住顶部拖动；v0.5.8 候选支持在面板正文任意位置按住拖动。鼠标靠近边缘时显示关闭与设置入口，移开自动隐藏。
+- **自由移动**：当前公开版按住顶部拖动；v0.5.9 候选支持在面板正文任意位置按住拖动。鼠标靠近边缘时显示关闭与设置入口，移开自动隐藏。
 - **保留全部玻璃参数**：自动/深/浅外观、不透明度（35–100%）、边缘强度、弹性高光、圆角、折射模式、位移、磨砂、色彩增益、色散与色调。
 - **参数即时共用**：三种模式沿用相同参数与现有底层玻璃渲染，切换不重置；也可直接在面板设置弹窗调整。
 - **额度颜色不变**：剩余 ≥60% 为绿色，30–59% 为橙色，<30% 为红色。
@@ -33,7 +33,7 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 这不是系统“编辑小组件”中的组件；不需要搜索组件库，也不会改变其他图标的透明度。
 粒子实验不包含在本次稳定玻璃面板实现中。
 
-## v0.5.8 候选：多服务与玻璃调整
+## v0.5.9 候选：多服务与玻璃调整
 
 在 App 中选择 **Codex** 或 **Claude Code（实验性）**，已打开的同一个面板随服务切换；三种尺寸、位置与玻璃参数保持共用。
 候选还调整了中型面板留白，增强 **边缘色散** 和 **磨砂深度** 的可见变化。色散只作用于边缘；磨砂深度控制雾化层，系统背景模糊仍由 macOS 决定。
@@ -54,7 +54,7 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 
 请在 [最新正式版页面](https://github.com/tonig0709/codex-quota-widget/releases/latest) 下载对应版本的 **Codex-Quota-…-macOS.dmg**，不要下载旧版或 Source code。
 
-- 当前公开附件为 **Codex-Quota-v0.5.7-macOS.dmg**；它不包含上方 v0.5.8 候选功能。请以实际发布说明与附件为准。
+- 当前公开附件为 **Codex-Quota-v0.5.7-macOS.dmg**；它不包含上方 v0.5.9 候选功能。请以实际发布说明与附件为准。
 - 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
 - 打开 DMG，将 **Codex Quota.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
 - 仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证。Ad-hoc 测试版未公证，可能仍需系统首次打开确认。

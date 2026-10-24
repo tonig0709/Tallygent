@@ -221,6 +221,14 @@ struct MultiProviderProbe {
         try expect(snapshot.displayWindow(weekly, at: lastReset) == nil &&
                    snapshot.statusLabel(at: lastReset) == "窗口待更新",
                    "Fully expired Claude windows are still presented as usable quota")
+        try expect(snapshot.menuSummary(at: before) == "周额度剩余 30%" &&
+                   snapshot.menuSummary(at: firstReset) == "周额度剩余 30%" &&
+                   snapshot.menuSummary(at: lastReset) == "等待额度数据",
+                   "The menu presents expired Claude weekly quota or hides a still-current weekly window")
+        var missingWeekly = snapshot
+        missingWeekly.weekly = nil
+        try expect(missingWeekly.menuSummary(at: before) == "等待额度数据",
+                   "The menu invents a weekly percentage from a missing Claude window")
         try expect(snapshot.claudePresentationKey(at: before) != snapshot.claudePresentationKey(at: firstReset) &&
                    snapshot.claudePresentationKey(at: firstReset) != snapshot.claudePresentationKey(at: lastReset),
                    "A reset does not invalidate the unchanged-file presentation")
@@ -241,6 +249,9 @@ struct MultiProviderProbe {
         codex.service = .codex
         try expect(codex.displayWindow(fiveHour, at: lastReset) == fiveHour,
                    "Claude expiry handling changed the established Codex presentation")
+        try expect(codex.menuSummary(at: lastReset) == "周额度剩余 30%" &&
+                   UsageSnapshot.empty.menuSummary(at: lastReset) == "等待额度数据",
+                   "Claude menu expiry changed the established Codex wording or missing-data behavior")
         try expect(snapshot.fiveHour == fiveHour && snapshot.weekly == weekly && snapshot.receivedAt == receivedAt,
                    "Presentation changed the original record or fabricated a refresh")
     }

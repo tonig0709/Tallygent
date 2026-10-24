@@ -75,7 +75,7 @@ private struct QuotaMediumPanelView: View {
                 Text(snapshot.resolvedService.title).font(.headline.weight(.semibold)).tracking(-0.3)
                 if snapshot.resolvedService == .claude {
                     Spacer()
-                    Text("会话记录").font(.caption2).foregroundStyle(.secondary)
+                    Text(snapshot.statusLabel(at: .now)).font(.caption2).foregroundStyle(.secondary)
                 }
             }
             quotaBar("5h额度", window: snapshot.fiveHour)
@@ -90,7 +90,7 @@ private struct QuotaMediumPanelView: View {
     }
 
     private func quotaBar(_ title: String, window: UsageWindow?) -> some View {
-        let remaining = window?.remainingPercent
+        let remaining = snapshot.displayWindow(window)?.remainingPercent
         let color: Color = switch QuotaLevel(remainingPercent: remaining ?? 0) {
         case .healthy: .green
         case .warning: .orange
@@ -219,7 +219,7 @@ public struct QuotaWidgetView: View {
     }
 
     private func quotaSection(title: String, window: UsageWindow?) -> some View {
-        let remaining = window?.remainingPercent
+        let remaining = snapshot.displayWindow(window)?.remainingPercent
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
@@ -256,6 +256,9 @@ public struct QuotaWidgetView: View {
     }
 
     private func resetText(for window: UsageWindow?) -> String {
+        if snapshot.resolvedService == .claude, window != nil, snapshot.displayWindow(window) == nil {
+            return "已到重置时间，等待会话更新"
+        }
         guard let date = window?.resetsAt else { return "等待账户数据" }
         return "\(date.formatted(date: .numeric, time: .shortened)) 重置"
     }
@@ -285,7 +288,8 @@ public struct QuotaRingWidgetView: View {
                 quotaRing(title: "周", window: snapshot.weekly)
             }
             if snapshot.resolvedService == .claude {
-                Text("Claude · 会话记录").font(.caption2).foregroundStyle(.secondary)
+                Text("Claude · \(snapshot.statusLabel(at: .now))").font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(1).minimumScaleFactor(0.8)
             }
         }
         .padding(12)
@@ -295,7 +299,7 @@ public struct QuotaRingWidgetView: View {
     }
 
     private func quotaRing(title: String, window: UsageWindow?) -> some View {
-        let remaining = window?.remainingPercent
+        let remaining = snapshot.displayWindow(window)?.remainingPercent
         return VStack(spacing: 7) {
             ZStack {
                 Circle().stroke(trackColor, lineWidth: 8)

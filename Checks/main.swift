@@ -218,10 +218,16 @@ await MainActor.run {
     // A second provider uses the same native surface in all sizes, including
     // the waiting state. It must never become a black or sample-filled panel.
     for appearance in [WidgetAppearance.dark, .light] {
-        for hasQuota in [false, true] {
+        for state in ["waiting", "quota", "expired"] {
+            var fiveHour = state == "waiting" ? nil : boundary.fiveHour
+            var weekly = state == "waiting" ? nil : boundary.weekly
+            if state == "expired" {
+                fiveHour?.resetsAt = Date(timeIntervalSince1970: 1)
+                weekly?.resetsAt = Date(timeIntervalSince1970: 1)
+            }
             let claude = UsageSnapshot(
-                fiveHour: hasQuota ? boundary.fiveHour : nil,
-                weekly: hasQuota ? boundary.weekly : nil,
+                fiveHour: fiveHour,
+                weekly: weekly,
                 appearance: appearance, service: .claude
             )
             for mode in DesktopPanelMode.allCases {
@@ -229,7 +235,7 @@ await MainActor.run {
                     QuotaPanelContent(mode: mode, snapshot: claude, glassOpacity: 0.35),
                     on: LiquidGlassSurface(isLight: appearance == .light, opacity: 0.35, accent: .blue),
                     width: mode.size.width, height: mode.size.height,
-                    label: "Claude \(mode.rawValue) \(appearance.rawValue) \(hasQuota ? "quota" : "waiting")",
+                    label: "Claude \(mode.rawValue) \(appearance.rawValue) \(state)",
                     regions: [("content", CGRect(x: 0.05, y: 0.1, width: 0.9, height: 0.8))]
                 )
             }

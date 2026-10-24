@@ -10,3 +10,6 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     -framework Foundation -framework Combine -framework CryptoKit \
     -o "$probe_dir/provider-probe"
 "$probe_dir/provider-probe" "$probe_dir"
+# Time-only expiry must invalidate an otherwise unchanged SwiftUI child input.
+grep -Fq '.id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")' App/DashboardView.swift
+grep -Fq '.id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")' App/DesktopGlassPanelView.swift

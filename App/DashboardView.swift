@@ -51,6 +51,7 @@ struct DashboardView: View {
                     HStack(spacing: 0) {
                         ForEach(DesktopPanelMode.allCases) { page in
                             QuotaPanelContent(mode: page, snapshot: previewSnapshot, glassOpacity: glassOpacity)
+                                .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
                                 .frame(width: page.size.width, height: page.size.height)
                                 .background {
                                 LiquidGlassSurface(
@@ -127,7 +128,7 @@ struct DashboardView: View {
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             if server.service == .claude {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Claude Code 会话运行时接收额度；退出后保留最后记录。仅绑定一个会话，不读取登录凭证。")
+                    Text("需要 Claude Code 提供订阅额度。会话退出后保留记录，过期窗口显示待更新。仅绑定一个会话，不读取登录凭证。")
                     HStack {
                         Button("启用本地接入") { server.enableClaudeBridge() }
                         Button("移除接入") { server.removeClaudeBridge() }
@@ -191,7 +192,7 @@ struct DashboardView: View {
         if server.service == .claude {
             if case .failed(let message) = server.state { return message }
             return server.snapshot.hasQuota
-                ? "会话记录 · \(server.snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))"
+                ? "\(server.snapshot.statusLabel(at: .now)) · \(server.snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))"
                 : "等待 Claude Code 会话数据"
         }
         return switch server.state {

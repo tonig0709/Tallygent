@@ -35,6 +35,7 @@ struct DesktopGlassPanelView: View {
 
     var body: some View {
         QuotaPanelContent(mode: mode, snapshot: panelSnapshot, glassOpacity: glassOpacity)
+            .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
             .frame(width: mode.size.width, height: mode.size.height)
             .background {
                 DesktopGlassSurface(

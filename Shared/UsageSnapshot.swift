@@ -166,10 +166,28 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     public var hasQuota: Bool { fiveHour != nil || weekly != nil }
     public var lastReceivedAt: Date { receivedAt ?? updatedAt }
 
+    /// Retain the source record, but never present a reset Claude window as current quota.
+    public func displayWindow(_ window: UsageWindow?, at now: Date = .now) -> UsageWindow? {
+        guard let window else { return nil }
+        if resolvedService == .claude, let reset = window.resetsAt, reset <= now { return nil }
+        return window
+    }
+
     public func statusLabel(at now: Date) -> String {
         guard hasQuota else { return "等待数据" }
-        if resolvedService == .claude { return "会话记录" }
+        if resolvedService == .claude {
+            let windows = [fiveHour, weekly].compactMap { $0 }
+            let expired = windows.filter { displayWindow($0, at: now) == nil }.count
+            if expired == windows.count { return "窗口待更新" }
+            if expired > 0 { return "部分窗口待更新" }
+            return now.timeIntervalSince(lastReceivedAt) > 300 ? "较旧会话记录" : "会话记录"
+        }
         return now.timeIntervalSince(lastReceivedAt) > 60 ? "数据待刷新" : "已同步"
+    }
+
+    /// Time changes presentation only at receipt-age and individual reset boundaries.
+    public func claudePresentationKey(at now: Date = .now) -> String {
+        "\(statusLabel(at: now)):\(displayWindow(fiveHour, at: now) != nil):\(displayWindow(weekly, at: now) != nil)"
     }
 
     public static let empty = UsageSnapshot(updatedAt: .distantPast)

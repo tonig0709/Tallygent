@@ -1,9 +1,10 @@
-# Multi-agent quota monitoring — experimental foundation
+# Multi-agent quota monitoring — v0.5.8 candidate
 
-The tested build 42 remains the local stable baseline. This work extends the
-existing native panel, not WidgetKit or the particle experiment. Public naming
-and artwork are a separate final decision; bundle identity and glass settings
-remain compatible.
+The candidate targets v0.5.8 (build 44), extending the tested build 42 panel and
+build 43 dual-service foundation. The public stable release remains v0.5.7
+(build 41) until a checked draft is published. The product name stays Codex Quota;
+bundle identity and glass settings remain compatible. This work uses the existing
+three native movable panels, not WidgetKit or the particle experiment.
 
 ## Data flow
 
@@ -27,13 +28,17 @@ independent of provider selection.
   account inference or merging unrelated accounts.
 - Existing third-party statusLine configuration causes a refusal with guidance,
   rather than silent replacement. Other settings are preserved. Removing the
-  integration restores only the configuration owned by this app.
+  integration restores only the configuration owned by this app and retains the
+  last quota record; resetting the session clears that record.
 - Local record stores normalized quota windows, receipt time and a session hash.
-  Raw statusLine input, prompt text, paths, credentials and transcripts are not saved.
+  Raw statusLine input, prompt text, paths and transcripts are not saved. Setup
+  must read and back up the full existing settings JSON to preserve other fields;
+  its owner-only 0600 backup may therefore include pre-existing env secrets.
 - Receipt time describes local ingestion, not a fresh server read. Refreshing the
   UI only rereads the file. Claude Code must be running and emit usable quota data.
 - Missing quota remains missing; no fake 0%, sample values or synthetic seven-day
-  Token history in the production UI. Cached or expired records are identified.
+  Token history in the production UI. No subscription or an unsupported session
+  may yield no quota fields. Cached or expired records are identified.
 
 Official interface: https://code.claude.com/docs/en/statusline
 
@@ -44,11 +49,15 @@ Official interface: https://code.claude.com/docs/en/statusline
 2. Real-account validation: a subscribing volunteer runs the test version and
    confirms actual quota, reset fields, activity/idle/exit behavior and existing
    statusLine compatibility. No password or API token needs to be shared.
-3. Branding: agree the name, draw the icon and update display names/download
-   documentation while retaining the bundle ID and preference keys.
+3. Branding: retain Codex Quota for this candidate. A future name/icon decision
+   must retain the bundle ID and preference keys unless an explicit migration is added.
 4. Release: universal full-Xcode builds on macOS 14/15/26, existing full release
    preflight plus provider checks, then desktop drag/close/reopen/hover smoke test.
    Until real-account validation, Claude remains experimental.
+
+For this delivery, stop before publication: prepare the candidate, test results
+and draft notes. Do not update the public "latest" download to an unpublished
+artifact or describe simulated Claude input as real-account acceptance.
 
 No claim of verified real Claude subscription access can be made from simulated
 input alone. Further providers require a documented data source and separate

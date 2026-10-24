@@ -13,18 +13,21 @@ final class QuotaMonitor: ObservableObject {
     private let codex: CodexAppServer
     private let defaults: UserDefaults
     private let claudeURL: URL
+    private let now: () -> Date
     private var claudeRecord: ClaudeStatuslineRecord?
     private var claudeError: String?
+    private var lastClaudePresentationKey: String?
     private var subscriptions = Set<AnyCancellable>()
     private var refreshTimer: Timer?
     private var started = false
 
     init(codex: CodexAppServer? = nil, defaults: UserDefaults = .standard,
-         claudeURL: URL = ClaudeStatuslineStore.defaultURL) {
+         claudeURL: URL = ClaudeStatuslineStore.defaultURL, now: @escaping () -> Date = { .now }) {
         let codex = codex ?? CodexAppServer()
         self.codex = codex
         self.defaults = defaults
         self.claudeURL = claudeURL
+        self.now = now
         service = AgentService(rawValue: defaults.string(forKey: "selectedAgentService") ?? "") ?? .codex
         codex.$snapshot.combineLatest(codex.$state).sink { [weak self] value, state in
             guard let self, self.service == .codex else { return }
@@ -99,7 +102,9 @@ final class QuotaMonitor: ObservableObject {
     private func readClaude() {
         do {
             let record = try ClaudeStatuslineStore.load(from: claudeURL)
-            guard record != claudeRecord || claudeError != nil else { return }
+            let presentationChanged = service == .claude &&
+                snapshot.claudePresentationKey(at: now()) != lastClaudePresentationKey
+            guard record != claudeRecord || claudeError != nil || presentationChanged else { return }
             claudeError = nil
             claudeRecord = record
             if service == .claude { publishSelection() }
@@ -121,6 +126,7 @@ final class QuotaMonitor: ObservableObject {
                 updatedAt: date, service: .claude, receivedAt: claudeRecord?.receivedAt
             )
             state = claudeError.map(State.failed) ?? (snapshot.hasQuota ? .connected(nil) : .disconnected)
+            lastClaudePresentationKey = snapshot.claudePresentationKey(at: now())
         }
     }
 }

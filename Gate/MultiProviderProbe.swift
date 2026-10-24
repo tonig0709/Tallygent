@@ -46,6 +46,7 @@ struct MultiProviderProbe {
                                                attributes: [.posixPermissions: 0o700])
         try parserAndStore(at: root)
         try setup(at: root)
+        try presentation()
         try coordinator(at: root)
         print("Agent provider probe passed: parser, private cache, reversible setup, selection and freshness.")
     }
@@ -201,6 +202,49 @@ struct MultiProviderProbe {
                    "Refusing external modifications lost the settings or backup")
     }
 
+    private static func presentation() throws {
+        let fiveHour = UsageWindow(usedPercent: 25, windowDurationMinutes: 300,
+                                   resetsAt: receivedAt.addingTimeInterval(100))
+        let weekly = UsageWindow(usedPercent: 70, windowDurationMinutes: 10_080,
+                                 resetsAt: receivedAt.addingTimeInterval(700))
+        let snapshot = UsageSnapshot(fiveHour: fiveHour, weekly: weekly,
+                                     updatedAt: receivedAt, service: .claude, receivedAt: receivedAt)
+        let before = receivedAt.addingTimeInterval(99)
+        let firstReset = receivedAt.addingTimeInterval(100)
+        let lastReset = receivedAt.addingTimeInterval(700)
+        try expect(snapshot.displayWindow(fiveHour, at: before) == fiveHour &&
+                   snapshot.statusLabel(at: before) == "会话记录", "A current Claude window was hidden")
+        try expect(snapshot.displayWindow(fiveHour, at: firstReset) == nil &&
+                   snapshot.displayWindow(weekly, at: firstReset) == weekly &&
+                   snapshot.statusLabel(at: firstReset) == "部分窗口待更新",
+                   "A reset Claude window is still presented as current remaining quota")
+        try expect(snapshot.displayWindow(weekly, at: lastReset) == nil &&
+                   snapshot.statusLabel(at: lastReset) == "窗口待更新",
+                   "Fully expired Claude windows are still presented as usable quota")
+        try expect(snapshot.claudePresentationKey(at: before) != snapshot.claudePresentationKey(at: firstReset) &&
+                   snapshot.claudePresentationKey(at: firstReset) != snapshot.claudePresentationKey(at: lastReset),
+                   "A reset does not invalidate the unchanged-file presentation")
+        try expect(snapshot.claudePresentationKey(at: firstReset) ==
+                   snapshot.claudePresentationKey(at: receivedAt.addingTimeInterval(600)),
+                   "An unchanged presentation causes unnecessary quota publications")
+        var undated = snapshot
+        undated.fiveHour?.resetsAt = nil
+        undated.weekly?.resetsAt = nil
+        try expect(undated.statusLabel(at: receivedAt.addingTimeInterval(300)) == "会话记录" &&
+                   undated.statusLabel(at: receivedAt.addingTimeInterval(301)) == "较旧会话记录" &&
+                   undated.displayWindow(undated.fiveHour, at: lastReset) != nil,
+                   "Receipt age either stays fresh forever or invents a reset without a timestamp")
+        try expect(undated.claudePresentationKey(at: receivedAt.addingTimeInterval(300)) !=
+                   undated.claudePresentationKey(at: receivedAt.addingTimeInterval(301)),
+                   "The receipt-age transition does not invalidate presentation")
+        var codex = snapshot
+        codex.service = .codex
+        try expect(codex.displayWindow(fiveHour, at: lastReset) == fiveHour,
+                   "Claude expiry handling changed the established Codex presentation")
+        try expect(snapshot.fiveHour == fiveHour && snapshot.weekly == weekly && snapshot.receivedAt == receivedAt,
+                   "Presentation changed the original record or fabricated a refresh")
+    }
+
     @MainActor
     private static func coordinator(at root: URL) throws {
         let defaults = MemoryDefaults()
@@ -252,5 +296,35 @@ struct MultiProviderProbe {
         try expect(absent.snapshot.statusLabel(at: .now) == "等待数据", "Missing quota is described as synchronized")
         try expect(monitor.snapshot.statusLabel(at: receivedAt.addingTimeInterval(600)) != "已同步",
                    "An old Claude session record is described as live synchronization")
+
+        let expiryURL = root.appendingPathComponent("expiring-coordinator.json")
+        let expiring = ClaudeStatuslineRecord(
+            fiveHour: .init(usedPercent: 25, windowDurationMinutes: 300, resetsAt: receivedAt.addingTimeInterval(10)),
+            weekly: .init(usedPercent: 70, windowDurationMinutes: 10_080, resetsAt: receivedAt.addingTimeInterval(20)),
+            receivedAt: receivedAt, sessionFingerprint: record.sessionFingerprint
+        )
+        try ClaudeStatuslineStore.save(expiring, to: expiryURL)
+        let originalBytes = try Data(contentsOf: expiryURL)
+        var clock = receivedAt
+        let expiryCodex = CodexAppServer()
+        let expiryMonitor = QuotaMonitor(codex: expiryCodex, defaults: defaults, claudeURL: expiryURL, now: { clock })
+        let rawSnapshot = expiryMonitor.snapshot
+        var publications = 0
+        let observation = expiryMonitor.$snapshot.dropFirst().sink { _ in publications += 1 }
+        defer { observation.cancel() }
+        clock = receivedAt.addingTimeInterval(11)
+        expiryMonitor.refresh()
+        try expect(publications == 1 && expiryMonitor.snapshot.statusLabel(at: clock) == "部分窗口待更新",
+                   "An unchanged file does not notify the desktop at its first reset")
+        clock = receivedAt.addingTimeInterval(15)
+        expiryMonitor.refresh()
+        try expect(publications == 1, "An unchanged Claude presentation publishes on every polling tick")
+        clock = receivedAt.addingTimeInterval(21)
+        expiryMonitor.refresh()
+        try expect(publications == 2 && expiryMonitor.snapshot.statusLabel(at: clock) == "窗口待更新",
+                   "The remaining window does not expire without another status-line emission")
+        try expect(expiryMonitor.snapshot == rawSnapshot && Data(contentsOf: expiryURL) == originalBytes &&
+                   expiryCodex.connectCount == 0 && expiryCodex.refreshCount == 0,
+                   "A local expiry changed the raw record, receipt time, or contacted Codex")
     }
 }

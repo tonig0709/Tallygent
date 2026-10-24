@@ -166,9 +166,15 @@ struct GlassSettingsView: View {
                 .pickerStyle(.segmented)
 
                 slider("折射位移", value: $displacement, range: 0...1, format: .percent)
-                slider("磨砂", value: $blurAmount, range: 0...1, format: .percent)
+                slider("磨砂深度", value: $blurAmount, range: 0...1, format: .percent)
+                    .help("调整玻璃表面的雾化浓度；真实背景模糊由 macOS 系统材质决定，不是可调模糊半径。")
                 slider("色彩增益", value: $saturation, range: 1...2.2, format: .multiplier)
-                slider("色散", value: $dispersion, range: 0...0.30, format: .percent)
+                slider("边缘色散", value: dispersionStrength, range: 0...1, format: .percent)
+                    .help("调整边缘红青分光高光，不改变文字和进度条颜色，也不对壁纸做真实 RGB 折射。")
+
+                Text("磨砂深度控制表面雾化；背景模糊由系统材质决定。边缘色散只作用于玻璃轮廓。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Picker("玻璃色调", selection: tone) {
                     ForEach(GlassTone.allCases) { tone in
@@ -255,6 +261,14 @@ struct GlassSettingsView: View {
         Binding(
             get: { GlassTone(rawValue: toneRaw) ?? .neutral },
             set: { toneRaw = $0.rawValue }
+        )
+    }
+
+    // Keep existing 0...0.30 preferences compatible while exposing full 0...100% travel.
+    private var dispersionStrength: Binding<Double> {
+        Binding(
+            get: { GlassOptics(blurAmount: blurAmount, dispersion: dispersion).dispersionStrength },
+            set: { dispersion = min(0.30, max(0, $0 * 0.30)) }
         )
     }
 

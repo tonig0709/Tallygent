@@ -21,6 +21,7 @@ Local non-destructive checks are `swift run quota-self-check` and `./scripts/che
   Small reuses both quota rings, medium omits the trend, large retains it.
 - **One panel:** repeated show calls do not create a second window; close/reopen works.
   Resizing preserves the top-left position, accepts keyboard focus, and keeps the panel below normal apps but above Finder.
+  The production drag surface covers the panel body and excludes transparent rounded corners.
 - **Selector restoration:** a hosted production Dashboard must position its native scroll
   view on the persisted mode, not just mark a mode button selected. Its minimum height
   must accommodate the complete selector and action row after restoring an old window.
@@ -33,6 +34,10 @@ Local non-destructive checks are `swift run quota-self-check` and `./scripts/che
   delayed and queued refreshes, quota progress despite missing trend, preservation of
   last valid trend, unchanged snapshot stability and port-collision recovery.
   Every mode renders the production snapshot client output. Identity is removed from the local endpoint.
+- **Provider isolation:** temporary Claude settings and records prove bounded input,
+  missing-data semantics, session binding/reset, receipt time, refusal to overwrite
+  another statusLine and reversible setup. Switching providers cannot mix their caches
+  or allow a late Codex response to replace selected Claude content.
 - **Update safety:** non-installed copies cannot connect an account or occupy the local port.
   Tagged builds are monotonic and match their marketing version.
 - **Exact artifact:** full Xcode universal arm64+x86_64 build, valid app signature,
@@ -53,13 +58,36 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
       At 0.35, wallpaper must remain visible; 1.00 dark must stay near-black.
 - [ ] Adjust all sliders in the App and in the panel popover. The placed panel follows continuously;
       mode changes preserve all current values.
-- [ ] With Finder active, reveal edge controls, drag the top region, close with X, reopen,
+- [ ] With Finder active, reveal edge controls, drag from the title, center, quota content and lower body, close with X, reopen,
       and close via the menu bar. Moving to the center/outside hides chrome.
       Controls stay available while the settings popover is open.
+- [ ] Edge dispersion at 0%/100% visibly changes only the rim. Frost depth at 0%/100%
+      visibly changes haze at minimum opacity, while fully opaque dark glass stays black.
+      Labels must distinguish native system blur from the adjustable haze layer; no private backdrop APIs or screen capture are used.
 - [ ] Generate usage; verify 5h, weekly and large-panel trend refresh within the expected polling cycle.
       Closing a panel must not stop the App's connection.
+- [ ] Switch Codex → Claude → Codex in each panel size. The same single panel follows;
+      glass settings and position remain unchanged, and unavailable Claude quota is not 0%.
+      Claude is visibly experimental and its timestamp is a local receipt time, not a server refresh claim.
+- [ ] For Claude, explicitly test enable/remove/reset using disposable settings first.
+      Existing third-party statusLine must be refused; unrelated settings must survive setup/removal.
+      Only claim real Claude subscription support after a subscribing tester verifies activity,
+      idle/exit behavior, reset fields and session switching. Record an untested result honestly;
+      an experimental release may retain that limitation, never mark it as a real-account pass.
 - [ ] Verify the installed bundle contains no WidgetKit extension. Old desktop widgets are manually removed;
       do not clear global system caches.
 - [ ] Homepage/download instructions clearly identify which published DMG contains this panel-only product.
       Do not advertise a draft or older widget release as the new build.
 - [ ] Publish the draft only after all checks above pass.
+
+## Experimental multi-agent checks
+
+- Run `sh scripts/check-agent-providers.sh` before packaging. It must preserve
+  provider isolation, missing-data semantics, receipt time, and existing Claude
+  configuration using temporary files only.
+- Confirm Codex/Claude selection updates the same single desktop panel in all
+  sizes, retaining glass preferences and position. Claude is labeled experimental
+  and as a session record; it must not claim a fresh background server query.
+- Test actual Claude subscription input with a subscribing volunteer before
+  claiming real-account support. Mock data cannot satisfy this check.
+- Keep bridge setup opt-in; an existing third-party statusLine must remain intact.

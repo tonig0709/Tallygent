@@ -2,8 +2,15 @@ import AppKit
 import SwiftUI
 
 @main
+enum CodexQuotaMain {
+    static func main() {
+        if let status = ClaudeStatuslineBridge.runIfRequested() { exit(status) }
+        CodexQuotaApp.main()
+    }
+}
+
 struct CodexQuotaApp: App {
-    @StateObject private var server = CodexAppServer()
+    @StateObject private var server = QuotaMonitor()
 
     var body: some Scene {
         WindowGroup {
@@ -27,7 +34,7 @@ struct CodexQuotaApp: App {
 }
 
 private struct CodexQuotaMenuBarContent: View {
-    @ObservedObject var server: CodexAppServer
+    @ObservedObject var server: QuotaMonitor
     let menuSummary: String
 
     var body: some View {
@@ -35,6 +42,9 @@ private struct CodexQuotaMenuBarContent: View {
             Text("请从“应用程序”启动")
             Button("打开“应用程序”文件夹") { AppInstallation.revealApplicationsFolder() }
         } else {
+            Picker("监测服务", selection: Binding(get: { server.service }, set: server.selectService)) {
+                ForEach(AgentService.allCases) { Text($0.title).tag($0) }
+            }
             Text(menuSummary)
             Divider()
             Button("立即刷新") { server.refresh() }

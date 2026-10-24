@@ -1,18 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Codex Quota dual quota gauges">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#253651"/><stop offset=".48" stop-color="#101725"/><stop offset="1" stop-color="#080b12"/></linearGradient>
-    <radialGradient id="glow" cx=".24" cy=".1" r=".9"><stop stop-color="#b9dcff" stop-opacity=".72"/><stop offset=".32" stop-color="#4d8de8" stop-opacity=".28"/><stop offset="1" stop-color="#17335f" stop-opacity="0"/></radialGradient>
-    <linearGradient id="bar" x1="0" y1="1" x2="0" y2="0"><stop stop-color="#2d7ce5"/><stop offset="1" stop-color="#7ec8ff"/></linearGradient>
-    <filter id="shadow"><feDropShadow dx="0" dy="30" stdDeviation="34" flood-color="#000" flood-opacity=".48"/></filter>
+    <radialGradient id="glass" cx=".205" cy=".098" r="1">
+      <stop stop-color="#353f50"/>
+      <stop offset=".5" stop-color="#19212e"/>
+      <stop offset="1" stop-color="#10151e"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#d2e6f6" stop-opacity=".59"/>
+      <stop offset="1" stop-color="#6c839b" stop-opacity=".14"/>
+    </linearGradient>
+    <linearGradient id="ice" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#bee8ff"/>
+      <stop offset="1" stop-color="#4c9edb"/>
+    </linearGradient>
+    <linearGradient id="mint" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#abefd8"/>
+      <stop offset="1" stop-color="#41b091"/>
+    </linearGradient>
+    <filter id="shadow" x="-.1" y="-.1" width="1.2" height="1.2">
+      <feDropShadow dy="18" stdDeviation="22" flood-opacity=".44"/>
+    </filter>
+    <filter id="glow" x="-.1" y="-.1" width="1.2" height="1.2">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
   </defs>
-  <rect x="62" y="62" width="900" height="900" rx="220" fill="url(#bg)" filter="url(#shadow)"/>
-  <rect x="63" y="63" width="898" height="898" rx="219" fill="url(#glow)" stroke="#fff" stroke-opacity=".28" stroke-width="4"/>
-  <g fill="url(#bar)">
-    <rect x="260" y="560" width="92" height="190" rx="38"/>
-    <rect x="406" y="430" width="92" height="320" rx="38"/>
-    <rect x="552" y="285" width="92" height="465" rx="38"/>
-    <rect x="698" y="485" width="92" height="265" rx="38"/>
+  <rect x="62" y="62" width="900" height="900" rx="214" fill="url(#glass)" filter="url(#shadow)"/>
+  <rect x="64.5" y="64.5" width="895" height="895" rx="211.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <rect x="71.5" y="71.5" width="881" height="881" rx="205.5" fill="none" stroke="#0a0e15" stroke-opacity=".38" stroke-width="3"/>
+  <g fill="none" stroke="#5d748b" stroke-opacity=".21">
+    <circle cx="512" cy="512" r="274" stroke-width="64"/>
+    <circle cx="512" cy="512" r="171" stroke-width="58"/>
   </g>
-  <path d="M230 820h560" stroke="#dcedff" stroke-opacity=".42" stroke-width="18" stroke-linecap="round"/>
-  <path d="M175 220c190-105 400-96 635 25" fill="none" stroke="#fff" stroke-opacity=".36" stroke-width="22" stroke-linecap="round"/>
+  <g fill="none" stroke-linecap="round">
+    <g opacity=".1" filter="url(#glow)">
+      <path d="M512 238A274 274 0 1 1 242.163 464.42" stroke="#4c9edb" stroke-width="64"/>
+      <path d="M512 341A171 171 0 1 1 393.212 635.009" stroke="#41b091" stroke-width="58"/>
+    </g>
+    <path d="M512 238A274 274 0 1 1 242.163 464.42" stroke="url(#ice)" stroke-width="64"/>
+    <path d="M512 341A171 171 0 1 1 393.212 635.009" stroke="url(#mint)" stroke-width="58"/>
+  </g>
 </svg>

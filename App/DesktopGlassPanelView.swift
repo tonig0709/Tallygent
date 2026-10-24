@@ -5,7 +5,7 @@ import SwiftUI
 struct DesktopGlassPanelView: View {
     static let windowID = "desktop-glass-panel"
 
-    @ObservedObject var server: CodexAppServer
+    @ObservedObject var server: QuotaMonitor
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
@@ -35,6 +35,7 @@ struct DesktopGlassPanelView: View {
 
     var body: some View {
         QuotaPanelContent(mode: mode, snapshot: panelSnapshot, glassOpacity: glassOpacity)
+            .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
             .frame(width: mode.size.width, height: mode.size.height)
             .background {
                 DesktopGlassSurface(
@@ -61,11 +62,10 @@ struct DesktopGlassPanelView: View {
                     .opacity(showsChrome || showsControls ? 1 : 0)
                     .allowsHitTesting(false)
             }
-            .overlay(alignment: .top) {
-                DesktopPanelDragRegion()
-                    .frame(height: 22)
-                    .padding(.horizontal, 36)
-                    .help("按住顶部拖动面板")
+            .overlay {
+                // The content is read-only; native window dragging can cover it all.
+                // Controls below remain above this layer and keep their own clicks.
+                DesktopPanelDragRegion(cornerRadius: cornerRadius)
             }
             .overlay(alignment: .topLeading) {
                 Button(action: closePanel) {
@@ -112,6 +112,9 @@ struct DesktopGlassPanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("桌面玻璃面板")
                 .font(.headline)
+            Picker("监测服务", selection: Binding(get: { server.service }, set: server.selectService)) {
+                ForEach(AgentService.allCases) { Text($0.title).tag($0) }
+            }
 
             ScrollView {
                 GlassSettingsView(compact: true, onSettingsChange: server.updateGlassSettings)
@@ -180,10 +183,25 @@ struct DesktopGlassPanelView: View {
 
 // Use AppKit's native window drag loop; SwiftUI content is not a window background.
 struct DesktopPanelDragRegion: NSViewRepresentable {
-    func makeNSView(context: Context) -> DragView { DragView() }
-    func updateNSView(_ view: DragView, context: Context) {}
+    var cornerRadius: Double = 30
+
+    func makeNSView(context: Context) -> DragView {
+        let view = DragView()
+        view.cornerRadius = cornerRadius
+        return view
+    }
+    func updateNSView(_ view: DragView, context: Context) {
+        view.cornerRadius = cornerRadius
+    }
 
     final class DragView: NSView {
+        var cornerRadius: Double = 30
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            let local = convert(point, from: superview)
+            let radius = min(CGFloat(cornerRadius), min(bounds.width, bounds.height) / 2)
+            // Transparent rounded corners must not intercept desktop clicks.
+            return RoundedRectangle(cornerRadius: radius, style: .continuous).path(in: bounds).contains(local) ? self : nil
+        }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func resetCursorRects() {
             addCursorRect(bounds, cursor: .openHand)
@@ -296,16 +314,16 @@ private struct DesktopGlassSurface: View {
     }
 
     private var chromaticEdge: some View {
-        let resolvedDispersion = min(0.30, max(0, dispersion))
-        let offset = CGFloat(resolvedDispersion * 3)
+        let offset = CGFloat(optics.edgeOffset)
         return ZStack {
-            shape
-                .strokeBorder(.red.opacity(resolvedDispersion * 0.18), lineWidth: 0.65)
-                .offset(x: -offset)
-            shape
-                .strokeBorder(.cyan.opacity(resolvedDispersion * 0.18), lineWidth: 0.65)
-                .offset(x: offset)
+            shape.inset(by: offset + CGFloat(optics.edgeWidth) / 2)
+                .strokeBorder(.red.opacity(optics.edgeOpacity), lineWidth: CGFloat(optics.edgeWidth))
+                .offset(x: -offset, y: offset * 0.4)
+            shape.inset(by: offset + CGFloat(optics.edgeWidth) / 2)
+                .strokeBorder(.cyan.opacity(optics.edgeOpacity), lineWidth: CGFloat(optics.edgeWidth))
+                .offset(x: offset, y: -offset * 0.4)
         }
+        .allowsHitTesting(false)
     }
 
     var body: some View {
@@ -324,8 +342,13 @@ private struct DesktopGlassSurface: View {
     }
 
     private var frostColor: Color {
-        (isLight ? Color.white : Color.black).opacity(blurAmount * (isLight ? 0.16 : 0.09))
+        // Public macOS materials own backdrop blur. This controls visible frosting,
+        // not a fictitious blur radius, and leaves fully opaque dark glass black.
+        (isLight ? Color.white : Color(white: 0.28))
+            .opacity(optics.frostOpacity * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
     }
+
+    private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
 
     private var toneOpacity: Double { 0.035 * saturation }
 
@@ -453,7 +476,7 @@ final class DesktopPanelController {
     private var panel: DesktopGlassWindow?
     var isVisible: Bool { panel?.isVisible == true }
 
-    func show(server: CodexAppServer) {
+    func show(server: QuotaMonitor) {
         if panel == nil {
             let size = DesktopPanelMode.stored().size
             let window = DesktopGlassWindow(

@@ -26,6 +26,8 @@ if grep -Fq 'Text(snapshot.updatedAt, style: .time)' Shared/QuotaWidgetView.swif
     exit 1
 fi
 grep -q 'QuotaPanelContent(mode: mode, snapshot: panelSnapshot' App/DesktopGlassPanelView.swift
+grep -Fq 'DesktopPanelDragRegion(cornerRadius: cornerRadius)' App/DesktopGlassPanelView.swift
+grep -Fq 'GlassOptics(blurAmount: blurAmount, dispersion: dispersion)' App/DesktopGlassPanelView.swift
 if grep -Eq 'import WidgetKit|WidgetCenter|WidgetRepairService' App/*.swift; then
     echo 'Panel-only app still invokes WidgetKit' >&2
     exit 1

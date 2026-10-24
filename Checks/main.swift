@@ -215,6 +215,27 @@ await MainActor.run {
         }
     }
 
+    // A second provider uses the same native surface in all sizes, including
+    // the waiting state. It must never become a black or sample-filled panel.
+    for appearance in [WidgetAppearance.dark, .light] {
+        for hasQuota in [false, true] {
+            let claude = UsageSnapshot(
+                fiveHour: hasQuota ? boundary.fiveHour : nil,
+                weekly: hasQuota ? boundary.weekly : nil,
+                appearance: appearance, service: .claude
+            )
+            for mode in DesktopPanelMode.allCases {
+                checkRender(
+                    QuotaPanelContent(mode: mode, snapshot: claude, glassOpacity: 0.35),
+                    on: LiquidGlassSurface(isLight: appearance == .light, opacity: 0.35, accent: .blue),
+                    width: mode.size.width, height: mode.size.height,
+                    label: "Claude \(mode.rawValue) \(appearance.rawValue) \(hasQuota ? "quota" : "waiting")",
+                    regions: [("content", CGRect(x: 0.05, y: 0.1, width: 0.9, height: 0.8))]
+                )
+            }
+        }
+    }
+
     let solidSmall = render(
         ZStack {
             LiquidGlassSurface(isLight: false, opacity: WidgetGlassOpacity.minimum, accent: .green)

@@ -3,12 +3,18 @@ import SwiftUI
 
 // No account connection or persistent settings are needed for this window probe.
 @MainActor
-final class CodexAppServer: ObservableObject {
+final class QuotaMonitor: ObservableObject {
     enum State: Equatable {
         case disconnected, connecting, signingIn, connected(String?), failed(String)
     }
     @Published var state = State.connected(nil)
     @Published var snapshot = UsageSnapshot.placeholder
+    @Published var service = AgentService.codex
+    @Published var connectionMessage: String?
+    func selectService(_ value: AgentService) { service = value }
+    func enableClaudeBridge() {}
+    func removeClaudeBridge() {}
+    func resetClaudeSession() {}
     func connect() {}
     func refresh() {}
     #if CODEX_QUOTA_ADVANCED_GLASS
@@ -76,7 +82,7 @@ struct DesktopPanelProbe {
         }
         window.close()
         let controller = DesktopPanelController.shared
-        let server = CodexAppServer()
+        let server = QuotaMonitor()
         controller.show(server: server)
         let first = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
         first.contentView?.layoutSubtreeIfNeeded()

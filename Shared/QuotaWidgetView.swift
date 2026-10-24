@@ -1,6 +1,21 @@
 import Charts
 import SwiftUI
 
+private struct ServiceMark: View {
+    let service: AgentService
+    var body: some View {
+        Group {
+            if service == .codex {
+                Image("CodexMark").resizable().scaledToFit()
+            } else {
+                Image(systemName: "terminal.fill").resizable().scaledToFit()
+                    .padding(3).foregroundStyle(.orange)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
 public enum DesktopPanelMode: String, CaseIterable, Identifiable {
     case small, medium, large
 
@@ -56,10 +71,12 @@ private struct QuotaMediumPanelView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Image("CodexMark")
-                    .resizable().scaledToFit().frame(width: 22, height: 22)
-                    .accessibilityHidden(true)
-                Text("Codex").font(.headline.weight(.semibold)).tracking(-0.3)
+                ServiceMark(service: snapshot.resolvedService).frame(width: 22, height: 22)
+                Text(snapshot.resolvedService.title).font(.headline.weight(.semibold)).tracking(-0.3)
+                if snapshot.resolvedService == .claude {
+                    Spacer()
+                    Text("会话记录").font(.caption2).foregroundStyle(.secondary)
+                }
             }
             quotaBar("5h额度", window: snapshot.fiveHour)
             quotaBar("周额度", window: snapshot.weekly)
@@ -69,6 +86,7 @@ private struct QuotaMediumPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(isLight ? Color(red: 0.08, green: 0.1, blue: 0.14) : .white)
         .accessibilityElement(children: .contain)
+        .help(snapshot.resolvedService == .claude ? "实验性 · Claude Code 会话记录；不代表后台实时查询" : "Codex 账户额度")
     }
 
     private func quotaBar(_ title: String, window: UsageWindow?) -> some View {
@@ -119,23 +137,24 @@ public struct QuotaWidgetView: View {
     public var body: some View {
         VStack(spacing: 18) {
             HStack(spacing: 10) {
-                Image("CodexMark")
-                    .resizable()
-                    .scaledToFit()
+                ServiceMark(service: snapshot.resolvedService)
                     .frame(width: 34, height: 34)
                     .accessibilityHidden(true)
-                Text("Codex")
+                Text(snapshot.resolvedService.title)
                     .font(.title2.weight(.semibold))
                     .tracking(-0.4)
                 Spacer()
                 HStack(spacing: 6) {
-                    Circle().fill(.green).frame(width: 6, height: 6)
-                    Text("已同步")
                     // Keep the clock independent of account polling and snapshot timestamps.
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
-                        Text(Date(), format: .dateTime.hour().minute().second())
-                            .monospacedDigit()
-                            .accessibilityLabel("Mac 系统时间")
+                        HStack(spacing: 6) {
+                            Circle().fill(snapshot.statusLabel(at: .now) == "已同步" ? .green : .orange)
+                                .frame(width: 6, height: 6)
+                            Text(snapshot.statusLabel(at: .now))
+                            Text(Date(), format: .dateTime.hour().minute().second())
+                                .monospacedDigit()
+                                .accessibilityLabel("Mac 系统时间")
+                        }
                     }
                 }
                 .font(.caption.weight(.medium))
@@ -143,7 +162,7 @@ public struct QuotaWidgetView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(trackColor, in: Capsule())
-                .help("系统时钟每秒更新；额度数据更新于 \(snapshot.updatedAt.formatted(date: .abbreviated, time: .standard))")
+                .help(snapshot.hasQuota ? "系统时钟每秒更新；最近接收数据：\(snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))" : "等待所选服务提供额度数据")
             }
 
             HStack(alignment: .bottom, spacing: 30) {
@@ -154,6 +173,16 @@ public struct QuotaWidgetView: View {
                 .frame(maxWidth: 244)
 
                 VStack(alignment: .leading, spacing: 5) {
+                    if snapshot.resolvedService == .claude {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Claude Code · 实验性", systemImage: "flask")
+                                .font(.subheadline.weight(.semibold))
+                            Text("此接入提供会话额度记录，尚无可靠的七日 Token 历史。")
+                            Text("最近接收：\(snapshot.hasQuota ? snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .shortened) : "等待会话数据")")
+                        }
+                        .font(.caption).foregroundStyle(secondaryText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                    } else {
                     HStack {
                         Text("近 7 天趋势").font(.subheadline.weight(.semibold))
                         Spacer()
@@ -179,6 +208,7 @@ public struct QuotaWidgetView: View {
                         }
                     }
                     .accessibilityLabel("近七天 Codex Token 用量")
+                    }
                 }
             }
         }
@@ -189,13 +219,13 @@ public struct QuotaWidgetView: View {
     }
 
     private func quotaSection(title: String, window: UsageWindow?) -> some View {
-        let remaining = window?.remainingPercent ?? 0
+        let remaining = window?.remainingPercent
         return VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
                 Text(title)
                     .font(.headline.weight(.semibold))
                 Spacer()
-                Text("\(remaining)%")
+                Text(remaining.map { "\($0)%" } ?? "—")
                     .font(.system(size: 34, weight: .semibold, design: .rounded))
                     .tracking(-1.1)
                     .monospacedDigit()
@@ -205,8 +235,8 @@ public struct QuotaWidgetView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(trackColor)
                     Capsule()
-                        .fill(quotaColor(for: remaining).gradient)
-                        .frame(width: proxy.size.width * CGFloat(remaining) / 100)
+                        .fill(quotaColor(for: remaining ?? 0).gradient)
+                        .frame(width: proxy.size.width * CGFloat(remaining ?? 0) / 100)
                 }
             }
             .frame(height: 9)
@@ -249,9 +279,14 @@ public struct QuotaRingWidgetView: View {
     private var trackColor: Color { isLight ? .black.opacity(0.09) : .white.opacity(0.14) }
 
     public var body: some View {
-        HStack(spacing: 12) {
-            quotaRing(title: "5h", window: snapshot.fiveHour)
-            quotaRing(title: "周", window: snapshot.weekly)
+        VStack(spacing: 8) {
+            HStack(spacing: 12) {
+                quotaRing(title: "5h", window: snapshot.fiveHour)
+                quotaRing(title: "周", window: snapshot.weekly)
+            }
+            if snapshot.resolvedService == .claude {
+                Text("Claude · 会话记录").font(.caption2).foregroundStyle(.secondary)
+            }
         }
         .padding(12)
         .foregroundStyle(primaryText)
@@ -260,28 +295,27 @@ public struct QuotaRingWidgetView: View {
     }
 
     private func quotaRing(title: String, window: UsageWindow?) -> some View {
-        let remaining = window?.remainingPercent ?? 0
+        let remaining = window?.remainingPercent
         return VStack(spacing: 7) {
             ZStack {
                 Circle().stroke(trackColor, lineWidth: 8)
                 Circle()
-                    .trim(from: 0, to: CGFloat(remaining) / 100)
-                    .stroke(quotaColor(for: remaining).gradient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                    .trim(from: 0, to: CGFloat(remaining ?? 0) / 100)
+                    .stroke(quotaColor(for: remaining ?? 0).gradient, style: StrokeStyle(lineWidth: 8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Image("CodexMark")
-                    .resizable()
-                    .scaledToFit()
+                ServiceMark(service: snapshot.resolvedService)
                     .frame(width: 22, height: 22)
                     .accessibilityHidden(true)
             }
             .frame(width: 58, height: 58)
 
-            Text("\(title) \(remaining)%")
+            Text("\(title) \(remaining.map { "\($0)%" } ?? "—")")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Codex \(title)额度剩余 \(remaining)%")
+        .accessibilityLabel("\(snapshot.resolvedService.title) \(title)额度，\(remaining.map { "剩余 \($0)%" } ?? "等待数据")")
+        .help(snapshot.resolvedService == .claude ? "实验性 · 会话记录，不代表后台实时查询" : "Codex 账户额度")
     }
 
     private func quotaColor(for remaining: Int) -> Color {

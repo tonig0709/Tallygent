@@ -1,5 +1,11 @@
 import Foundation
 
+public enum AgentService: String, Codable, CaseIterable, Identifiable, Sendable {
+    case codex, claude
+    public var id: Self { self }
+    public var title: String { self == .codex ? "Codex" : "Claude Code" }
+}
+
 public enum WidgetAppearance: String, Codable, CaseIterable, Identifiable, Sendable {
     case dark, light
 
@@ -127,6 +133,9 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     public var appearance: WidgetAppearance?
     public var glassSettings: GlassRenderSettings?
     public var updatedAt: Date
+    // Optional fields keep existing Codex caches readable across the upgrade.
+    public var service: AgentService?
+    public var receivedAt: Date?
 
     public init(
         fiveHour: UsageWindow? = nil,
@@ -136,7 +145,9 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
         plan: String? = nil,
         appearance: WidgetAppearance = .dark,
         glassSettings: GlassRenderSettings? = nil,
-        updatedAt: Date = .now
+        updatedAt: Date = .now,
+        service: AgentService? = nil,
+        receivedAt: Date? = nil
     ) {
         self.fiveHour = fiveHour
         self.weekly = weekly
@@ -146,9 +157,22 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
         self.appearance = appearance
         self.glassSettings = glassSettings
         self.updatedAt = updatedAt
+        self.service = service
+        self.receivedAt = receivedAt
     }
 
     public var resolvedAppearance: WidgetAppearance { appearance ?? .dark }
+    public var resolvedService: AgentService { service ?? .codex }
+    public var hasQuota: Bool { fiveHour != nil || weekly != nil }
+    public var lastReceivedAt: Date { receivedAt ?? updatedAt }
+
+    public func statusLabel(at now: Date) -> String {
+        guard hasQuota else { return "等待数据" }
+        if resolvedService == .claude { return "会话记录" }
+        return now.timeIntervalSince(lastReceivedAt) > 60 ? "数据待刷新" : "已同步"
+    }
+
+    public static let empty = UsageSnapshot(updatedAt: .distantPast)
 
     public static let placeholder = UsageSnapshot(
         fiveHour: UsageWindow(usedPercent: 18, windowDurationMinutes: 300, resetsAt: nil),
@@ -229,7 +253,7 @@ public enum SnapshotStore {
     public static func load(defaults: UserDefaults = sharedDefaults) -> UsageSnapshot {
         guard let data = defaults.data(forKey: key),
               let value = try? JSONDecoder().decode(UsageSnapshot.self, from: data)
-        else { return .placeholder }
+        else { return .empty }
         return value
     }
 

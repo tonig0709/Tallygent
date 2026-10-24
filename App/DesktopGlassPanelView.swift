@@ -5,7 +5,7 @@ import SwiftUI
 struct DesktopGlassPanelView: View {
     static let windowID = "desktop-glass-panel"
 
-    @ObservedObject var server: CodexAppServer
+    @ObservedObject var server: QuotaMonitor
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
@@ -111,6 +111,9 @@ struct DesktopGlassPanelView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("桌面玻璃面板")
                 .font(.headline)
+            Picker("监测服务", selection: Binding(get: { server.service }, set: server.selectService)) {
+                ForEach(AgentService.allCases) { Text($0.title).tag($0) }
+            }
 
             ScrollView {
                 GlassSettingsView(compact: true, onSettingsChange: server.updateGlassSettings)
@@ -472,7 +475,7 @@ final class DesktopPanelController {
     private var panel: DesktopGlassWindow?
     var isVisible: Bool { panel?.isVisible == true }
 
-    func show(server: CodexAppServer) {
+    func show(server: QuotaMonitor) {
         if panel == nil {
             let size = DesktopPanelMode.stored().size
             let window = DesktopGlassWindow(

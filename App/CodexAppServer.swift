@@ -95,6 +95,7 @@ final class CodexAppServer: ObservableObject {
 
     init() {
         var initialSnapshot = SnapshotStore.load()
+        initialSnapshot.service = .codex
         initialSnapshot.glassSettings = GlassSettingsSnapshot.load()
         snapshot = initialSnapshot
         SnapshotStore.save(initialSnapshot)
@@ -351,6 +352,9 @@ final class CodexAppServer: ObservableObject {
 
         var snapshotChanged = false
         if let rateLimits = pending.rateLimits {
+            // A successful read can confirm unchanged values. Keep this separate
+            // from updatedAt, which tracks actual data changes and disk writes.
+            snapshot.receivedAt = .now
             if rateLimits.fiveHour != snapshot.fiveHour {
                 snapshot.fiveHour = rateLimits.fiveHour
                 snapshotChanged = true

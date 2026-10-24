@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DashboardView: View {
-    @ObservedObject var server: CodexAppServer
+    @ObservedObject var server: QuotaMonitor
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
@@ -21,6 +21,17 @@ struct DashboardView: View {
 
     var body: some View {
         VStack(spacing: 20) {
+            HStack {
+                Picker("监测服务", selection: Binding(get: { server.service }, set: server.selectService)) {
+                    ForEach(AgentService.allCases) { service in
+                        Text(service == .claude ? "Claude Code · 实验性" : service.title).tag(service)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 320)
+                Spacer()
+                if server.service == .claude { Text("本地会话接入").font(.caption).foregroundStyle(.secondary) }
+            }
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("桌面面板").font(.title2.weight(.semibold))
@@ -106,7 +117,7 @@ struct DashboardView: View {
                 .help("打开一个独立透明、不会改变其他图标外观的桌面面板")
                 Button("刷新") { server.refresh() }
                     .disabled(server.state == .connecting)
-                if case .disconnected = server.state {
+                if server.service == .codex, case .disconnected = server.state {
                     Button("连接 Codex") { server.connect() }
                         .buttonStyle(.borderedProminent)
                 }
@@ -114,6 +125,19 @@ struct DashboardView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            if server.service == .claude {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Claude Code 会话运行时接收额度；退出后保留最后记录。仅绑定一个会话，不读取登录凭证。")
+                    HStack {
+                        Button("启用本地接入") { server.enableClaudeBridge() }
+                        Button("移除接入") { server.removeClaudeBridge() }
+                        Button("重新绑定会话") { server.resetClaudeSession() }
+                    }
+                    if let message = server.connectionMessage { Text(message).textSelection(.enabled) }
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
         .padding(24)
         .inspector(isPresented: $showsGlassInspector) {
@@ -164,7 +188,13 @@ struct DashboardView: View {
     }
 
     private var statusText: String {
-        switch server.state {
+        if server.service == .claude {
+            if case .failed(let message) = server.state { return message }
+            return server.snapshot.hasQuota
+                ? "会话记录 · \(server.snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))"
+                : "等待 Claude Code 会话数据"
+        }
+        return switch server.state {
         case .disconnected: "尚未连接"
         case .connecting: "正在连接 Codex…"
         case .signingIn: "请在浏览器完成登录"
@@ -183,7 +213,7 @@ struct DashboardView: View {
 
     private var statusColor: Color {
         switch server.state {
-        case .connected: .green
+        case .connected: server.service == .claude ? .orange : .green
         case .failed: .red
         default: .secondary
         }

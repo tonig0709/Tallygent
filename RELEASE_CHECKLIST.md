@@ -67,3 +67,15 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
 - [ ] Homepage/download instructions clearly identify which published DMG contains this panel-only product.
       Do not advertise a draft or older widget release as the new build.
 - [ ] Publish the draft only after all checks above pass.
+# Experimental multi-agent checks
+
+- Run `sh scripts/check-agent-providers.sh` before packaging. It must preserve
+  provider isolation, missing-data semantics, receipt time, and existing Claude
+  configuration using temporary files only.
+- Confirm Codex/Claude selection updates the same single desktop panel in all
+  sizes, retaining glass preferences and position. Claude is labeled experimental
+  and as a session record; it must not claim a fresh background server query.
+- Test actual Claude subscription input with a subscribing volunteer before
+  claiming real-account support. Mock data cannot satisfy this check.
+- Keep bridge setup opt-in; an existing third-party statusLine must remain intact.
+

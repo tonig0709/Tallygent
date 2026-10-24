@@ -128,6 +128,7 @@ final class CodexAppServer: ObservableObject {
         guard process == nil else { refresh() ; return }
         guard let executable = findCodex() else {
             state = .failed("未找到 Codex CLI。请先安装 Codex 或 ChatGPT for Mac。")
+            finishModelCatalog(error: "未找到本机 Codex，无法读取目录；可使用手动配置。")
             return
         }
 
@@ -204,7 +205,8 @@ final class CodexAppServer: ObservableObject {
     func refreshModelCatalog() {
         guard !isLoadingModels else { return }
         wantsModels = true
-        guard process != nil, initialized else { connect(); return }
+        guard process != nil else { connect(); return }
+        guard initialized else { return }
         catalogBuffer = []; catalogCursors = []
         requestModelsPage(cursor: nil)
     }
@@ -238,6 +240,7 @@ final class CodexAppServer: ObservableObject {
 
     func refresh() {
         guard process != nil else { connect(); return }
+        guard initialized else { refreshQueued = true; return }
         if case .failed = state {
             state = .connecting
             requestAccount()

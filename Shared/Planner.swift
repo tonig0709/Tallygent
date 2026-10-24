@@ -142,7 +142,10 @@ public struct PlannerConfiguration: Codable, Equatable, Identifiable, Sendable {
     public var effort: String
     public var id: String { model.id + ":" + effort }
     public var isValid: Bool { model.isValid && model.efforts.contains(effort) }
-    public var copyText: String { "model = \"\(model.identifier)\"\nmodel_reasoning_effort = \"\(effort)\"" }
+    public var copyText: String {
+        model.provider == .codex ? "model = \"\(model.identifier)\"\nmodel_reasoning_effort = \"\(effort)\""
+            : "Provider: \(model.provider.title)\nModel: \(model.identifier)\nReasoning effort: \(effort)\nUser-declared configuration; apply manually."
+    }
 }
 
 public struct PlannerQuotaWindow: Codable, Equatable, Identifiable, Sendable {

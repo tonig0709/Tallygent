@@ -193,6 +193,16 @@ if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
     fail "snapshot port is already occupied; never run this gate against a live user session"
 fi
 
+section "Production model catalog and quota request isolation"
+/usr/bin/ditto Gate/fake-catalog-codex.py "$tmp/catalog-codex"
+chmod +x "$tmp/catalog-codex"
+xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
+    Gate/ModelCatalogProbe.swift App/CodexAppServer.swift Shared/AppServerParser.swift \
+    Shared/UsageSnapshot.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
+    -framework AppKit -framework Combine -framework Network -framework CryptoKit -o "$tmp/catalog-probe"
+CODEX_BINARY="$tmp/catalog-codex" "$tmp/catalog-probe"
+pass "model pagination and failures do not corrupt the monitoring refresh state"
+
 section "Signed app Claude bridge entry point"
 bridge_cache="$HOME/Library/Application Support/CodexQuota/claude-usage.json"
 [ ! -e "$bridge_cache" ] && [ ! -L "$bridge_cache" ] || fail "isolated Claude cache must start empty"

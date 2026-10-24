@@ -8,10 +8,12 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 > [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **本地测试候选：v0.6.0（build 46）。** 首次使用 Tallygent 名称；保留原 Bundle ID、设置、面板位置与数据，并安全迁移本应用管理的 Claude 接入路径。
+> **本地测试候选：v0.6.0（build 47）。** 保留 Tallygent 品牌、原 Bundle ID 与全部面板设置；修复主窗口宽度协调，加入本地 Planner 模型建议与反馈记录。
 > 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
 
 ## 三种尺寸，一个桌面面板
+
+本地测试候选新增 [Planner](docs/PLANNER.md)：读取本机模型目录，结合任务特征、5h/周额度和保留量给出 Model + Effort 建议，可复制配置并记录结果。不自动执行任务，不用额度百分比推算 Token；没有可靠历史时明确显示信息不足。
 
 | 模式 | 尺寸（pt） | 内容 |
 | --- | --- | --- |

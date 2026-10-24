@@ -138,6 +138,23 @@ struct DesktopPanelProbe {
             }
             dashboardWindow.close()
         }
+        for width in [760.0, 1_120] {
+            let planner = NSHostingView(rootView: DashboardView(server: server, section: .planner))
+            planner.frame = NSRect(x: 0, y: 0, width: width, height: 760)
+            let host = NSWindow(contentRect: planner.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            host.isReleasedWhenClosed = false
+            host.contentView = planner
+            host.makeKeyAndOrderFront(nil)
+            planner.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            precondition(planner.fittingSize.width <= width + 2, "Planner overflows a compact window")
+            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
+               let bitmap = planner.bitmapImageRepForCachingDisplay(in: planner.bounds) {
+                planner.cacheDisplay(in: planner.bounds, to: bitmap)
+                try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: output).appendingPathComponent("planner-\(Int(width)).png"))
+            }
+            host.close()
+        }
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 }

@@ -53,6 +53,15 @@ jobs:
             "$PWD/build/Build/Products/Release/Tallygent.app" \
             "$PWD/Tallygent-test.dmg"
 
+      - name: Upload native UI diagnostics
+        if: always() && github.event_name == 'workflow_dispatch' && matrix.os == 'macos-26'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tallygent-ui-checks
+          path: ui-checks/*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload local test DMG
         if: github.event_name == 'workflow_dispatch' && matrix.os == 'macos-26'
         uses: actions/upload-artifact@v4

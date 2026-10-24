@@ -118,7 +118,18 @@ struct DesktopPanelProbe {
             dashboardWindow.contentView = dashboard
             dashboardWindow.makeKeyAndOrderFront(nil)
             dashboard.layoutSubtreeIfNeeded()
-            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            RunLoop.main.run(until: Date().addingTimeInterval(1))
+            print("Dashboard layout width \(width), frame \(dashboard.frame), fitting \(dashboard.fittingSize)")
+            for scroll in scrollViews(in: dashboard) {
+                print("Scroll frame \(scroll.frame), clip \(scroll.contentView.bounds), document \(String(describing: scroll.documentView?.frame))")
+            }
+            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
+               let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
+                let url = URL(fileURLWithPath: output, isDirectory: true)
+                try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                dashboard.cacheDisplay(in: dashboard.bounds, to: bitmap)
+                try! bitmap.representation(using: .png, properties: [:])!.write(to: url.appendingPathComponent("monitor-\(Int(width)).png"))
+            }
             guard let gallery = scrollViews(in: dashboard).first(where: { ($0.documentView?.frame.width ?? 0) > ($0.contentView.bounds.width * 2.5) }) else {
                 preconditionFailure("native panel gallery scroll view is missing")
             }
@@ -128,14 +139,6 @@ struct DesktopPanelProbe {
             precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 3, "resized gallery page does not match persisted panel mode")
             precondition(dashboard.fittingSize.width <= width + 2, "dashboard forces its contents outside the window")
             precondition(DashboardLayout.hasInlineInspector(width: width) == (width >= 1_080), "compact window keeps a clipped inspector")
-            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"] {
-                let url = URL(fileURLWithPath: output, isDirectory: true)
-                try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-                if let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
-                    dashboard.cacheDisplay(in: dashboard.bounds, to: bitmap)
-                    try! bitmap.representation(using: .png, properties: [:])!.write(to: url.appendingPathComponent("monitor-\(Int(width)).png"))
-                }
-            }
             dashboardWindow.close()
         }
         for width in [760.0, 1_120] {

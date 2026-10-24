@@ -31,31 +31,31 @@ jobs:
 
       - name: Apply ad-hoc signature
         run: |
-          app="$PWD/build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/build/Build/Products/Release/Tallygent.app"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
 
       - name: Package test DMG
         run: |
-          app="$PWD/build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/build/Build/Products/Release/Tallygent.app"
           mkdir "$PWD/dmg-root"
-          /usr/bin/ditto "$app" "$PWD/dmg-root/Codex Quota.app"
+          /usr/bin/ditto "$app" "$PWD/dmg-root/Tallygent.app"
           ln -s /Applications "$PWD/dmg-root/Applications"
-          hdiutil create -volname "Codex Quota" -srcfolder "$PWD/dmg-root" \
-            -ov -format UDZO "$PWD/Codex-Quota-test.dmg"
+          hdiutil create -volname "Tallygent" -srcfolder "$PWD/dmg-root" \
+            -ov -format UDZO "$PWD/Tallygent-test.dmg"
 
       - name: Run release bug gate
         env:
           CODEX_QUOTA_ISOLATED_REGISTRY: "1"
         run: |
           ./scripts/release-preflight.sh \
-            "$PWD/build/Build/Products/Release/Codex Quota.app" \
-            "$PWD/Codex-Quota-test.dmg"
+            "$PWD/build/Build/Products/Release/Tallygent.app" \
+            "$PWD/Tallygent-test.dmg"
 
       - name: Upload local test DMG
         if: github.event_name == 'workflow_dispatch' && matrix.os == 'macos-26'
         uses: actions/upload-artifact@v4
         with:
-          name: Codex-Quota-local-macOS
-          path: Codex-Quota-test.dmg
+          name: Tallygent-local-macOS
+          path: Tallygent-test.dmg
           retention-days: 7

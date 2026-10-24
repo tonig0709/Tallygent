@@ -32,13 +32,13 @@ jobs:
             clean build
       - name: Apply ad-hoc signature
         run: |
-          app="$PWD/preflight-build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/preflight-build/Build/Products/Release/Tallygent.app"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
       - name: Release preflight checklist
         env:
           CODEX_QUOTA_ISOLATED_REGISTRY: "1"
-        run: ./scripts/release-preflight.sh "$PWD/preflight-build/Build/Products/Release/Codex Quota.app"
+        run: ./scripts/release-preflight.sh "$PWD/preflight-build/Build/Products/Release/Tallygent.app"
 
   release:
     needs: preflight
@@ -92,7 +92,7 @@ jobs:
       - name: Apply Developer ID signature
         if: env.SIGNED_RELEASE == 'true'
         run: |
-          app="$PWD/build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/build/Build/Products/Release/Tallygent.app"
           codesign --force --options runtime --timestamp \
             --sign "$DEVELOPER_ID_APPLICATION" \
             --entitlements App/CodexQuota.entitlements "$app"
@@ -100,31 +100,31 @@ jobs:
       - name: Apply ad-hoc signature
         if: env.SIGNED_RELEASE != 'true'
         run: |
-          app="$PWD/build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/build/Build/Products/Release/Tallygent.app"
           codesign --force --sign - \
             --entitlements App/CodexQuota.entitlements "$app"
 
       - name: Verify app signature
         run: |
-          app="$PWD/build/Build/Products/Release/Codex Quota.app"
+          app="$PWD/build/Build/Products/Release/Tallygent.app"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign --display --verbose=4 "$app"
 
       - name: Package app
         run: |
-          dmg="Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg"
+          dmg="Tallygent-${GITHUB_REF_NAME}-macOS.dmg"
           mkdir "$PWD/dmg-root"
-          /usr/bin/ditto "$PWD/build/Build/Products/Release/Codex Quota.app" \
-            "$PWD/dmg-root/Codex Quota.app"
+          /usr/bin/ditto "$PWD/build/Build/Products/Release/Tallygent.app" \
+            "$PWD/dmg-root/Tallygent.app"
           ln -s /Applications "$PWD/dmg-root/Applications"
-          hdiutil create -volname "Codex Quota" -srcfolder "$PWD/dmg-root" \
+          hdiutil create -volname "Tallygent" -srcfolder "$PWD/dmg-root" \
             -ov -format UDZO "$dmg"
 
       - name: Notarize and staple DMG
         if: env.SIGNED_RELEASE == 'true'
         run: |
           key="$RUNNER_TEMP/AuthKey_${APPLE_API_KEY_ID}.p8"
-          dmg="Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg"
+          dmg="Tallygent-${GITHUB_REF_NAME}-macOS.dmg"
           echo "$APPLE_API_KEY_BASE64" | base64 --decode > "$key"
           xcrun notarytool submit "$dmg" --key "$key" \
             --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait
@@ -137,8 +137,8 @@ jobs:
           CODEX_QUOTA_ISOLATED_REGISTRY: "1"
         run: |
           ./scripts/release-preflight.sh \
-            "$PWD/build/Build/Products/Release/Codex Quota.app" \
-            "$PWD/Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg"
+            "$PWD/build/Build/Products/Release/Tallygent.app" \
+            "$PWD/Tallygent-${GITHUB_REF_NAME}-macOS.dmg"
 
       - name: Record signing status
         run: |
@@ -150,18 +150,18 @@ jobs:
 
       - name: Create checksum
         run: |
-          dmg="Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg"
-          shasum -a 256 "$dmg" > "Codex-Quota-${GITHUB_REF_NAME}-checksums.txt"
+          dmg="Tallygent-${GITHUB_REF_NAME}-macOS.dmg"
+          shasum -a 256 "$dmg" > "Tallygent-${GITHUB_REF_NAME}-checksums.txt"
 
       - name: Create draft GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          dmg="Codex-Quota-${GITHUB_REF_NAME}-macOS.dmg"
-          checksums="Codex-Quota-${GITHUB_REF_NAME}-checksums.txt"
+          dmg="Tallygent-${GITHUB_REF_NAME}-macOS.dmg"
+          checksums="Tallygent-${GITHUB_REF_NAME}-checksums.txt"
           gh release create "$GITHUB_REF_NAME" \
             "$dmg" \
             "$checksums" \
-            --title "Codex Quota ${GITHUB_REF_NAME}" \
+            --title "Tallygent ${GITHUB_REF_NAME}" \
             --draft \
             --generate-notes

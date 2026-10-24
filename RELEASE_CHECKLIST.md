@@ -7,7 +7,7 @@ Every push/PR, version tag and final signed payload runs:
 
 ```sh
 CODEX_QUOTA_ISOLATED_REGISTRY=1 \
-  ./scripts/release-preflight.sh "/path/to/Codex Quota.app" "/path/to/Codex-Quota.dmg"
+  ./scripts/release-preflight.sh "/path/to/Tallygent.app" "/path/to/Tallygent.dmg"
 ```
 
 Run the full gate only in an isolated CI user: it installs a temporary candidate,

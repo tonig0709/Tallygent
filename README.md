@@ -1,15 +1,15 @@
-# Codex Quota for macOS
+# Tallygent for macOS
 
-一个原生 macOS 菜单栏应用，用可移动的 Liquid Glass 桌面面板查看 Codex 5h 额度、周额度与近七天 Token 用量。
+一个本地优先的 macOS 菜单栏应用，用可移动的 Liquid Glass 桌面面板监测 Codex 与 Claude Code 的额度。
 
-Native, movable glass panels for your Codex quota. One desktop panel, three layouts, shared live controls.
+Native, movable glass panels for agent quotas. One desktop panel, three layouts, shared live controls.
 
 > **当前公开稳定版：v0.5.7（build 41）。**
-> [下载最新正式版](https://github.com/tonig0709/codex-quota-widget/releases/latest)。
+> [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **待发布候选：v0.5.9（build 45）。** 保留 Codex Quota 名称，加入 Claude Code 实验性接入、面板正文拖动及玻璃细节调整。
-> 候选源码和测试附件不代表正式版已经更新；草稿 Release 只有发布后才会公开，以上正式版下载入口仍指向已发布版本。
+> **本地测试候选：v0.6.0（build 46）。** 首次使用 Tallygent 名称；保留原 Bundle ID、设置、面板位置与数据，并安全迁移本应用管理的 Claude 接入路径。
+> 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
 
 ## 三种尺寸，一个桌面面板
 
@@ -33,7 +33,7 @@ Native, movable glass panels for your Codex quota. One desktop panel, three layo
 这不是系统“编辑小组件”中的组件；不需要搜索组件库，也不会改变其他图标的透明度。
 粒子实验不包含在本次稳定玻璃面板实现中。
 
-## v0.5.9 候选：多服务与玻璃调整
+## 多服务与玻璃面板
 
 在 App 中选择 **Codex** 或 **Claude Code（实验性）**，已打开的同一个面板随服务切换；三种尺寸、位置与玻璃参数保持共用。
 候选还调整了中型面板留白，增强 **边缘色散** 和 **磨砂深度** 的可见变化。色散只作用于边缘；磨砂深度控制雾化层，系统背景模糊仍由 macOS 决定。
@@ -52,16 +52,16 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 
 ## 下载与安装
 
-请在 [最新正式版页面](https://github.com/tonig0709/codex-quota-widget/releases/latest) 下载对应版本的 **Codex-Quota-…-macOS.dmg**，不要下载旧版或 Source code。
+请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 下载对应版本的 **Tallygent-…-macOS.dmg**，不要下载旧版或 Source code。
 
-- 当前公开附件为 **Codex-Quota-v0.5.7-macOS.dmg**；它不包含上方 v0.5.9 候选功能。请以实际发布说明与附件为准。
+- 当前公开附件仍使用旧名 **Codex-Quota-v0.5.7-macOS.dmg**；请以实际发布说明与附件为准。
 - 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
-- 打开 DMG，将 **Codex Quota.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
+- 打开 DMG，将 **Tallygent.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
 - 仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证。Ad-hoc 测试版未公证，可能仍需系统首次打开确认。
 
 面板版使用方式：
 
-1. 保持 Codex Quota 运行，在 App 中选择小、中或大模式。
+1. 保持 Tallygent 运行，在 App 中选择小、中或大模式。
 2. 点击 **桌面玻璃面板**；在 App 中换页，已放置面板随之切换。
 3. 用 App 的 **玻璃设置** 或面板边缘的设置按钮调整参数。
 4. 关闭面板不退出主程序；可从 App 或菜单栏重新打开。

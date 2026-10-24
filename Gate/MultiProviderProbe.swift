@@ -158,11 +158,17 @@ struct MultiProviderProbe {
         try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/echo"), settingsURL: settings, backupURL: backup)
         try expect(try Data(contentsOf: settings) == installedBytes && Data(contentsOf: backup) == backupBytes,
                    "Repeated setup overwrote the original recovery data")
-        try rejects("Installing from another executable silently changed the bridge path") {
-            try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/cat"), settingsURL: settings, backupURL: backup)
-        }
-        try expect(try Data(contentsOf: settings) == installedBytes && Data(contentsOf: backup) == backupBytes,
-                   "Refusing a changed bridge path altered settings or recovery data")
+        try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/cat"), settingsURL: settings, backupURL: backup)
+        installed = try object(settings)
+        let migratedCommand = (installed["statusLine"] as? [String: Any])?["command"] as? String
+        try expect(migratedCommand == "'/bin/cat' --claude-statusline-bridge",
+                   "A managed bridge did not migrate to the renamed executable")
+        let migratedSettingsBytes = try Data(contentsOf: settings)
+        let migratedBackupBytes = try Data(contentsOf: backup)
+        try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/cat"), settingsURL: settings, backupURL: backup)
+        try expect(try Data(contentsOf: settings) == migratedSettingsBytes
+                    && Data(contentsOf: backup) == migratedBackupBytes,
+                   "Repeated setup after a path migration was not idempotent")
         installed["model"] = "changed-by-user"
         try write(installed, to: settings)
         try ClaudeBridgeSetup.remove(settingsURL: settings, backupURL: backup)

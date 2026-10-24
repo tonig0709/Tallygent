@@ -6,14 +6,14 @@ cd "$root"
 
 app_input="${1:-}"
 if [ -z "$app_input" ] || [ ! -d "$app_input" ]; then
-    echo "Usage: $0 <Codex Quota.app> [Codex-Quota.dmg]" >&2
+    echo "Usage: $0 <Tallygent.app> [Tallygent.dmg]" >&2
     exit 64
 fi
 dmg_input="${2:-}"
 [ -z "$dmg_input" ] || [ -f "$dmg_input" ] || { echo "DMG not found: $dmg_input" >&2; exit 66; }
 
 app="$(cd "$(dirname "$app_input")" && pwd -P)/$(basename "$app_input")"
-app_executable="$app/Contents/MacOS/Codex Quota"
+app_executable="$app/Contents/MacOS/Tallygent"
 app_info="$app/Contents/Info.plist"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/codex-quota-release.XXXXXX")"
 app_pid=""
@@ -159,6 +159,9 @@ app_identifier="$(plist_value "$app_info" CFBundleIdentifier)"
 app_version="$(plist_value "$app_info" CFBundleShortVersionString)"
 app_build="$(plist_value "$app_info" CFBundleVersion)"
 [ "$app_identifier" = "dev.codexquota.app" ] || fail "unexpected bundle identifier"
+[ "$(plist_value "$app_info" CFBundleDisplayName)" = "Tallygent" ] || fail "bundle display name is not Tallygent"
+[ "$(plist_value "$app_info" CFBundleExecutable)" = "Tallygent" ] || fail "bundle executable is not Tallygent"
+[ "$(basename "$app")" = "Tallygent.app" ] || fail "app bundle is not named Tallygent.app"
 case "$app_build" in *[!0-9]*|'') fail "bundle build number is not numeric" ;; esac
 app_archs="$(lipo -archs "$app_executable")"
 case " $app_archs " in *" arm64 "*) ;; *) fail "app is missing arm64" ;; esac
@@ -220,13 +223,13 @@ claude_probe_cache=""
 pass "the exact signed app handles Claude input without launching the GUI/account server"
 
 section "Non-installed copies stay inert"
-volume_name="Codex Quota Gate $$"
+volume_name="Tallygent Gate $$"
 mkdir -p "$tmp/dmg-root"
-/usr/bin/ditto "$app" "$tmp/dmg-root/Codex Quota.app"
+/usr/bin/ditto "$app" "$tmp/dmg-root/Tallygent.app"
 hdiutil create -quiet -volname "$volume_name" -srcfolder "$tmp/dmg-root" -format UDZO "$tmp/translocation.dmg"
 hdiutil attach -quiet -nobrowse -readonly "$tmp/translocation.dmg"
 translocation_mount="/Volumes/$volume_name"
-"$translocation_mount/Codex Quota.app/Contents/MacOS/Codex Quota" >"$tmp/translocated.log" 2>&1 &
+"$translocation_mount/Tallygent.app/Contents/MacOS/Tallygent" >"$tmp/translocated.log" 2>&1 &
 translocated_pid=$!
 sleep 2
 if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
@@ -242,10 +245,10 @@ pass "DMG/build copies do not connect an account or occupy the live snapshot por
 
 section "Installed app snapshot freshness"
 mkdir -p "$HOME/Applications"
-runtime_app="$HOME/Applications/Codex Quota Current Gate $$.app"
+runtime_app="$HOME/Applications/Tallygent Current Gate $$.app"
 [ ! -e "$runtime_app" ] || fail "temporary installed-app path already exists"
 /usr/bin/ditto "$app" "$runtime_app"
-runtime_executable="$runtime_app/Contents/MacOS/Codex Quota"
+runtime_executable="$runtime_app/Contents/MacOS/Tallygent"
 
 cat > "$tmp/fake-codex" <<'PY'
 #!/usr/bin/env python3
@@ -422,13 +425,13 @@ if [ -n "$dmg_input" ]; then
     payload_mount="$tmp/payload-mount"
     mkdir -p "$payload_mount"
     hdiutil attach -quiet -nobrowse -readonly -mountpoint "$payload_mount" "$dmg_input"
-    payload_app="$payload_mount/Codex Quota.app"
-    payload_app_executable="$payload_app/Contents/MacOS/Codex Quota"
-    [ -d "$payload_app" ] || fail "DMG does not contain Codex Quota.app"
+    payload_app="$payload_mount/Tallygent.app"
+    payload_app_executable="$payload_app/Contents/MacOS/Tallygent"
+    [ -d "$payload_app" ] || fail "DMG does not contain Tallygent.app"
     [ ! -L "$payload_app" ] || fail "DMG app is an unexpected symbolic link"
     [ -L "$payload_mount/Applications" ] && [ "$(readlink "$payload_mount/Applications")" = "/Applications" ] ||
         fail "DMG lacks the expected Applications shortcut"
-    unexpected_payload_count="$(find "$payload_mount" -mindepth 1 -maxdepth 1 ! -name 'Codex Quota.app' ! -name Applications -print | wc -l | tr -d ' ')"
+    unexpected_payload_count="$(find "$payload_mount" -mindepth 1 -maxdepth 1 ! -name 'Tallygent.app' ! -name Applications -print | wc -l | tr -d ' ')"
     [ "$unexpected_payload_count" -eq 0 ] || fail "DMG contains unexpected top-level payloads"
     [ -x "$payload_app_executable" ] || fail "DMG app executable lost its executable mode"
     [ "$(plist_value "$payload_app/Contents/Info.plist" CFBundleShortVersionString)" = "$app_version" ] || fail "DMG app version differs from checked app"
@@ -442,4 +445,4 @@ if [ -n "$dmg_input" ]; then
     pass "verified DMG contains the exact signed app bundle that passed the gate"
 fi
 
-printf '\nRelease gate passed for Codex Quota %s (%s).\n' "$app_version" "$app_build"
+printf '\nRelease gate passed for Tallygent %s (%s).\n' "$app_version" "$app_build"

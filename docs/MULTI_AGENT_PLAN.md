@@ -1,10 +1,13 @@
-# Multi-agent quota monitoring — v0.5.8 candidate
+# Multi-agent quota monitoring — implementation baseline and Tallygent direction
 
-The candidate targets v0.5.8 (build 44), extending the tested build 42 panel and
-build 43 dual-service foundation. The public stable release remains v0.5.7
-(build 41) until a checked draft is published. The product name stays Codex Quota;
-bundle identity and glass settings remain compatible. This work uses the existing
-three native movable panels, not WidgetKit or the particle experiment.
+The checked implementation baseline is v0.5.9 (build 45), extending the tested
+build 42 panel and build 43 dual-service foundation. Its binary is still named
+Codex Quota. On 2026-10-24 the user confirmed the future product name **Tallygent**.
+The rename is a product decision, not an already-completed binary migration.
+See [the Tallygent roadmap](TALLYGENT_ROADMAP.md) for the updated Monitor → Insights
+→ Planner → Control phases, migration constraints and acceptance criteria.
+Bundle identity and glass settings must remain compatible. This work uses the
+existing three native movable panels, not WidgetKit or the particle experiment.
 
 ## Data flow
 
@@ -49,8 +52,9 @@ Official interface: https://code.claude.com/docs/en/statusline
 2. Real-account validation: a subscribing volunteer runs the test version and
    confirms actual quota, reset fields, activity/idle/exit behavior and existing
    statusLine compatibility. No password or API token needs to be shared.
-3. Branding: retain Codex Quota for this candidate. A future name/icon decision
-   must retain the bundle ID and preference keys unless an explicit migration is added.
+3. Branding: the approved product name is Tallygent. A new candidate must retain
+   the bundle ID and preference keys, account for Claude's absolute bridge path,
+   and test upgrades before replacing the already-checked Codex Quota binary.
 4. Release: universal full-Xcode builds on macOS 14/15/26, existing full release
    preflight plus provider checks, then desktop drag/close/reopen/hover smoke test.
    Until real-account validation, Claude remains experimental.

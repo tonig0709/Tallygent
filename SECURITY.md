@@ -7,7 +7,7 @@ tokens. This project does not send credentials to a third-party server. The
 Claude settings backup described below can contain secrets already present in
 the user's configuration.
 
-The v0.5.8 candidate adds an experimental, opt-in Claude Code status-line bridge.
+The v0.6.0 candidate includes an experimental, opt-in Claude Code status-line bridge.
 It consumes the official status-line JSON locally; it does not access private
 OAuth endpoints, browser cookies or Claude login credentials, and does not make
 inference requests to estimate subscription quota. Enabling the bridge is a
@@ -38,6 +38,11 @@ restores only that owned setting, preserves other current settings and deletes
 the backup. If configuration was changed externally, the app leaves it intact
 and reports the conflict. Removing the bridge retains the last quota record;
 the separate session-reset action clears that record.
+
+The Tallygent rename changes the app executable path. Re-enabling the bridge may
+migrate that absolute path only when the current `statusLine` exactly matches the
+command recorded by the previous app-managed backup. It never treats an arbitrary
+command as an older Tallygent installation and never overwrites a third-party entry.
 
 The current product uses native movable panels, not WidgetKit extensions.
 Panels observe the App's in-process snapshot directly. The existing read-only

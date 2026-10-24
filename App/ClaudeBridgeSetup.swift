@@ -26,9 +26,29 @@ enum ClaudeBridgeSetup {
             let backupData = try ClaudeBridgeFiles.readIfPresent(backupURL, maximumBytes: 2_097_152)
             let priorBackup = try backupData.map { try JSONDecoder().decode(Backup.self, from: $0) }
             if let priorBackup {
-                guard priorBackup.installedCommand == command else { throw ClaudeBridgeError.bridgePathChanged }
-                guard priorBackup.version == 1,
-                      isOurStatusLine(settings["statusLine"], command: priorBackup.installedCommand)
+                guard priorBackup.version == 1 else { throw ClaudeBridgeError.changedConfiguration }
+                if priorBackup.installedCommand != command {
+                    let usesOldCommand = isOurStatusLine(settings["statusLine"], command: priorBackup.installedCommand)
+                    let usesNewCommand = isOurStatusLine(settings["statusLine"], command: command)
+                    guard usesOldCommand || usesNewCommand || currentData == priorBackup.originalSettings else {
+                        throw ClaudeBridgeError.bridgePathChanged
+                    }
+                    if usesOldCommand {
+                        settings["statusLine"] = ["type": "command", "command": command]
+                        try ClaudeBridgeFiles.write(
+                            JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]),
+                            to: settingsURL
+                        )
+                    }
+                    try ClaudeBridgeFiles.write(
+                        JSONEncoder().encode(Backup(version: 1,
+                                                    originalSettings: priorBackup.originalSettings,
+                                                    installedCommand: command)),
+                        to: backupURL
+                    )
+                    if usesOldCommand || usesNewCommand { return }
+                }
+                guard isOurStatusLine(settings["statusLine"], command: command)
                         || currentData == priorBackup.originalSettings else { throw ClaudeBridgeError.changedConfiguration }
                 if isOurStatusLine(settings["statusLine"], command: command) { return }
             } else if settings["statusLine"] != nil {

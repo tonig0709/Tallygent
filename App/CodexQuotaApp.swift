@@ -22,7 +22,7 @@ struct CodexQuotaApp: App {
         }
         .windowResizability(.contentSize)
 
-        MenuBarExtra("Codex Quota", image: "CodexMark") {
+        MenuBarExtra("Tallygent", image: "CodexMark") {
             CodexQuotaMenuBarContent(server: server, menuSummary: menuSummary)
         }
     }

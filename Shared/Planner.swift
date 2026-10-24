@@ -93,8 +93,8 @@ public struct PlannerModel: Codable, Equatable, Identifiable, Sendable {
     public var manuallyConfigured: Bool
 
     public var isValid: Bool {
-        Self.safeIdentifier(identifier) && !name.isEmpty && !efforts.isEmpty
-            && efforts.allSatisfy(Self.safeIdentifier) && efforts.contains(defaultEffort)
+        Self.safeIdentifier(identifier) && !name.isEmpty && name.count <= 160 && !efforts.isEmpty && efforts.count <= 16
+            && Set(efforts).count == efforts.count && efforts.allSatisfy(Self.safeIdentifier) && efforts.contains(defaultEffort)
     }
 
     public static func safeIdentifier(_ value: String) -> Bool {
@@ -318,8 +318,8 @@ public enum PlannerEngine {
         }
         var chosen = candidates.first
         if let override {
-            if available.contains(where: { $0.id == override.model.id && $0.efforts.contains(override.effort) }) && override.isValid {
-                chosen = override
+            if let current = available.first(where: { $0.id == override.model.id && $0.efforts.contains(override.effort) }), override.isValid {
+                chosen = PlannerConfiguration(model: current, effort: override.effort)
                 reasons.append("用户手动选择；没有自动修改 Codex 的模型设置。")
                 if PlannerModel.effortRank(override.effort) < minimumRank {
                     warnings.append("手动配置低于此任务的保守推理建议；高风险约束仍需你确认。")

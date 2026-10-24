@@ -71,6 +71,9 @@ struct PlannerProbe {
         let manual = PlannerConfiguration(model: models[2], effort: "medium")
         expect(advice(feature, .balanced, quota, models, [], override: manual).recommended == manual, "Valid manual override was ignored")
         expect(advice(feature, .balanced, quota, models, [], override: PlannerConfiguration(model: models[2], effort: "invented")).recommended?.effort != "invented", "Invalid override bypassed catalog")
+        var duplicateEfforts = models[0]; duplicateEfforts.efforts = ["medium", "medium"]
+        expect(!duplicateEfforts.isValid, "Duplicate effort IDs can break the native picker")
+        expect(!PlannerModel.safeIdentifier("model\"; do-not-execute"), "Unsafe configuration escaped model validation")
 
         let response: [String: Any] = ["result": ["data": [
             ["model": "fixture-visible", "displayName": "Visible", "description": "Fast and efficient", "hidden": false,

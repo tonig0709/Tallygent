@@ -107,11 +107,10 @@ struct DesktopPanelProbe {
         controller.show(server: server)
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
-        func scrollViews(in view: NSView) -> [NSScrollView] {
-            (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
-        }
         for width in [760.0, 1_030, 1_120, 1_400] {
-            let dashboard = NSHostingView(rootView: DashboardView(server: server))
+            var frames: [DesktopPanelMode: CGRect] = [:]
+            let dashboard = NSHostingView(rootView: DashboardView(server: server, onGalleryLayout: { frames[$0] = $1 })
+                .background(Color(nsColor: .windowBackgroundColor)))
             dashboard.frame = NSRect(x: 0, y: 0, width: width, height: 720)
             let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: [.titled], backing: .buffered, defer: false)
             dashboardWindow.isReleasedWhenClosed = false
@@ -120,9 +119,7 @@ struct DesktopPanelProbe {
             dashboard.layoutSubtreeIfNeeded()
             RunLoop.main.run(until: Date().addingTimeInterval(1))
             print("Dashboard layout width \(width), frame \(dashboard.frame), fitting \(dashboard.fittingSize)")
-            for scroll in scrollViews(in: dashboard) {
-                print("Scroll frame \(scroll.frame), clip \(scroll.contentView.bounds), document \(String(describing: scroll.documentView?.frame))")
-            }
+            print("Gallery page frames \(frames)")
             fflush(stdout)
             if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
                let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
@@ -131,19 +128,20 @@ struct DesktopPanelProbe {
                 dashboard.cacheDisplay(in: dashboard.bounds, to: bitmap)
                 try! bitmap.representation(using: .png, properties: [:])!.write(to: url.appendingPathComponent("monitor-\(Int(width)).png"))
             }
-            guard let gallery = scrollViews(in: dashboard).first(where: { ($0.documentView?.frame.width ?? 0) > ($0.contentView.bounds.width * 2.5) }) else {
-                preconditionFailure("native panel gallery scroll view is missing")
+            guard let selectedFrame = frames[.stored()] else {
+                preconditionFailure("selected panel page did not produce an on-screen frame")
             }
-            let viewport = gallery.contentView.bounds.width
+            let viewport = selectedFrame.width
             precondition(viewport > 600 && viewport <= width - 40, "gallery exceeds the available dashboard width")
-            let expectedOffset = CGFloat(DesktopPanelMode.allCases.firstIndex(of: .stored())!) * viewport
-            precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 3, "resized gallery page does not match persisted panel mode")
+            precondition(abs(selectedFrame.minX) < 3, "resized gallery page does not match persisted panel mode")
+            precondition(frames.values.allSatisfy { abs($0.width - viewport) < 2 }, "gallery page widths diverge when resizing")
             precondition(dashboard.fittingSize.width <= width + 2, "dashboard forces its contents outside the window")
             precondition(DashboardLayout.hasInlineInspector(width: width) == (width >= 1_080), "compact window keeps a clipped inspector")
             dashboardWindow.close()
         }
         for width in [760.0, 1_120] {
-            let planner = NSHostingView(rootView: DashboardView(server: server, section: .planner))
+            let planner = NSHostingView(rootView: DashboardView(server: server, section: .planner)
+                .background(Color(nsColor: .windowBackgroundColor)))
             planner.frame = NSRect(x: 0, y: 0, width: width, height: 760)
             let host = NSWindow(contentRect: planner.frame, styleMask: [.titled], backing: .buffered, defer: false)
             host.isReleasedWhenClosed = false

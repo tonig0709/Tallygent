@@ -267,7 +267,7 @@ struct PlannerView: View {
                 Button("采用手动目录（本次运行）") {
                     let efforts = manualEfforts.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                     let model = PlannerModel(provider: server.service, identifier: manualIdentifier.trimmingCharacters(in: .whitespaces),
-                                             name: manualIdentifier, detail: "用户手动配置；能力未核验", efforts: efforts,
+                                             name: manualIdentifier.trimmingCharacters(in: .whitespaces), detail: "用户手动配置；能力未核验", efforts: efforts,
                                              defaultEffort: efforts.first ?? "", isDefault: false, role: manualRole,
                                              source: "用户声明，未核验", discoveredAt: .now, manuallyConfigured: true)
                     guard model.isValid, !server.models.contains(where: { $0.id == model.id }) else {

@@ -33,13 +33,16 @@ struct DashboardView: View {
     @State private var showsGlassSheet = false
     @State var section = WorkspaceSection.monitor
     @ObservedObject var planner: PlannerStore
+    private let onGalleryLayout: ((DesktopPanelMode, CGRect) -> Void)?
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @State private var selectedMode: DesktopPanelMode?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(server: QuotaMonitor, planner: PlannerStore? = nil, section: WorkspaceSection = .monitor) {
+    init(server: QuotaMonitor, planner: PlannerStore? = nil, section: WorkspaceSection = .monitor,
+         onGalleryLayout: ((DesktopPanelMode, CGRect) -> Void)? = nil) {
         self.server = server
         self.planner = planner ?? PlannerStore()
+        self.onGalleryLayout = onGalleryLayout
         _section = State(initialValue: section)
     }
 
@@ -149,12 +152,23 @@ struct DashboardView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
                                 .scaleEffect(DashboardLayout.previewScale(width: geometry.size.width))
                                 .frame(width: geometry.size.width, height: 300)
+                                .background {
+                                    if let onGalleryLayout {
+                                        GeometryReader { pageGeometry in
+                                            let frame = pageGeometry.frame(in: .named("panel-gallery"))
+                                            Color.clear
+                                                .onAppear { onGalleryLayout(page, frame) }
+                                                .onChange(of: frame) { _, value in onGalleryLayout(page, value) }
+                                        }
+                                    }
+                                }
                                 .id(page)
                         }
                     }
                     .scrollTargetLayout()
                 }
                 .scrollTargetBehavior(.viewAligned)
+                .coordinateSpace(name: "panel-gallery")
                 .scrollPosition(id: $selectedMode)
                 .onAppear {
                     selectedMode = mode

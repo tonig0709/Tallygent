@@ -369,7 +369,10 @@ final class CodexAppServer: ObservableObject {
             return
         }
         if account.isLoggedIn {
-            if snapshot.email != account.email { models = [] }
+            if snapshot.email != account.email && !models.isEmpty {
+                models = []
+                refreshModelCatalog()
+            }
             snapshot.email = account.email
             snapshot.plan = account.plan
             state = .connected(account.email)

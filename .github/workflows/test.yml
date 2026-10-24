@@ -58,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Tallygent-ui-checks
-          path: ui-checks/*.png
+          path: ui-checks/*
           if-no-files-found: ignore
           retention-days: 7
 

@@ -13,6 +13,10 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
     -framework AppKit -framework Charts -framework SwiftUI \
     -o "$probe_dir/panel-probe"
+if [ -n "${TALLYGENT_UI_CHECKS:-}" ]; then
+    mkdir -p "$TALLYGENT_UI_CHECKS"
+    /usr/bin/ditto "$probe_dir/panel-probe" "$TALLYGENT_UI_CHECKS/panel-probe"
+fi
 "$probe_dir/panel-probe"
 # Actual WindowServer dragging/closing still needs the desktop smoke test.
 grep -q 'Button(action: closePanel)' App/DesktopGlassPanelView.swift

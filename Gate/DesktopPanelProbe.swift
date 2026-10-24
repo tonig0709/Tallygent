@@ -123,6 +123,7 @@ struct DesktopPanelProbe {
             for scroll in scrollViews(in: dashboard) {
                 print("Scroll frame \(scroll.frame), clip \(scroll.contentView.bounds), document \(String(describing: scroll.documentView?.frame))")
             }
+            fflush(stdout)
             if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
                let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
                 let url = URL(fileURLWithPath: output, isDirectory: true)

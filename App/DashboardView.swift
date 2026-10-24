@@ -14,6 +14,7 @@ enum DashboardLayout {
     static func previewScale(width: CGFloat) -> CGFloat { min(1, max(0.1, width / 680)) }
 }
 
+@MainActor
 struct DashboardView: View {
     @ObservedObject var server: QuotaMonitor
     @Environment(\.colorScheme) private var colorScheme
@@ -31,10 +32,16 @@ struct DashboardView: View {
     @State private var showsGlassInspector = true
     @State private var showsGlassSheet = false
     @State var section = WorkspaceSection.monitor
-    @StateObject private var planner = PlannerStore()
+    @ObservedObject var planner: PlannerStore
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @State private var selectedMode: DesktopPanelMode?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    init(server: QuotaMonitor, planner: PlannerStore? = nil, section: WorkspaceSection = .monitor) {
+        self.server = server
+        self.planner = planner ?? PlannerStore()
+        _section = State(initialValue: section)
+    }
 
     var body: some View {
         GeometryReader { geometry in

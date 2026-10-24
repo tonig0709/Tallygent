@@ -22,6 +22,7 @@ translocated_pid=""
 translocation_mount=""
 payload_mount=""
 runtime_app=""
+claude_probe_cache=""
 
 cleanup() {
     if [ -n "$blocker_pid" ]; then kill "$blocker_pid" 2>/dev/null || true; fi
@@ -34,6 +35,7 @@ cleanup() {
     if [ -n "$translocation_mount" ]; then hdiutil detach "$translocation_mount" -force >/dev/null 2>&1 || true; fi
     if [ -n "$payload_mount" ]; then hdiutil detach "$payload_mount" -force >/dev/null 2>&1 || true; fi
     if [ -n "$runtime_app" ] && [ -e "$runtime_app" ]; then rm -rf "$runtime_app"; fi
+    if [ -n "$claude_probe_cache" ]; then rm -f "$claude_probe_cache" "$claude_probe_cache.lock"; fi
     rm -rf "$tmp"
 }
 trap cleanup EXIT
@@ -186,6 +188,36 @@ section "Isolated runtime user"
 if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
     fail "snapshot port is already occupied; never run this gate against a live user session"
 fi
+
+section "Signed app Claude bridge entry point"
+bridge_cache="$HOME/Library/Application Support/CodexQuota/claude-usage.json"
+[ ! -e "$bridge_cache" ] && [ ! -L "$bridge_cache" ] || fail "isolated Claude cache must start empty"
+claude_probe_cache="$bridge_cache"
+python3 - "$app_executable" <<'PY' || fail "signed bridge entry point failed or launched the GUI"
+import json, subprocess, sys
+payload = {"session_id": "release-gate-session", "rate_limits": {
+    "five_hour": {"used_percentage": 37}, "seven_day": {"used_percentage": 61}},
+    "prompt": "must-not-store", "access_token": "must-not-store"}
+result = subprocess.run([sys.argv[1], "--claude-statusline-bridge"],
+                        input=json.dumps(payload), text=True, capture_output=True, timeout=15)
+assert result.returncode == 0 and "Claude Code" in result.stdout
+PY
+python3 - "$bridge_cache" <<'PY' || fail "signed bridge stored untrusted fields or incorrect quota"
+import json, os, sys
+path = sys.argv[1]
+raw = open(path, encoding="utf-8").read()
+value = json.loads(raw)
+assert set(value) == {"fiveHour", "weekly", "receivedAt", "sessionFingerprint"}
+assert value["fiveHour"]["usedPercent"] == 37 and value["weekly"]["usedPercent"] == 61
+assert "must-not-store" not in raw and "release-gate-session" not in raw
+assert os.stat(path).st_mode & 0o777 == 0o600
+PY
+if /usr/sbin/lsof -nP -iTCP:48193 -sTCP:LISTEN >/dev/null 2>&1; then
+    fail "Claude bridge unexpectedly launched the account server"
+fi
+rm -f "$claude_probe_cache" "$claude_probe_cache.lock"
+claude_probe_cache=""
+pass "the exact signed app handles Claude input without launching the GUI/account server"
 
 section "Non-installed copies stay inert"
 volume_name="Codex Quota Gate $$"

@@ -157,6 +157,11 @@ struct MultiProviderProbe {
         try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/echo"), settingsURL: settings, backupURL: backup)
         try expect(try Data(contentsOf: settings) == installedBytes && Data(contentsOf: backup) == backupBytes,
                    "Repeated setup overwrote the original recovery data")
+        try rejects("Installing from another executable silently changed the bridge path") {
+            try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/cat"), settingsURL: settings, backupURL: backup)
+        }
+        try expect(try Data(contentsOf: settings) == installedBytes && Data(contentsOf: backup) == backupBytes,
+                   "Refusing a changed bridge path altered settings or recovery data")
         installed["model"] = "changed-by-user"
         try write(installed, to: settings)
         try ClaudeBridgeSetup.remove(settingsURL: settings, backupURL: backup)
@@ -165,6 +170,14 @@ struct MultiProviderProbe {
         try expect(NSDictionary(dictionary: try object(settings)).isEqual(to: expected),
                    "Disconnect reverted unrelated settings edited after connection")
         try expect(!FileManager.default.fileExists(atPath: backup.path), "Disconnect retained an active backup")
+
+        let originalBytes = try Data(contentsOf: settings)
+        try ClaudeBridgeSetup.install(executableURL: URL(fileURLWithPath: "/bin/echo"), settingsURL: settings, backupURL: backup)
+        // Simulate a first-install interruption after the backup, before settings were written.
+        try originalBytes.write(to: settings)
+        try ClaudeBridgeSetup.remove(settingsURL: settings, backupURL: backup)
+        try expect(try Data(contentsOf: settings) == originalBytes && !FileManager.default.fileExists(atPath: backup.path),
+                   "Recovering an interrupted install changed original settings or retained its backup")
 
         var foreign = original
         foreign["statusLine"] = ["type": "command", "command": "do-not-execute-or-overwrite"]
@@ -191,6 +204,7 @@ struct MultiProviderProbe {
     @MainActor
     private static func coordinator(at root: URL) throws {
         let defaults = MemoryDefaults()
+        try expect(SnapshotStore.load(defaults: defaults) == .empty, "A clean install invents cached quota")
         let url = root.appendingPathComponent("coordinator.json")
         let record = try parse(#"{"session_id":"coordinator","rate_limits":{"five_hour":{"used_percentage":25},"seven_day":{"used_percentage":70}}}"#)
         try ClaudeStatuslineStore.save(record, to: url)

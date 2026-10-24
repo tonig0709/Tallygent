@@ -109,6 +109,7 @@ public struct PlannerModel: Codable, Equatable, Identifiable, Sendable {
             throw PlannerError.invalidCatalog
         }
         let models = entries.compactMap { entry -> Self? in
+            if let modalities = entry["inputModalities"] as? [String], !modalities.contains("text") { return nil }
             guard entry["hidden"] as? Bool != true, entry["available"] as? Bool != false,
                   let identifier = entry["model"] as? String,
                   let name = entry["displayName"] as? String,
@@ -321,6 +322,7 @@ public enum PlannerEngine {
             if let current = available.first(where: { $0.id == override.model.id && $0.efforts.contains(override.effort) }), override.isValid {
                 chosen = PlannerConfiguration(model: current, effort: override.effort)
                 reasons.append("用户手动选择；没有自动修改 Codex 的模型设置。")
+                if PlannerModel.effortRank(override.effort) == 99 { warnings.append("此 effort 的推理深度语义未知，只保留你的手动选择，不作资源或质量判断。") }
                 if PlannerModel.effortRank(override.effort) < minimumRank {
                     warnings.append("手动配置低于此任务的保守推理建议；高风险约束仍需你确认。")
                 }

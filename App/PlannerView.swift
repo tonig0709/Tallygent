@@ -213,13 +213,14 @@ struct PlannerView: View {
                     Button("复制配置") {
                         NSPasteboard.general.clearContents()
                         NSPasteboard.general.setString(selected.copyText, forType: .string)
-                        notice = "已复制模型与 effort；请自行在 Codex 中应用。"
+                        notice = "已复制模型与 effort；请自行在 \(selected.model.provider.title) 中应用。"
                     }
                     Button("保存为计划") { save(selected, start: false) }
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500)
                     Button("标记开始") { save(selected, start: true) }
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500)
                     Spacer()
                 }
-                .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500)
             } else {
                 ForEach(Array(advice.warnings.enumerated()), id: \.offset) { _, warning in Text(warning).foregroundStyle(.secondary) }
             }
@@ -259,6 +260,12 @@ struct PlannerView: View {
                 }
                 Text("目录不做推理调用，也不证明账户已获授权。手动配置需要你确认型号与支持的 effort。")
                     .font(.caption).foregroundStyle(.secondary)
+                Button("手动采用目录默认配置") {
+                    if let model = models.first(where: \.isDefault) ?? models.first {
+                        override = PlannerConfiguration(model: model, effort: model.defaultEffort)
+                        recommend()
+                    }
+                }.disabled(models.isEmpty)
                 TextField("模型 ID（必须来自你已确认的本机配置）", text: $manualIdentifier)
                 TextField("支持的 effort，用逗号分隔；第一项为默认档", text: $manualEfforts)
                 Picker("角色（用户声明）", selection: $manualRole) {
@@ -273,9 +280,12 @@ struct PlannerView: View {
                     guard model.isValid, !server.models.contains(where: { $0.id == model.id }) else {
                         notice = "模型 ID / effort 无效或与当前目录重复。"; return
                     }
-                    manualModel = model; override = nil; recommend()
+                    manualModel = model
+                    override = PlannerConfiguration(model: model, effort: model.defaultEffort)
+                    recommend()
                 }
                 if let manualModel { Text("已加入：\(manualModel.name)（未核验）").font(.caption).foregroundStyle(.secondary) }
+                if advice == nil, let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
             }.padding(.top, 12)
         }
     }
@@ -347,7 +357,7 @@ struct PlannerView: View {
         Task {
             if await store.saveTask(profile: effectiveProfile, preference: preference, configuration: configuration,
                                     title: savesTitle ? taskText : nil, quota: server.plannerQuota(), start: start) {
-                notice = start ? "已标记开始；请在 Codex 中手动执行，结束后记录结果。" : "计划已保存；未启动任务。"
+                notice = start ? "已标记开始；请在 \(configuration.model.provider.title) 中手动执行，结束后记录结果。" : "计划已保存；未启动任务。"
             }
         }
     }

@@ -40,6 +40,8 @@ struct PlannerProbe {
         expect(advice(feature, .balanced, quota, []).recommended == nil, "No catalog produced invented models")
         var unsupported = models[0]; unsupported.efforts = ["low"]; unsupported.defaultEffort = "low"
         expect(advice(architecture, .quality, quota, [unsupported]).recommended == nil, "Unsupported high-risk effort combination was invented")
+        expect(advice(architecture, .quality, quota, [unsupported], override: PlannerConfiguration(model: unsupported, effort: "low")).recommended?.effort == "low",
+               "An explicit low-effort override is not available to the user")
 
         var missing = quota; missing.windows = []
         expect(advice(feature, .balanced, missing).recommended != nil && advice(feature, .balanced, missing).warnings.contains { $0.contains("缺失") }, "Missing quota should preserve clearly unvalidated task advice")

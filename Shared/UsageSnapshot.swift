@@ -173,6 +173,11 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
         return window
     }
 
+    public func menuSummary(at now: Date = .now) -> String {
+        guard let value = displayWindow(weekly, at: now)?.remainingPercent else { return "等待额度数据" }
+        return "周额度剩余 \(value)%"
+    }
+
     public func statusLabel(at now: Date) -> String {
         guard hasQuota else { return "等待数据" }
         if resolvedService == .claude {

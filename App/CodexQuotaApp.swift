@@ -28,8 +28,7 @@ struct CodexQuotaApp: App {
     }
 
     private var menuSummary: String {
-        guard let value = server.snapshot.weekly?.remainingPercent else { return "等待额度数据" }
-        return "周额度剩余 \(value)%"
+        server.snapshot.menuSummary()
     }
 }
 

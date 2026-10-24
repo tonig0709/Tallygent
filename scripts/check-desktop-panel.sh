@@ -24,6 +24,11 @@ grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift
 grep -q 'Button("关闭桌面玻璃面板")' App/CodexQuotaApp.swift
 grep -q 'window.styleMask.remove(.titled)' App/DesktopGlassPanelView.swift
 grep -q '.scrollTargetBehavior(.viewAligned)' App/DashboardView.swift
+grep -Fq '.accessibilityHidden(section != .planner)' App/DashboardView.swift
+if grep -Fq 'if section == .planner {' App/DashboardView.swift; then
+    echo 'Workspace branching destroys the unsaved in-memory Planner draft' >&2
+    exit 1
+fi
 grep -Fq 'TimelineView(.periodic(from: .now, by: 1))' Shared/QuotaWidgetView.swift
 grep -Fq 'Text(Date(), format: .dateTime.hour().minute().second())' Shared/QuotaWidgetView.swift
 if grep -Fq 'Text(snapshot.updatedAt, style: .time)' Shared/QuotaWidgetView.swift; then

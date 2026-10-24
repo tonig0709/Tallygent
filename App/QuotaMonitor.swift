@@ -79,7 +79,8 @@ final class QuotaMonitor: ObservableObject {
         } else { scope = service == .claude ? claudeRecord?.sessionFingerprint : nil }
         let windows = [("fiveHour", "5h 额度", snapshot.fiveHour), ("weekly", "周额度", snapshot.weekly)].compactMap { id, title, window -> PlannerQuotaWindow? in
             guard let window else { return nil }
-            return PlannerQuotaWindow(id: id, title: title, remainingPercent: window.remainingPercent, resetsAt: window.resetsAt)
+            return PlannerQuotaWindow(id: id, title: title, remainingPercent: window.remainingPercent,
+                                      resetsAt: window.resetsAt, durationMinutes: window.windowDurationMinutes)
         }
         let connected: Bool
         if case .connected = state { connected = true } else { connected = false }

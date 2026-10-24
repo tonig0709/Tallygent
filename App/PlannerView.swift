@@ -8,9 +8,11 @@ import SwiftUI
 struct PlannerView: View {
     @ObservedObject var server: QuotaMonitor
     @ObservedObject var store: PlannerStore
+    var isActive = true
     @State private var taskText = ""
     @State private var context = ""
     @State private var profile = PlannerProfile()
+    @State private var profileIsManual = false
     @State private var preference = PlannerPreference.balanced
     @AppStorage("plannerSafetyReserve") private var reserve = 10
     @State private var savesTitle = false
@@ -25,7 +27,7 @@ struct PlannerView: View {
     @State private var notice: String?
 
     private var models: [PlannerModel] {
-        server.models.filter { $0.provider == server.service } + [manualModel].compactMap { $0 }.filter { $0.provider == server.service }
+        PlannerModel.merged(live: server.models, manual: manualModel, provider: server.service)
     }
 
     private var effectiveProfile: PlannerProfile {
@@ -52,7 +54,12 @@ struct PlannerView: View {
             .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .task { await store.load(); if server.service == .codex { server.refreshModelCatalog() } }
+        .task(id: isActive) {
+            guard isActive else { return }
+            await store.load()
+            if advice != nil { recommend() }
+            if server.service == .codex { server.refreshModelCatalog() }
+        }
         .onChange(of: server.service) { _, _ in
             advice = nil; override = nil
             if server.service == .codex { server.refreshModelCatalog() }
@@ -64,7 +71,7 @@ struct PlannerView: View {
         .onChange(of: reserve) { _, _ in if advice != nil { recommend() } }
         .onChange(of: store.records) { _, _ in if advice != nil { recommend() } }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
-            if advice != nil { recommend() }
+            if isActive && advice != nil { recommend() }
         }
         .sheet(item: $feedback) { record in PlannerFeedbackView(record: record, store: store, quota: { server.plannerQuota() }) }
         .confirmationDialog("清空全部本地任务记录？此操作不影响额度与面板设置。", isPresented: $confirmsClear) {
@@ -104,10 +111,13 @@ struct PlannerView: View {
                     taskText = String(value.prefix(8_000)); advice = nil; override = nil
                 }
             HStack {
-                Picker("任务类别", selection: $profile.category) {
+                Picker("任务类别", selection: Binding(get: { profile.category }, set: { profile.category = $0; profileIsManual = true })) {
                     ForEach(PlannerCategory.allCases.filter { $0 != .automatic }) { Text($0.title).tag($0) }
                 }
-                Button("本地自动识别") { profile = PlannerProfile.classify(taskText + " " + context) }
+                Button("本地自动识别") {
+                    profileIsManual = false
+                    profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
+                }
                 Spacer()
                 Toggle("紧急", isOn: $profile.urgent).toggleStyle(.checkbox)
             }
@@ -116,11 +126,13 @@ struct PlannerView: View {
                     TextField("补充背景（不保存）", text: $context)
                         .onChange(of: context) { _, value in context = String(value.prefix(2_000)); advice = nil }
                     HStack(spacing: 20) {
-                        levelPicker("规模", value: $profile.complexity, size: true)
-                        levelPicker("不确定性", value: $profile.uncertainty)
-                        levelPicker("风险", value: $profile.risk)
+                        levelPicker("规模", value: profileLevel(\.complexity), size: true)
+                        levelPicker("不确定性", value: profileLevel(\.uncertainty))
+                        levelPicker("风险", value: profileLevel(\.risk))
                     }
                     Text("安全、认证和关键业务关键词始终保留高风险护栏。高 effort 不等于保证成功。")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text(profileIsManual ? "当前使用手动任务特征；点“本地自动识别”恢复自动。" : "每次生成建议都会按当前任务重新自动识别。")
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding(.top, 10)
             }
@@ -132,10 +144,7 @@ struct PlannerView: View {
                     .fixedSize()
                 Spacer()
                 Button("生成建议") {
-                    if profile.signals.isEmpty {
-                        let inferred = PlannerProfile.classify(taskText + " " + context)
-                        if profile == PlannerProfile() { profile = inferred }
-                    }
+                    profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: profileIsManual)
                     override = nil; recommend()
                 }
                 .buttonStyle(.borderedProminent)
@@ -149,6 +158,10 @@ struct PlannerView: View {
         Picker(title, selection: value) {
             ForEach(PlannerLevel.allCases) { Text(size ? $0.sizeTitle : $0.title).tag($0) }
         }
+    }
+
+    private func profileLevel(_ keyPath: WritableKeyPath<PlannerProfile, PlannerLevel>) -> Binding<PlannerLevel> {
+        Binding(get: { profile[keyPath: keyPath] }, set: { profile[keyPath: keyPath] = $0; profileIsManual = true })
     }
 
     private func recommendation(_ advice: PlannerAdvice) -> some View {
@@ -271,13 +284,13 @@ struct PlannerView: View {
                 Picker("角色（用户声明）", selection: $manualRole) {
                     ForEach(PlannerModelRole.allCases) { Text($0.title).tag($0) }
                 }
-                Button("采用手动目录（本次运行）") {
+                Button("采用手动目录（仅本窗口会话）") {
                     let efforts = manualEfforts.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
                     let model = PlannerModel(provider: server.service, identifier: manualIdentifier.trimmingCharacters(in: .whitespaces),
                                              name: manualIdentifier.trimmingCharacters(in: .whitespaces), detail: "用户手动配置；能力未核验", efforts: efforts,
                                              defaultEffort: efforts.first ?? "", isDefault: false, role: manualRole,
                                              source: "用户声明，未核验", discoveredAt: .now, manuallyConfigured: true)
-                    guard model.isValid, !server.models.contains(where: { $0.id == model.id }) else {
+                    guard model.isValid, !PlannerModel.merged(live: server.models, manual: nil, provider: server.service).contains(where: { $0.id == model.id }) else {
                         notice = "模型 ID / effort 无效或与当前目录重复。"; return
                     }
                     manualModel = model
@@ -320,6 +333,8 @@ struct PlannerView: View {
                     DisclosureGroup {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("\(record.configuration.model.identifier) · \(record.configuration.effort) · \(record.profile.category.title)")
+                            Text("用户记录的配置，未自动核验实际执行模型。切换工作区不丢草稿；关闭窗口不保存原始输入。")
+                                .foregroundStyle(.secondary)
                             Text(record.attribution).foregroundStyle(.secondary)
                             Text("重试 \(record.retries) · \(record.verification.title)\(record.manualRework ? " · 有手工返工" : "")")
                             if let tokens = record.tokens { Text("填报 Token：输入 \(tokens.input)，输出 \(tokens.output)；\(tokens.source)") }

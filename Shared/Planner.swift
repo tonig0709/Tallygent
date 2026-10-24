@@ -68,6 +68,13 @@ public struct PlannerProfile: Codable, Equatable, Sendable {
                     risk: sensitive ? .high : .low,
                     signals: ["本地关键词规则；未扫描项目或发送任务文本"] + (sensitive ? ["检测到安全或关键业务信号"] : []))
     }
+
+    public static func resolved(_ text: String, previous: Self, manual: Bool) -> Self {
+        guard !manual else { return previous }
+        var value = classify(text)
+        value.urgent = previous.urgent
+        return value
+    }
 }
 
 public enum PlannerModelRole: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -101,6 +108,12 @@ public struct PlannerModel: Codable, Equatable, Identifiable, Sendable {
         !value.isEmpty && value.utf8.count <= 160 && value.unicodeScalars.allSatisfy {
             CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-_.:/")).contains($0)
         }
+    }
+
+    public static func merged(live: [Self], manual: Self?, provider: AgentService, at date: Date = .now) -> [Self] {
+        let current = live.filter { $0.provider == provider && $0.isValid && date.timeIntervalSince($0.discoveredAt) <= 1_800 && date >= $0.discoveredAt.addingTimeInterval(-5) }
+        guard let manual, manual.provider == provider, !current.contains(where: { $0.id == manual.id }) else { return current }
+        return current + [manual]
     }
 
     /// The local catalog is a picker contract, not a successful inference entitlement check.
@@ -154,6 +167,7 @@ public struct PlannerQuotaWindow: Codable, Equatable, Identifiable, Sendable {
     public var title: String
     public var remainingPercent: Int
     public var resetsAt: Date?
+    public var durationMinutes: Int? = nil
 }
 
 public struct PlannerQuota: Codable, Equatable, Sendable {
@@ -173,6 +187,9 @@ public struct PlannerQuota: Codable, Equatable, Sendable {
         guard !windows.isEmpty else { return ["额度数据缺失；本建议未通过额度校验。"] }
         var warnings: [String] = []
         if !isFresh(at: date) { warnings.append("额度记录较旧或来源未连接；请刷新后再判断可用量。") }
+        for (id, title) in [("fiveHour", "5h 额度"), ("weekly", "周额度")] where !windows.contains(where: { $0.id == id }) {
+            warnings.append("来源未提供\(title)窗口，无法校验该约束；不能仅凭另一个窗口判断可运行。")
+        }
         for window in windows {
             if let reset = window.resetsAt, reset <= date {
                 warnings.append("\(window.title)已到重置点，等待来源确认新周期。")
@@ -243,7 +260,8 @@ public struct PlannerTaskRecord: Codable, Equatable, Identifiable, Sendable {
         guard before.isFresh(at: startedAt), after.isFresh(at: completedAt) else { return "起止额度记录过期" }
         for window in before.windows {
             guard let end = after.windows.first(where: { $0.id == window.id }), let reset = window.resetsAt,
-                  end.resetsAt == reset, reset > completedAt, end.remainingPercent <= window.remainingPercent else {
+                  end.resetsAt == reset, end.durationMinutes == window.durationMinutes,
+                  reset > completedAt, end.remainingPercent <= window.remainingPercent else {
                 return "跨重置或窗口变化，不可归因"
             }
         }

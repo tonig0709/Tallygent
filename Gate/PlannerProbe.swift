@@ -23,6 +23,11 @@ struct PlannerProbe {
         let models = [model("fixture-efficient", role: .efficient), model("fixture-balanced", role: .balanced, defaultModel: true), model("fixture-quality", role: .quality)]
         let routine = PlannerProfile.classify("修正文案拼写 typo")
         let architecture = PlannerProfile.classify("设计支付认证系统架构 architecture auth")
+        let taskB = PlannerProfile.resolved("修正文案拼写 typo", previous: architecture, manual: false)
+        expect(taskB.category == .routine && taskB.complexity == .low && taskB.uncertainty == .low,
+               "Task B inherited task A's automatic profile")
+        expect(PlannerProfile.resolved("修正文案", previous: architecture, manual: true) == architecture,
+               "Automatic classification discarded an explicit manual profile")
         let feature = PlannerProfile(category: .feature)
         func advice(_ profile: PlannerProfile = feature, _ preference: PlannerPreference = .balanced,
                     _ input: PlannerQuota = quota, _ catalog: [PlannerModel] = models,
@@ -45,6 +50,8 @@ struct PlannerProbe {
 
         var missing = quota; missing.windows = []
         expect(advice(feature, .balanced, missing).recommended != nil && advice(feature, .balanced, missing).warnings.contains { $0.contains("缺失") }, "Missing quota should preserve clearly unvalidated task advice")
+        var partial = quota; partial.windows.removeFirst()
+        expect(advice(feature, .balanced, partial).warnings.contains { $0.contains("未提供5h") }, "Partial quota omitted an unknown short-term constraint")
         var stale = quota; stale.receivedAt = now.addingTimeInterval(-600)
         expect(advice(feature, .balanced, stale).warnings.contains { $0.contains("较旧") }, "Stale quota not exposed")
         var constrained = quota; constrained.windows[1].remainingPercent = 5
@@ -90,6 +97,13 @@ struct PlannerProbe {
         rejects("Malformed catalog accepted") { _ = try PlannerModel.parsePage(["result": ["data": "broken"]], at: now) }
         var oldCatalog = models; oldCatalog[0].discoveredAt = now.addingTimeInterval(-4_000)
         expect(advice(routine, .efficiency, quota, oldCatalog).recommended?.model.identifier != models[0].identifier, "Stale catalog entry used")
+        var manualDuplicate = models[0]; manualDuplicate.manuallyConfigured = true
+        let merged = PlannerModel.merged(live: models, manual: manualDuplicate, provider: .codex, at: now)
+        expect(merged.count == models.count && merged.first { $0.id == manualDuplicate.id }?.manuallyConfigured == false,
+               "Recovered catalog duplicates or loses authority to a fallback Picker ID")
+        let staleFallback = PlannerModel.merged(live: oldCatalog, manual: manualDuplicate, provider: .codex, at: now)
+        expect(staleFallback.first { $0.id == manualDuplicate.id }?.manuallyConfigured == true,
+               "A stale catalog prevents explicitly declared fallback configuration")
 
         let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
         let url = root.appendingPathComponent("planner.json")

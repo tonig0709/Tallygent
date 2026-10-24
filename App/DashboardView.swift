@@ -60,9 +60,7 @@ struct DashboardView: View {
                 }
                 .padding(.horizontal, 24).padding(.vertical, 16)
                 Divider()
-                if section == .planner {
-                    PlannerView(server: server, store: planner)
-                } else {
+                ZStack {
                     HStack(spacing: 0) {
                         ScrollView(.vertical) {
                             monitorContent(wide: DashboardLayout.hasInlineInspector(width: geometry.size.width))
@@ -78,6 +76,15 @@ struct DashboardView: View {
                             .background(.primary.opacity(0.025))
                         }
                     }
+                    .opacity(section == .monitor ? 1 : 0)
+                    .allowsHitTesting(section == .monitor)
+                    .accessibilityHidden(section != .monitor)
+                    .disabled(section != .monitor)
+                    PlannerView(server: server, store: planner, isActive: section == .planner)
+                        .opacity(section == .planner ? 1 : 0)
+                        .allowsHitTesting(section == .planner)
+                        .accessibilityHidden(section != .planner)
+                        .disabled(section != .planner)
                 }
             }
         }

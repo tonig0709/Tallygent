@@ -9,6 +9,7 @@ if [ -f App/GlassSettingsView.swift ]; then
 fi
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     "$@" Gate/DesktopPanelProbe.swift App/DesktopGlassPanelView.swift App/DashboardView.swift \
+    App/PlannerView.swift App/PlannerStore.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
     Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
     -framework AppKit -framework Charts -framework SwiftUI \
     -o "$probe_dir/panel-probe"

@@ -1,5 +1,19 @@
 import SwiftUI
 
+enum WorkspaceSection: String, CaseIterable, Identifiable {
+    case monitor, planner
+    var id: Self { self }
+    var title: String { self == .monitor ? "额度与面板" : "Planner" }
+}
+
+enum DashboardLayout {
+    static let minimumWidth: CGFloat = 760
+    static let minimumHeight: CGFloat = 620
+    static let inspectorWidth: CGFloat = 300
+    static func hasInlineInspector(width: CGFloat) -> Bool { width >= 1_080 }
+    static func previewScale(width: CGFloat) -> CGFloat { min(1, max(0.1, width / 680)) }
+}
+
 struct DashboardView: View {
     @ObservedObject var server: QuotaMonitor
     @Environment(\.colorScheme) private var colorScheme
@@ -15,11 +29,66 @@ struct DashboardView: View {
     @AppStorage(GlassSettingKeys.tone) private var toneRaw = GlassTone.neutral.rawValue
     @AppStorage(GlassSettingKeys.refractionMode) private var refractionModeRaw = GlassRefractionMode.standard.rawValue
     @State private var showsGlassInspector = true
+    @State private var showsGlassSheet = false
+    @State var section = WorkspaceSection.monitor
+    @StateObject private var planner = PlannerStore()
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @State private var selectedMode: DesktopPanelMode?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                HStack {
+                    Picker("工作区", selection: $section) {
+                        ForEach(WorkspaceSection.allCases) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 250)
+                    Spacer()
+                    Text("Make Every Token Count").font(.callout).foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 24).padding(.vertical, 16)
+                Divider()
+                if section == .planner {
+                    PlannerView(server: server, store: planner)
+                } else {
+                    HStack(spacing: 0) {
+                        ScrollView(.vertical) {
+                            monitorContent(wide: DashboardLayout.hasInlineInspector(width: geometry.size.width))
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        if showsGlassInspector && DashboardLayout.hasInlineInspector(width: geometry.size.width) {
+                            Divider()
+                            ScrollView {
+                                GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings)
+                                    .padding(20)
+                            }
+                            .frame(width: DashboardLayout.inspectorWidth)
+                            .background(.primary.opacity(0.025))
+                        }
+                    }
+                }
+            }
+        }
+        .frame(minWidth: DashboardLayout.minimumWidth, minHeight: DashboardLayout.minimumHeight)
+        .sheet(isPresented: $showsGlassSheet) {
+            VStack(spacing: 0) {
+                HStack { Text("玻璃设置").font(.headline); Spacer(); Button("完成") { showsGlassSheet = false } }
+                    .padding(20)
+                Divider()
+                ScrollView { GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings).padding(20) }
+            }
+            .frame(width: 380, height: 600)
+        }
+        .task { server.connect(); await planner.load() }
+        .onChange(of: selectedMode) { _, value in
+            if let value { modeRaw = value.rawValue }
+        }
+        .onChange(of: modeRaw) { _, _ in selectedMode = mode }
+    }
+
+    private func monitorContent(wide: Bool) -> some View {
         VStack(spacing: 20) {
             HStack {
                 Picker("监测服务", selection: Binding(get: { server.service }, set: server.selectService)) {
@@ -46,7 +115,8 @@ struct DashboardView: View {
                     .accessibilityLabel("下一个面板")
                     .disabled(mode == .large)
             }
-            ScrollViewReader { proxy in
+            GeometryReader { geometry in
+              ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(DesktopPanelMode.allCases) { page in
@@ -70,7 +140,8 @@ struct DashboardView: View {
                                 )
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
-                                .frame(width: 680, height: 300)
+                                .scaleEffect(DashboardLayout.previewScale(width: geometry.size.width))
+                                .frame(width: geometry.size.width, height: 300)
                                 .id(page)
                         }
                     }
@@ -82,8 +153,10 @@ struct DashboardView: View {
                     selectedMode = mode
                     proxy.scrollTo(mode, anchor: .center)
                 }
+                .onChange(of: geometry.size.width) { _, _ in proxy.scrollTo(mode, anchor: .center) }
+              }
             }
-            .frame(width: 680, height: 300)
+            .frame(height: 300)
 
             HStack(spacing: 16) {
                 ForEach(DesktopPanelMode.allCases) { page in
@@ -107,10 +180,12 @@ struct DashboardView: View {
                 Label(statusText, systemImage: statusIcon)
                     .foregroundStyle(statusColor)
                     .font(.callout.weight(.medium))
+                    .lineLimit(2)
+                    .textSelection(.enabled)
                 Spacer()
 
                 Button("玻璃设置", systemImage: "slider.horizontal.3") {
-                    showsGlassInspector.toggle()
+                    if wide { showsGlassInspector.toggle() } else { showsGlassSheet = true }
                 }
                 Button("桌面玻璃面板") {
                     DesktopPanelController.shared.show(server: server)
@@ -141,19 +216,7 @@ struct DashboardView: View {
             }
         }
         .padding(24)
-        .inspector(isPresented: $showsGlassInspector) {
-            ScrollView {
-                GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings)
-            }
-                .padding(20)
-                .inspectorColumnWidth(min: 260, ideal: 300, max: 340)
-        }
-        .frame(minWidth: 730, minHeight: 560)
-        .task { server.connect() }
-        .onChange(of: selectedMode) { _, value in
-            if let value { modeRaw = value.rawValue }
-        }
-        .onChange(of: modeRaw) { _, _ in selectedMode = mode }
+        .frame(maxWidth: .infinity)
     }
 
     private var mode: DesktopPanelMode { DesktopPanelMode(rawValue: modeRaw) ?? .large }

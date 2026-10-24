@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import CryptoKit
 
 /// Owns provider selection. Providers never write into each other's cache.
 @MainActor
@@ -9,6 +10,9 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var state: State = .disconnected
     @Published private(set) var snapshot: UsageSnapshot = .empty
     @Published private(set) var connectionMessage: String?
+    @Published private(set) var models: [PlannerModel] = []
+    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var isLoadingModels = false
 
     private let codex: CodexAppServer
     private let defaults: UserDefaults
@@ -29,6 +33,9 @@ final class QuotaMonitor: ObservableObject {
         self.claudeURL = claudeURL
         self.now = now
         service = AgentService(rawValue: defaults.string(forKey: "selectedAgentService") ?? "") ?? .codex
+        codex.$models.assign(to: &$models)
+        codex.$modelCatalogMessage.assign(to: &$modelCatalogMessage)
+        codex.$isLoadingModels.assign(to: &$isLoadingModels)
         codex.$snapshot.combineLatest(codex.$state).sink { [weak self] value, state in
             guard let self, self.service == .codex else { return }
             self.snapshot = value
@@ -61,6 +68,24 @@ final class QuotaMonitor: ObservableObject {
     func refresh() {
         if service == .codex { codex.refresh() }
         else { readClaude() }
+    }
+
+    func refreshModelCatalog() { codex.refreshModelCatalog() }
+
+    func plannerQuota() -> PlannerQuota {
+        let scope: String?
+        if service == .codex, let email = snapshot.email {
+            scope = SHA256.hash(data: Data(email.lowercased().utf8)).map { String(format: "%02x", $0) }.joined()
+        } else { scope = service == .claude ? claudeRecord?.sessionFingerprint : nil }
+        let windows = [("fiveHour", "5h 额度", snapshot.fiveHour), ("weekly", "周额度", snapshot.weekly)].compactMap { id, title, window -> PlannerQuotaWindow? in
+            guard let window else { return nil }
+            return PlannerQuotaWindow(id: id, title: title, remainingPercent: window.remainingPercent, resetsAt: window.resetsAt)
+        }
+        let connected: Bool
+        if case .connected = state { connected = true } else { connected = false }
+        return PlannerQuota(provider: service, scope: scope,
+                            source: service == .codex ? "Codex account/rateLimits/read" : "Claude Code statusLine（被动接收）",
+                            receivedAt: snapshot.lastReceivedAt, windows: windows, connected: connected)
     }
 
     func updateGlassSettings(_ settings: GlassRenderSettings) {

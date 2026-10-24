@@ -11,6 +11,13 @@ final class QuotaMonitor: ObservableObject {
     @Published var snapshot = UsageSnapshot.placeholder
     @Published var service = AgentService.codex
     @Published var connectionMessage: String?
+    @Published var models: [PlannerModel] = []
+    @Published var modelCatalogMessage = "测试目录（无推理）"
+    @Published var isLoadingModels = false
+    func refreshModelCatalog() {}
+    func plannerQuota() -> PlannerQuota {
+        PlannerQuota(provider: service, scope: nil, source: "隔离测试", receivedAt: .distantPast, windows: [], connected: false)
+    }
     func selectService(_ value: AgentService) { service = value }
     func enableClaudeBridge() {}
     func removeClaudeBridge() {}
@@ -100,25 +107,37 @@ struct DesktopPanelProbe {
         controller.show(server: server)
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
-        let dashboard = NSHostingView(rootView: DashboardView(server: server))
-        dashboard.frame = NSRect(x: 0, y: 0, width: 1030, height: 560)
-        let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: [.titled], backing: .buffered, defer: false)
-        dashboardWindow.isReleasedWhenClosed = false
-        dashboardWindow.contentView = dashboard
-        dashboardWindow.makeKeyAndOrderFront(nil)
-        dashboard.layoutSubtreeIfNeeded()
-        RunLoop.main.run(until: Date().addingTimeInterval(0.3))
         func scrollViews(in view: NSView) -> [NSScrollView] {
             (view as? NSScrollView).map { [$0] } ?? view.subviews.flatMap { scrollViews(in: $0) }
         }
-        guard let gallery = scrollViews(in: dashboard).first(where: { ($0.documentView?.frame.width ?? 0) > 1800 }) else {
-            preconditionFailure("native panel gallery scroll view is missing")
+        for width in [760.0, 1_030, 1_120, 1_400] {
+            let dashboard = NSHostingView(rootView: DashboardView(server: server))
+            dashboard.frame = NSRect(x: 0, y: 0, width: width, height: 720)
+            let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            dashboardWindow.isReleasedWhenClosed = false
+            dashboardWindow.contentView = dashboard
+            dashboardWindow.makeKeyAndOrderFront(nil)
+            dashboard.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+            guard let gallery = scrollViews(in: dashboard).first(where: { ($0.documentView?.frame.width ?? 0) > ($0.contentView.bounds.width * 2.5) }) else {
+                preconditionFailure("native panel gallery scroll view is missing")
+            }
+            let viewport = gallery.contentView.bounds.width
+            precondition(viewport > 600 && viewport <= width - 40, "gallery exceeds the available dashboard width")
+            let expectedOffset = CGFloat(DesktopPanelMode.allCases.firstIndex(of: .stored())!) * viewport
+            precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 3, "resized gallery page does not match persisted panel mode")
+            precondition(dashboard.fittingSize.width <= width + 2, "dashboard forces its contents outside the window")
+            precondition(DashboardLayout.hasInlineInspector(width: width) == (width >= 1_080), "compact window keeps a clipped inspector")
+            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"] {
+                let url = URL(fileURLWithPath: output, isDirectory: true)
+                try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+                if let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
+                    dashboard.cacheDisplay(in: dashboard.bounds, to: bitmap)
+                    try! bitmap.representation(using: .png, properties: [:])!.write(to: url.appendingPathComponent("monitor-\(Int(width)).png"))
+                }
+            }
+            dashboardWindow.close()
         }
-        let expectedOffset = CGFloat(DesktopPanelMode.allCases.firstIndex(of: .stored())!) * 680
-        precondition(abs(gallery.contentView.bounds.minX - expectedOffset) < 2, "initial gallery page does not match the persisted panel mode")
-        print("Dashboard fitted height: \(dashboard.fittingSize.height), gallery offset: \(gallery.contentView.bounds.minX)")
-        precondition(dashboard.fittingSize.height >= 559, "restored dashboard height clips panel selector controls")
-        dashboardWindow.close()
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 }

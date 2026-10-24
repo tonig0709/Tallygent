@@ -11,10 +11,14 @@ final class CodexAppServer: ObservableObject {
     }
     @Published var state: State = .disconnected
     @Published var snapshot: UsageSnapshot = .empty
+    @Published var models: [PlannerModel] = []
+    @Published var modelCatalogMessage = "test"
+    @Published var isLoadingModels = false
     private(set) var connectCount = 0
     private(set) var refreshCount = 0
     func connect() { connectCount += 1; state = .connected(nil) }
     func refresh() { refreshCount += 1 }
+    func refreshModelCatalog() {}
     func updateGlassSettings(_ settings: GlassRenderSettings) {
         snapshot.glassSettings = settings.sanitized
     }

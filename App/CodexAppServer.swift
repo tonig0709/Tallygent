@@ -74,6 +74,9 @@ final class CodexAppServer: ObservableObject {
 
     @Published private(set) var state: State = .disconnected
     @Published private(set) var snapshot: UsageSnapshot
+    @Published private(set) var models: [PlannerModel] = []
+    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var isLoadingModels = false
 
     private struct PendingRefresh {
         let rateLimitRequestID: Int
@@ -91,6 +94,12 @@ final class CodexAppServer: ObservableObject {
     private var refreshQueued = false
     private var refreshTimeout: DispatchWorkItem?
     private var nextRequestID = 3
+    private var initialized = false
+    private var wantsModels = false
+    private var modelRequestID: Int?
+    private var catalogBuffer: [PlannerModel] = []
+    private var catalogCursors = Set<String>()
+    private var modelTimeout: DispatchWorkItem?
     private let snapshotServer = SnapshotServer()
 
     init() {
@@ -123,6 +132,8 @@ final class CodexAppServer: ObservableObject {
         }
 
         state = .connecting
+        initialized = false
+        models = []
         let process = Process()
         let stdin = Pipe()
         let stdout = Pipe()
@@ -140,6 +151,8 @@ final class CodexAppServer: ObservableObject {
                 self?.refreshTimeout = nil
                 self?.pendingRefresh = nil
                 self?.refreshQueued = false
+                self?.initialized = false
+                self?.finishModelCatalog(error: "Codex 已断开，目录未刷新")
                 if status != 0 {
                     self?.state = .failed("Codex app-server 已退出（\(status)）")
                 }
@@ -184,6 +197,43 @@ final class CodexAppServer: ObservableObject {
         process = nil
         input = nil
         state = .disconnected
+        initialized = false
+        finishModelCatalog(error: "Codex 已断开，目录未刷新")
+    }
+
+    func refreshModelCatalog() {
+        guard !isLoadingModels else { return }
+        wantsModels = true
+        guard process != nil, initialized else { connect(); return }
+        catalogBuffer = []; catalogCursors = []
+        requestModelsPage(cursor: nil)
+    }
+
+    private func requestModelsPage(cursor: String?) {
+        isLoadingModels = true
+        modelCatalogMessage = "正在读取本机 model/list…"
+        let id = nextRequestID
+        nextRequestID += 1
+        modelRequestID = id
+        var params: [String: Any] = ["limit": 100, "includeHidden": false]
+        if let cursor { params["cursor"] = cursor }
+        send(method: "model/list", id: id, params: params)
+        modelTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in self?.finishModelCatalog(error: "模型目录读取超时；额度同步不受影响，可重试或手动配置。") }
+        modelTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: timeout)
+    }
+
+    private func finishModelCatalog(error: String? = nil) {
+        modelTimeout?.cancel(); modelTimeout = nil; modelRequestID = nil
+        isLoadingModels = false
+        wantsModels = false
+        if let error { modelCatalogMessage = error }
+        else {
+            models = catalogBuffer
+            modelCatalogMessage = "本机 model/list · \(models.count) 个可选模型 · 实际推理权限未验证"
+        }
+        catalogBuffer = []
     }
 
     func refresh() {
@@ -266,9 +316,23 @@ final class CodexAppServer: ObservableObject {
         }
 
         guard let id = (object["id"] as? NSNumber)?.intValue else { return }
+        if id == modelRequestID {
+            do {
+                let page = try PlannerModel.parsePage(object, at: .now)
+                catalogBuffer += page.models
+                guard catalogBuffer.count <= 1_000, Set(catalogBuffer.map(\.id)).count == catalogBuffer.count else { throw PlannerError.invalidCatalog }
+                if let cursor = page.cursor {
+                    guard catalogCursors.count < 10, catalogCursors.insert(cursor).inserted else { throw PlannerError.invalidCatalog }
+                    requestModelsPage(cursor: cursor)
+                } else { finishModelCatalog() }
+            } catch { finishModelCatalog(error: error.localizedDescription) }
+            return
+        }
         switch id {
         case 0:
             send(method: "initialized")
+            initialized = true
+            if wantsModels { refreshModelCatalog() }
             requestAccount()
         case 1:
             handleAccount(object)
@@ -302,6 +366,7 @@ final class CodexAppServer: ObservableObject {
             return
         }
         if account.isLoggedIn {
+            if snapshot.email != account.email { models = [] }
             snapshot.email = account.email
             snapshot.plan = account.plan
             state = .connected(account.email)

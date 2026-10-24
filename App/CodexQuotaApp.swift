@@ -20,7 +20,8 @@ struct CodexQuotaApp: App {
                 DashboardView(server: server)
             }
         }
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1_120, height: 760)
 
         MenuBarExtra("Tallygent", image: "CodexMark") {
             CodexQuotaMenuBarContent(server: server, menuSummary: menuSummary)

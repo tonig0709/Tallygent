@@ -124,6 +124,7 @@ RUBY
 pass "the last mutable artifact is gated before a draft release can be created"
 
 section "Panel source, parser, and visual render checks"
+sh scripts/check-planner.sh
 sh scripts/check-agent-providers.sh
 sh scripts/check-codex-discovery.sh
 sh scripts/check-desktop-panel.sh

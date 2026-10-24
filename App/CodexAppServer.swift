@@ -159,7 +159,7 @@ final class CodexAppServer: ObservableObject {
             send(method: "initialize", id: 0, params: [
                 "clientInfo": [
                     "name": "codex_quota_widget",
-                    "title": "Codex Quota Widget",
+                    "title": "Tallygent",
                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
                 ]
             ])

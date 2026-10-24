@@ -151,7 +151,7 @@ public enum ClaudeStatuslineBridge {
             return 0
         } catch {
             // Never echo the input: it may contain prompts, project paths or credentials.
-            try? FileHandle.standardError.write(contentsOf: Data(("Codex Quota: \(error.localizedDescription)\n").utf8))
+            try? FileHandle.standardError.write(contentsOf: Data(("Tallygent: \(error.localizedDescription)\n").utf8))
             return 1
         }
     }

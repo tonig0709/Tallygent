@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-[ "$#" = 2 ] || { echo "Usage: $0 <Codex-Quota.dmg> <checksums.txt>" >&2; exit 64; }
+[ "$#" = 2 ] || { echo "Usage: $0 <Tallygent.dmg> <checksums.txt>" >&2; exit 64; }
 
 dmg=$1
 checksums=$2
@@ -19,8 +19,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 mkdir "$work/mount"
 hdiutil attach -quiet -nobrowse -readonly -mountpoint "$work/mount" "$dmg"
-app="$work/mount/Codex Quota.app"
-[ -d "$app" ] || { echo "Codex Quota.app is missing from DMG" >&2; exit 1; }
+app="$work/mount/Tallygent.app"
+[ -d "$app" ] || { echo "Tallygent.app is missing from DMG" >&2; exit 1; }
 codesign --verify --deep --strict --verbose=2 "$app"
 
 signature=$(codesign -d --verbose=4 "$app" 2>&1)

@@ -1,4 +1,4 @@
-# Codex Quota release invariant
+# Tallygent release invariant
 
 Before creating a version tag, DMG, or GitHub Release:
 
@@ -9,7 +9,7 @@ Before creating a version tag, DMG, or GitHub Release:
 
    ```sh
    CODEX_QUOTA_ISOLATED_REGISTRY=1 \
-     ./scripts/release-preflight.sh "/path/to/Codex Quota.app" "/path/to/Codex-Quota.dmg"
+     ./scripts/release-preflight.sh "/path/to/Tallygent.app" "/path/to/Tallygent.dmg"
    ```
 
    Run the full command only in an isolated CI user: runtime probes launch a
@@ -26,3 +26,11 @@ Before creating a version tag, DMG, or GitHub Release:
 Keep stable Liquid Glass releases separate from the particle experiment. When
 a production bug is fixed, add the smallest regression to the release gate so
 the same failure cannot pass a later release.
+
+## Product direction (2026-10-24)
+
+The approved product name is **Tallygent**. See `docs/TALLYGENT_ROADMAP.md` before
+future feature or branding work. Build 45 has the legacy binary name; build 46
+is the first renamed test candidate. Preserve bundle
+identity, preference keys, data and panel ownership, and explicitly handle the
+Claude bridge's absolute executable path when renaming the installed app.

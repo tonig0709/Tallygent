@@ -104,7 +104,8 @@ public enum ClaudeStatuslineStore {
         }
     }
 
-    public static func save(_ record: ClaudeStatuslineRecord, to url: URL = defaultURL) throws {
+    public static func save(_ record: ClaudeStatuslineRecord, to url: URL = defaultURL,
+                            historyURL: URL? = nil) throws {
         try validate(record)
         // An omitted rate_limits is not proof that the last quota is invalid or refreshed.
         guard record.fiveHour != nil || record.weekly != nil else { return }
@@ -114,6 +115,17 @@ public enum ClaudeStatuslineStore {
                 throw ClaudeBridgeError.differentSession
             }
             if let existing, record.receivedAt < existing.receivedAt { throw ClaudeBridgeError.outdatedRecord }
+            // Capture the accepted source event, never GUI cache reads. DB first: if a process
+            // stops between the two writes the compatibility cache may lag, but history survives.
+            // Replaying this exact normalized receipt is idempotent; fresh receipts remain distinct.
+            do {
+                let destination = historyURL ?? url.deletingLastPathComponent().appendingPathComponent("observations.sqlite")
+                try ObservationHistory.append(QuotaObservation.claude(record), at: destination,
+                                              now: record.receivedAt)
+            } catch {
+                // Static diagnostic only: never print raw input, session IDs or filesystem paths.
+                try? FileHandle.standardError.write(contentsOf: Data("Tallygent: 本次 Claude 历史未保存；额度缓存仍会更新。\n".utf8))
+            }
             try ClaudeBridgeFiles.write(JSONEncoder().encode(record), to: url)
         }
     }

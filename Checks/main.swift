@@ -10,12 +10,48 @@ let rateLimits = try AppServerParser.rateLimitWindows(from: AppServerParser.obje
 let weekly = rateLimits.weekly
 precondition(rateLimits.fiveHour?.remainingPercent == 80)
 precondition(rateLimits.fiveHour?.windowDurationMinutes == 300)
-precondition(weekly.remainingPercent == 72)
-precondition(weekly.windowDurationMinutes == 10_080)
+precondition(weekly?.remainingPercent == 72)
+precondition(weekly?.windowDurationMinutes == 10_080)
 
 let weeklyOnlyData = Data(#"{"id":3,"result":{"rateLimits":{"secondary":{"usedPercent":28,"windowDurationMins":10080}}}}"#.utf8)
 let weeklyOnly = try AppServerParser.rateLimitWindows(from: AppServerParser.object(from: weeklyOnlyData))
 precondition(weeklyOnly.fiveHour == nil)
+precondition(weeklyOnly.weekly?.remainingPercent == 72)
+
+func parseLimits(_ json: String) throws -> RateLimitWindows {
+    try AppServerParser.rateLimitWindows(from: AppServerParser.object(from: Data(json.utf8)))
+}
+let fiveHourOnly = try parseLimits(#"{"result":{"rateLimits":{"primary":{"usedPercent":20,"windowDurationMins":300}}}}"#)
+precondition(fiveHourOnly.fiveHour?.remainingPercent == 80 && fiveHourOnly.weekly == nil,
+             "A lone 5h window must not be mislabeled as weekly quota")
+let reversed = try parseLimits(#"{"result":{"rateLimits":{"primary":{"usedPercent":28,"windowDurationMins":10080,"resetsAt":1800000000},"secondary":{"usedPercent":20,"windowDurationMins":300}}}}"#)
+precondition(reversed == rateLimits, "Provider field order changed the recognized window types")
+for json in [#"{"result":{"rateLimits":{}}}"#,
+             #"{"result":{"rateLimits":{"primary":null,"secondary":null}}}"#,
+             #"{"result":{"rateLimits":{"primary":{"usedPercent":1,"windowDurationMins":60}}}}"#] {
+    let absent = try parseLimits(json)
+    precondition(absent.fiveHour == nil && absent.weekly == nil, "Missing or unknown windows invented quota")
+}
+for fields in [#""usedPercent":-1,"windowDurationMins":300"#,
+               #""usedPercent":101,"windowDurationMins":300"#,
+               #""usedPercent":true,"windowDurationMins":300"#,
+               #""usedPercent":12.5,"windowDurationMins":300"#,
+               #""usedPercent":"12","windowDurationMins":300"#,
+               #""usedPercent":12,"windowDurationMins":true"#,
+               #""usedPercent":12"#,
+               #""usedPercent":12,"windowDurationMins":300,"resetsAt":-1"#,
+               #""usedPercent":12,"windowDurationMins":300,"resetsAt":true"#,
+               #""usedPercent":12,"windowDurationMins":300,"resetsAt":4102444801"#,
+               #""usedPercent":12,"windowDurationMins":300,"resetsAt":1800000000.5"#] {
+    do {
+        _ = try parseLimits("{\"result\":{\"rateLimits\":{\"primary\":{\(fields)}}}}")
+        preconditionFailure("Malformed normalized quota crossed the provider boundary")
+    } catch is AppServerParserError { }
+}
+do {
+    _ = try AppServerParser.weeklyWindow(from: AppServerParser.object(from: Data(#"{"result":{"rateLimits":{"primary":{"usedPercent":20,"windowDurationMins":300}}}}"#.utf8)))
+    preconditionFailure("Legacy weekly-only accessor invented a missing weekly window")
+} catch AppServerParserError.missingRateLimits { }
 
 let usageData = Data(#"{"id":4,"result":{"summary":{},"dailyUsageBuckets":[{"startDate":"2026-07-17","tokens":12500000}]}}"#.utf8)
 let usage = try AppServerParser.dailyUsage(from: AppServerParser.object(from: usageData))

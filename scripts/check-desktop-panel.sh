@@ -2,7 +2,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 probe_dir=$(mktemp -d)
-trap 'rm -f "$probe_dir/panel-probe"; rmdir "$probe_dir"' EXIT
+trap 'rm -f "$probe_dir/panel-probe" "$probe_dir/history.sqlite" "$probe_dir/history.sqlite-journal"; rmdir "$probe_dir"' EXIT
 set --
 if [ -f App/GlassSettingsView.swift ]; then
     set -- -D CODEX_QUOTA_ADVANCED_GLASS App/GlassSettingsView.swift
@@ -10,14 +10,15 @@ fi
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     "$@" Gate/DesktopPanelProbe.swift App/DesktopGlassPanelView.swift App/DashboardView.swift \
     App/PlannerView.swift App/PlannerStore.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
+    App/InsightsView.swift App/InsightsStore.swift Shared/ObservationHistory.swift Shared/UsageInsights.swift \
     Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
-    -framework AppKit -framework Charts -framework SwiftUI \
+    -lsqlite3 -framework UserNotifications -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI \
     -o "$probe_dir/panel-probe"
 if [ -n "${TALLYGENT_UI_CHECKS:-}" ]; then
     mkdir -p "$TALLYGENT_UI_CHECKS"
     /usr/bin/ditto "$probe_dir/panel-probe" "$TALLYGENT_UI_CHECKS/panel-probe"
 fi
-"$probe_dir/panel-probe"
+TALLYGENT_HISTORY_DB="$probe_dir/history.sqlite" "$probe_dir/panel-probe"
 # Actual WindowServer dragging/closing still needs the desktop smoke test.
 grep -q 'Button(action: closePanel)' App/DesktopGlassPanelView.swift
 grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift

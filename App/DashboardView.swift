@@ -1,9 +1,11 @@
 import SwiftUI
 
 enum WorkspaceSection: String, CaseIterable, Identifiable {
-    case monitor, planner
+    case monitor, insights, planner
     var id: Self { self }
-    var title: String { self == .monitor ? "额度与面板" : "Planner" }
+    var title: String {
+        switch self { case .monitor: "额度与面板"; case .insights: "Insights"; case .planner: "Planner" }
+    }
 }
 
 enum DashboardLayout {
@@ -54,7 +56,7 @@ struct DashboardView: View {
                         ForEach(WorkspaceSection.allCases) { Text($0.title).tag($0) }
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 250)
+                    .frame(width: 340)
                     Spacer()
                     Text("Make Every Token Count").font(.callout).foregroundStyle(.secondary)
                 }
@@ -85,6 +87,9 @@ struct DashboardView: View {
                         .allowsHitTesting(section == .planner)
                         .accessibilityHidden(section != .planner)
                         .disabled(section != .planner)
+                    if section == .insights {
+                        InsightsView(server: server, store: server.insights)
+                    }
                 }
             }
         }
@@ -98,7 +103,7 @@ struct DashboardView: View {
             }
             .frame(width: 380, height: 600)
         }
-        .task { server.connect(); await planner.load() }
+        .task { await server.connect(); await planner.load() }
         .onChange(of: selectedMode) { _, value in
             if let value { modeRaw = value.rawValue }
         }
@@ -222,7 +227,7 @@ struct DashboardView: View {
                 Button("刷新") { server.refresh() }
                     .disabled(server.state == .connecting)
                 if server.service == .codex, case .disconnected = server.state {
-                    Button("连接 Codex") { server.connect() }
+                    Button("连接 Codex") { Task { await server.connect() } }
                         .buttonStyle(.borderedProminent)
                 }
             }

@@ -124,6 +124,8 @@ RUBY
 pass "the last mutable artifact is gated before a draft release can be created"
 
 section "Panel source, parser, and visual render checks"
+sh scripts/check-observation-history.sh
+sh scripts/check-usage-insights.sh
 sh scripts/check-planner.sh
 sh scripts/check-agent-providers.sh
 sh scripts/check-codex-discovery.sh
@@ -198,8 +200,8 @@ section "Production model catalog and quota request isolation"
 chmod +x "$tmp/catalog-codex"
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     Gate/ModelCatalogProbe.swift App/CodexAppServer.swift Shared/AppServerParser.swift \
-    Shared/UsageSnapshot.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
-    -framework AppKit -framework Combine -framework Network -framework CryptoKit -o "$tmp/catalog-probe"
+    Shared/UsageSnapshot.swift Shared/Planner.swift Shared/ClaudeStatusline.swift Shared/ObservationHistory.swift \
+    -lsqlite3 -framework AppKit -framework Combine -framework Network -framework CryptoKit -o "$tmp/catalog-probe"
 CODEX_BINARY="$tmp/catalog-codex" "$tmp/catalog-probe"
 pass "model pagination and failures do not corrupt the monitoring refresh state"
 

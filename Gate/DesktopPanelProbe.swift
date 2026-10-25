@@ -14,6 +14,26 @@ final class QuotaMonitor: ObservableObject {
     @Published var models: [PlannerModel] = []
     @Published var modelCatalogMessage = "测试目录（无推理）"
     @Published var isLoadingModels = false
+    @Published var codexCollectionEnabled = true
+    @Published var claudeCollectionEnabled = true
+    @Published var isConfiguringCollection = false
+    let insights: InsightsStore
+    init() {
+        let path = ProcessInfo.processInfo.environment["TALLYGENT_HISTORY_DB"] ?? FileManager.default.temporaryDirectory.appendingPathComponent("tallygent-ui-\(UUID().uuidString)/history.sqlite").path
+        let url = URL(fileURLWithPath: path)
+        let date = Date()
+        for index in 0...40 {
+            let values = QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+                receivedAt: date.addingTimeInterval(Double(index - 40) * 60),
+                fiveHour: .init(usedPercent: 18 - (40 - index) / 3, windowDurationMinutes: 300, resetsAt: date.addingTimeInterval(14_400)),
+                weekly: .init(usedPercent: 28 - (40 - index) / 10, windowDurationMinutes: 10_080, resetsAt: date.addingTimeInterval(6 * 86_400)),
+                accountScope: String(repeating: "b", count: 64))
+            try! ObservationHistory.append(values, at: url, now: date)
+        }
+        insights = InsightsStore(url: url)
+        Task { await insights.reload(force: true) }
+    }
+    func setCollection(_ provider: AgentService, enabled: Bool) async {}
     func refreshModelCatalog() {}
     func plannerQuota() -> PlannerQuota {
         PlannerQuota(provider: service, scope: nil, source: "隔离测试", receivedAt: .distantPast, windows: [], connected: false)
@@ -22,7 +42,7 @@ final class QuotaMonitor: ObservableObject {
     func enableClaudeBridge() {}
     func removeClaudeBridge() {}
     func resetClaudeSession() {}
-    func connect() {}
+    func connect() async {}
     func refresh() {}
     #if CODEX_QUOTA_ADVANCED_GLASS
     func updateGlassSettings(_ settings: GlassRenderSettings) {}
@@ -154,6 +174,25 @@ struct DesktopPanelProbe {
                let bitmap = planner.bitmapImageRepForCachingDisplay(in: planner.bounds) {
                 planner.cacheDisplay(in: planner.bounds, to: bitmap)
                 try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: output).appendingPathComponent("planner-\(Int(width)).png"))
+            }
+            host.close()
+        }
+        for width in [760.0, 1_120] {
+            let insights = NSHostingView(rootView: DashboardView(server: server, section: .insights)
+                .background(Color(nsColor: .windowBackgroundColor)))
+            insights.frame = NSRect(x: 0, y: 0, width: width, height: 760)
+            let host = NSWindow(contentRect: insights.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            host.isReleasedWhenClosed = false
+            host.contentView = insights
+            host.makeKeyAndOrderFront(nil)
+            insights.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.5))
+            precondition(insights.fittingSize.width <= width + 2, "Insights overflows a compact window")
+            precondition(!server.insights.report.windows.filter { $0.provider == .codex }.contains { $0.history.isEmpty }, "Insights fixture did not load source history")
+            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
+               let bitmap = insights.bitmapImageRepForCachingDisplay(in: insights.bounds) {
+                insights.cacheDisplay(in: insights.bounds, to: bitmap)
+                try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: output).appendingPathComponent("insights-\(Int(width)).png"))
             }
             host.close()
         }

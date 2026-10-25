@@ -51,6 +51,7 @@ final class QuotaMonitor: ObservableObject {
 
 @main
 struct DesktopPanelProbe {
+    private static let applicationWindowStyle: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
     @MainActor
     static func main() {
         _ = NSApplication.shared
@@ -132,7 +133,7 @@ struct DesktopPanelProbe {
             let dashboard = NSHostingView(rootView: DashboardView(server: server, onGalleryLayout: { frames[$0] = $1 })
                 .background(Color(nsColor: .windowBackgroundColor)))
             dashboard.frame = NSRect(x: 0, y: 0, width: width, height: 720)
-            let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            let dashboardWindow = NSWindow(contentRect: dashboard.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
             dashboardWindow.isReleasedWhenClosed = false
             dashboardWindow.contentView = dashboard
             dashboardWindow.makeKeyAndOrderFront(nil)
@@ -164,7 +165,7 @@ struct DesktopPanelProbe {
             let planner = NSHostingView(rootView: DashboardView(server: server, section: .planner)
                 .background(Color(nsColor: .windowBackgroundColor)))
             planner.frame = NSRect(x: 0, y: 0, width: width, height: 760)
-            let host = NSWindow(contentRect: planner.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            let host = NSWindow(contentRect: planner.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
             host.isReleasedWhenClosed = false
             host.contentView = planner
             host.makeKeyAndOrderFront(nil)
@@ -182,7 +183,7 @@ struct DesktopPanelProbe {
             let insights = NSHostingView(rootView: DashboardView(server: server, section: .insights)
                 .background(Color(nsColor: .windowBackgroundColor)))
             insights.frame = NSRect(x: 0, y: 0, width: width, height: 760)
-            let host = NSWindow(contentRect: insights.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            let host = NSWindow(contentRect: insights.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
             host.isReleasedWhenClosed = false
             host.contentView = insights
             host.makeKeyAndOrderFront(nil)
@@ -256,12 +257,12 @@ struct DesktopPanelProbe {
                         .background(Color(nsColor: .windowBackgroundColor))
                         let view = NSHostingView(rootView: root)
                         view.frame = NSRect(x: 0, y: 0, width: 1_400, height: 760)
-                        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+                        let window = NSWindow(contentRect: view.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
                         window.isReleasedWhenClosed = false
                         window.appearance = NSAppearance(named: appearance)
                         window.contentView = view
                         window.makeKeyAndOrderFront(nil)
-                        let sequence: [CGFloat] = section == .monitor ? widths : [1_120, 760, 1_120]
+                        let sequence: [CGFloat] = section == .monitor ? widths : [1_400, 1_120, 760, 1_120]
                         for (index, width) in sequence.enumerated() {
                             // The same native window and hosting view shrink and restore. Recreating a
                             // new view at each width cannot catch stale container measurements.
@@ -292,13 +293,26 @@ struct DesktopPanelProbe {
                                 view.layoutSubtreeIfNeeded()
                                 RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.02)))
                                 settled = required.isSubset(of: Set(measured.keys)) &&
-                                    abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - 48)) < 2
+                                    abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - 48)) < 2 &&
+                                    abs(window.contentRect(forFrameRect: window.frame).width - width) < 2 &&
+                                    abs(view.frame.width - width) < 2
                             } while !settled && Date() < deadline
                             var failures = layoutViolations(measured, width: width, prefixes: prefixes, required: required)
                             if !settled {
                                 let message = "Layout settle timeout (2s): \(section.rawValue) \(locale) \(theme) font\(fontSize) width\(width); toolbar \(String(describing: measured["workspace.toolbar.container"]?.frame.width)); missing \(required.subtracting(Set(measured.keys)).sorted())"
                                 failures.insert(message, at: 0)
-                                try? FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))
+                                let diagnostic = """
+                                \(message)
+                                Window frame=\(window.frame) contentRect=\(window.contentRect(forFrameRect: window.frame)) contentLayoutRect=\(window.contentLayoutRect)
+                                Window contentMinSize=\(window.contentMinSize) minSize=\(window.minSize)
+                                ContentView frame=\(String(describing: window.contentView?.frame)) bounds=\(String(describing: window.contentView?.bounds))
+                                Hosting frame=\(view.frame) bounds=\(view.bounds) autoresizingMask=\(view.autoresizingMask) sizingOptions=\(view.sizingOptions) fittingSize=\(view.fittingSize)
+                                Hosting intrinsicContentSize=\(view.intrinsicContentSize) translatesAutoresizingMaskIntoConstraints=\(view.translatesAutoresizingMaskIntoConstraints) isContentView=\(window.contentView === view)
+                                Hosting horizontalConstraints=\(horizontalConstraints(in: view))
+                                Parent type=\(view.superview.map { String(describing: type(of: $0)) } ?? "none") frame=\(String(describing: view.superview?.frame)) bounds=\(String(describing: view.superview?.bounds)) horizontalConstraints=\(horizontalConstraints(in: view.superview))
+
+                                """
+                                try? FileHandle.standardError.write(contentsOf: Data(diagnostic.utf8))
                             }
                             if !failures.isEmpty {
                                 print("Control layout failed \(section.rawValue) \(locale) \(theme) font\(fontSize) width\(width):\n\(failures.joined(separator: "\n"))")
@@ -307,6 +321,8 @@ struct DesktopPanelProbe {
                             precondition(failures.isEmpty, "internal control/label layout is compressed or clipped")
                             precondition(abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - 48)) < 2,
                                          "internal toolbar did not update to the resized window width")
+                            precondition(abs(window.contentRect(forFrameRect: window.frame).width - width) < 2, "native content rectangle did not resize to the requested width")
+                            precondition(abs(view.frame.width - width) < 2, "native hosting view did not follow the requested width")
                             precondition(view.fittingSize.width <= width + 2, "window has horizontal overflow after resize")
                             verified += 1
                             if section == .monitor, locale == "zh_CN", theme == "dark", fontSize == 21 {
@@ -340,7 +356,7 @@ struct DesktopPanelProbe {
                     .background(Color(nsColor: .windowBackgroundColor))
                 let view = NSHostingView(rootView: expanded)
                 view.frame = NSRect(x: 0, y: 0, width: 1_120, height: 760)
-                let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+                let window = NSWindow(contentRect: view.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
                 window.appearance = NSAppearance(named: appearance)
                 window.contentView = view
@@ -358,6 +374,8 @@ struct DesktopPanelProbe {
                         fflush(stdout)
                     }
                     precondition(failures.isEmpty, "expanded Planner profile labels are compressed or clipped")
+                    precondition(abs(window.contentRect(forFrameRect: window.frame).width - width) < 2, "expanded Planner native window did not follow the requested width")
+                    precondition(abs(view.frame.width - width) < 2, "expanded Planner hosting view did not follow the requested width")
                     precondition(view.fittingSize.width <= width + 2, "expanded Planner overflows its window")
                     verified += 1
                     if locale == "zh_CN", theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }
@@ -382,6 +400,8 @@ struct DesktopPanelProbe {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .font(.system(size: 21))
+        .preferredColorScheme(.light)
+        .background(Color(nsColor: .windowBackgroundColor))
         .environment(\.recordsControlLayout, true)
         .coordinateSpace(name: ControlLayoutSpace.name)
         .onPreferenceChange(ControlLayoutPreference.self) { values in
@@ -391,8 +411,9 @@ struct DesktopPanelProbe {
         }
         let badView = NSHostingView(rootView: negative)
         badView.frame = NSRect(x: 0, y: 0, width: 760, height: 240)
-        let badWindow = NSWindow(contentRect: badView.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        let badWindow = NSWindow(contentRect: badView.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
         badWindow.isReleasedWhenClosed = false
+        badWindow.appearance = NSAppearance(named: .aqua)
         badWindow.contentView = badView
         badWindow.makeKeyAndOrderFront(nil)
         badView.layoutSubtreeIfNeeded()
@@ -404,6 +425,13 @@ struct DesktopPanelProbe {
         saveLayoutImage(badView, name: "negative-compressed-picker")
         badWindow.close()
         print("Internal control layout: PASS (\(verified) cases, locale/theme/font matrix, threshold widths, same-window shrink/restore, real negative control)")
+    }
+
+    @MainActor
+    private static func horizontalConstraints(in view: NSView?) -> String {
+        let attributes: Set<NSLayoutConstraint.Attribute> = [.left, .right, .leading, .trailing, .width, .centerX]
+        return view?.constraints.filter { attributes.contains($0.firstAttribute) || attributes.contains($0.secondAttribute) }
+            .map(\.description).joined(separator: " | ") ?? "none"
     }
 
     @MainActor

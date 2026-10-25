@@ -16,19 +16,16 @@ struct InsightsView: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    HStack(alignment: .top) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("用量与节奏").font(.title2.weight(.semibold))
-                            Text("只分析真实收到的额度。历史从启用后积累，不补造过去的数据。")
-                                .font(.callout).foregroundStyle(.secondary)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: 20) {
+                            heading.fixedSize(horizontal: true, vertical: true)
+                            Spacer(minLength: 0)
+                            rangePicker.fixedSize(horizontal: true, vertical: true)
                         }
-                        Spacer(minLength: 20)
-                        Picker("历史范围", selection: Binding(get: { store.range }, set: store.selectRange)) {
-                            ForEach(InsightsRange.allCases) { Text($0.title).tag($0) }
-                        }
-                        .frame(width: 130)
-                        .labelsHidden()
+                        VStack(alignment: .leading, spacing: 16) { heading; rangePicker }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .controlLayoutContainer("insights.header.container")
                     HStack {
                         Button("重新读取历史", systemImage: "arrow.clockwise") { Task { await store.reload(force: true) } }
                             .disabled(store.isLoading)
@@ -68,6 +65,7 @@ struct InsightsView: View {
                 }
                 .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .controlLayoutContainer("insights.content.container")
             }
         }
         .confirmationDialog("清空本机的额度观测历史？", isPresented: $showsClear) {
@@ -80,6 +78,23 @@ struct InsightsView: View {
                       defaultFilename: "Tallygent-observations") { result in
             Task { @MainActor in store.exportFinished(result) }
         }
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("用量与节奏").font(.title2.weight(.semibold))
+            Text("只分析真实收到的额度。历史从启用后积累，不补造过去的数据。")
+                .font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var rangePicker: some View {
+        AdaptivePicker("历史范围", id: "insights.range",
+                       selection: Binding(get: { store.range }, set: store.selectRange),
+                       showsTitle: false, prefersSegments: false) {
+            ForEach(InsightsRange.allCases) { Text($0.title).tag($0) }
+        }
+        .frame(idealWidth: 160, maxWidth: 240, alignment: .leading)
     }
 
     private func providerSection(_ provider: AgentService, wide: Bool) -> some View {

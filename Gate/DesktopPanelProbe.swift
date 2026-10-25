@@ -141,7 +141,8 @@ struct DesktopPanelProbe {
             print("Dashboard layout width \(width), frame \(dashboard.frame), fitting \(dashboard.fittingSize)")
             print("Gallery page frames \(frames)")
             fflush(stdout)
-            if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
+            if [760.0, 1_120].contains(width),
+               let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
                let bitmap = dashboard.bitmapImageRepForCachingDisplay(in: dashboard.bounds) {
                 let url = URL(fileURLWithPath: output, isDirectory: true)
                 try! FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
@@ -196,7 +197,213 @@ struct DesktopPanelProbe {
             }
             host.close()
         }
+        verifyMeaningfulControlLayouts(server: server)
         print("Desktop panel mouse routing and window-level probe passed.")
+    }
+
+    private struct MeasuredControl {
+        let frame: CGRect
+        let ideal: CGSize
+    }
+
+    /// Internal labels must fit their natural text, not merely their outer NSHostingView.
+    private static func layoutViolations(_ measured: [String: MeasuredControl], width: CGFloat,
+                                         prefixes: [String], required: Set<String>) -> [String] {
+        var failures = required.subtracting(Set(measured.keys)).sorted().map { "missing \($0)" }
+        let relevant = measured.filter { id, _ in prefixes.contains { id.hasPrefix($0 + ".") } }
+        for (id, value) in relevant {
+            let frame = value.frame
+            guard [frame.minX, frame.maxX, frame.width, frame.height, value.ideal.width, value.ideal.height].allSatisfy(\.isFinite),
+                  frame.width > 0, frame.height > 0 else { failures.append("\(id) has empty/invalid geometry"); continue }
+            if frame.minX < -2 || frame.maxX > width + 2 { failures.append("\(id) leaves horizontal viewport: \(frame)") }
+            if id.hasSuffix(".label") {
+                if frame.width + 2 < value.ideal.width { failures.append("\(id) squeezed \(frame.width) < natural \(value.ideal.width)") }
+                if frame.height + 2 < value.ideal.height { failures.append("\(id) clips text height \(frame.height) < \(value.ideal.height)") }
+                if frame.height > value.ideal.height * 1.4 + 1 { failures.append("\(id) wraps vertically \(frame.height) > single line \(value.ideal.height)") }
+                let containerID = String(id.dropLast(".label".count)) + ".container"
+                if let parent = relevant[containerID], frame.minX < parent.frame.minX - 2 || frame.maxX > parent.frame.maxX + 2 {
+                    failures.append("\(id) leaves field container \(parent.frame)")
+                }
+            }
+        }
+        if let content = relevant["monitor.content.container"], let actions = relevant["monitor.actions.container"],
+           actions.frame.minX < content.frame.minX - 2 || actions.frame.maxX > content.frame.maxX + 2 {
+            failures.append("monitor actions leave their scroll content")
+        }
+        return failures
+    }
+
+    @MainActor
+    private static func verifyMeaningfulControlLayouts(server: QuotaMonitor) {
+        let widths: [CGFloat] = [1_400, 1_120, 1_080, 1_079, 1_030, 900, 760, 1_400]
+        let sizes: [CGFloat] = [13, 21]
+        let locales = ["zh_CN", "en_US"]
+        let appearances: [(String, ColorScheme, NSAppearance.Name)] = [("light", .light, .aqua), ("dark", .dark, .darkAqua)]
+        var verified = 0
+        // A long but synthetic account label exercises the footer without touching a real account.
+        server.state = .connected("layout-regression-with-a-long-account-label@example.invalid")
+        for section in [WorkspaceSection.monitor, .planner, .insights] {
+            for locale in locales {
+                for (theme, scheme, appearance) in appearances {
+                    for fontSize in sizes {
+                        var measured: [String: MeasuredControl] = [:]
+                        let root = DashboardView(server: server, section: section, onControlLayout: { id, frame, ideal in
+                            measured[id] = MeasuredControl(frame: frame, ideal: ideal)
+                        })
+                        .font(.system(size: fontSize))
+                        .environment(\.locale, Locale(identifier: locale))
+                        .preferredColorScheme(scheme)
+                        .background(Color(nsColor: .windowBackgroundColor))
+                        let view = NSHostingView(rootView: root)
+                        view.frame = NSRect(x: 0, y: 0, width: 1_400, height: 760)
+                        let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+                        window.isReleasedWhenClosed = false
+                        window.appearance = NSAppearance(named: appearance)
+                        window.contentView = view
+                        window.makeKeyAndOrderFront(nil)
+                        let sequence: [CGFloat] = section == .monitor ? widths : [1_120, 760, 1_120]
+                        for (index, width) in sequence.enumerated() {
+                            // The same native window and hosting view shrink and restore. Recreating a
+                            // new view at each width cannot catch stale container measurements.
+                            window.setContentSize(NSSize(width: width, height: 760))
+                            view.layoutSubtreeIfNeeded()
+                            RunLoop.main.run(until: Date().addingTimeInterval(index == 0 ? 0.3 : 0.12))
+                            view.layoutSubtreeIfNeeded()
+                            var prefixes = ["workspace"]
+                            var required: Set<String> = ["workspace.label", "workspace.container", "workspace.toolbar.container"]
+                            switch section {
+                            case .monitor:
+                                prefixes += ["monitor"]
+                                required.formUnion(["monitor.service.label", "monitor.service.container", "monitor.content.container", "monitor.actions.container"])
+                                if DashboardLayout.hasInlineInspector(width: width) {
+                                    prefixes += ["glass"]
+                                    required.formUnion(["glass.preset.label", "glass.appearance.label", "glass.refraction.label", "glass.tone.label"])
+                                }
+                            case .planner:
+                                prefixes += ["planner"]
+                                required.insert("planner.provider.label")
+                            case .insights:
+                                prefixes += ["insights"]
+                                required.formUnion(["insights.header.container", "insights.range.container", "insights.range.picker.container", "insights.content.container"])
+                            }
+                            for id in Array(required) where id.hasSuffix(".label") {
+                                required.insert(String(id.dropLast(".label".count)) + ".container")
+                            }
+                            let failures = layoutViolations(measured, width: width, prefixes: prefixes, required: required)
+                            if !failures.isEmpty {
+                                print("Control layout failed \(section.rawValue) \(locale) \(theme) font\(fontSize) width\(width):\n\(failures.joined(separator: "\n"))")
+                                fflush(stdout)
+                            }
+                            precondition(failures.isEmpty, "internal control/label layout is compressed or clipped")
+                            precondition(abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - 48)) < 2,
+                                         "internal toolbar did not update to the resized window width")
+                            precondition(view.fittingSize.width <= width + 2, "window has horizontal overflow after resize")
+                            verified += 1
+                            if section == .monitor, locale == "zh_CN", theme == "dark", fontSize == 21 {
+                                if width == 900 { saveLayoutImage(view, name: "monitor-cn21-900") }
+                                if index == sequence.count - 1 { saveLayoutImage(view, name: "monitor-cn21-restored-1400") }
+                            }
+                        }
+                        window.close()
+                    }
+                }
+            }
+        }
+
+        // Expanded profile controls must also fit, not only the initially collapsed composer.
+        for locale in locales {
+            for (theme, scheme, appearance) in appearances {
+                var measured: [String: MeasuredControl] = [:]
+                let expanded = PlannerView(server: server, store: PlannerStore(), isActive: false, initialDetailsExpanded: true)
+                    .font(.system(size: 21))
+                    .environment(\.locale, Locale(identifier: locale))
+                    .preferredColorScheme(scheme)
+                    .environment(\.recordsControlLayout, true)
+                    .coordinateSpace(name: ControlLayoutSpace.name)
+                    .onPreferenceChange(ControlLayoutPreference.self) { values in
+                        measured = values.reduce(into: [:]) { output, item in
+                            if let frame = item.value.frame, let ideal = item.value.idealSize {
+                                output[item.key] = MeasuredControl(frame: frame, ideal: ideal)
+                            }
+                        }
+                    }
+                    .background(Color(nsColor: .windowBackgroundColor))
+                let view = NSHostingView(rootView: expanded)
+                view.frame = NSRect(x: 0, y: 0, width: 1_120, height: 760)
+                let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                window.appearance = NSAppearance(named: appearance)
+                window.contentView = view
+                window.makeKeyAndOrderFront(nil)
+                for width in [1_120.0, 760, 1_120] {
+                    window.setContentSize(NSSize(width: width, height: 760))
+                    view.layoutSubtreeIfNeeded()
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                    var required: Set<String> = ["planner.provider.label", "planner.category.label", "planner.preference.label",
+                        "planner.profile.规模.label", "planner.profile.不确定性.label", "planner.profile.风险.label"]
+                    for id in Array(required) { required.insert(String(id.dropLast(".label".count)) + ".container") }
+                    let failures = layoutViolations(measured, width: width, prefixes: ["planner"], required: required)
+                    if !failures.isEmpty {
+                        print("Expanded Planner layout failed \(locale) \(theme) font21 width\(width): \(failures.joined(separator: "; "))")
+                        fflush(stdout)
+                    }
+                    precondition(failures.isEmpty, "expanded Planner profile labels are compressed or clipped")
+                    precondition(view.fittingSize.width <= width + 2, "expanded Planner overflows its window")
+                    verified += 1
+                    if locale == "zh_CN", theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }
+                }
+                window.close()
+            }
+        }
+
+        // Negative control: render the actual native segmented Picker in a too-small row.
+        // The CJK Text must compress or leave its field; the very same validator must reject it.
+        var broken: [String: MeasuredControl] = [:]
+        let negative = HStack(spacing: 12) {
+            Text("监测服务").controlLayoutProbe("negative.label")
+            Picker("监测服务", selection: .constant(AgentService.codex)) {
+                Text("Codex").tag(AgentService.codex)
+                Text("Claude Code · 实验性").tag(AgentService.claude)
+            }
+            .labelsHidden().pickerStyle(.segmented).fixedSize()
+        }
+        .frame(width: 180)
+        .controlLayoutContainer("negative.container")
+        .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .font(.system(size: 21))
+        .environment(\.recordsControlLayout, true)
+        .coordinateSpace(name: ControlLayoutSpace.name)
+        .onPreferenceChange(ControlLayoutPreference.self) { values in
+            for (id, value) in values {
+                if let frame = value.frame, let ideal = value.idealSize { broken[id] = MeasuredControl(frame: frame, ideal: ideal) }
+            }
+        }
+        let badView = NSHostingView(rootView: negative)
+        badView.frame = NSRect(x: 0, y: 0, width: 760, height: 240)
+        let badWindow = NSWindow(contentRect: badView.frame, styleMask: [.titled], backing: .buffered, defer: false)
+        badWindow.isReleasedWhenClosed = false
+        badWindow.contentView = badView
+        badWindow.makeKeyAndOrderFront(nil)
+        badView.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        let negativeFailures = layoutViolations(broken, width: 760, prefixes: ["negative"], required: ["negative.label", "negative.container"])
+        precondition(broken["negative.label"] != nil, "negative control label was not measured")
+        precondition(negativeFailures.contains { $0.contains("negative.label") }, "layout gate accepted the known-bad compressed CJK picker label")
+        print("Control layout negative control rejected: \(negativeFailures.joined(separator: "; "))")
+        saveLayoutImage(badView, name: "negative-compressed-picker")
+        badWindow.close()
+        print("Internal control layout: PASS (\(verified) cases, locale/theme/font matrix, threshold widths, same-window shrink/restore, real negative control)")
+    }
+
+    @MainActor
+    private static func saveLayoutImage(_ view: NSView, name: String) {
+        guard let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"],
+              let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
+        let directory = URL(fileURLWithPath: output, isDirectory: true)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(name + ".png"))
     }
 }
 

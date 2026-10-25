@@ -13,7 +13,9 @@ CODEX_QUOTA_ISOLATED_REGISTRY=1 \
 Run the full gate only in an isolated CI user: it installs a temporary candidate,
 launches a deterministic fake account server and reserves the local snapshot port.
 It must never mutate a real user's PlugInKit registry.
-Local non-destructive checks are `swift run quota-self-check` and `./scripts/check-desktop-panel.sh`.
+Pure non-destructive checks include `swift run quota-self-check` and the isolated-file
+history/Planner checks. `check-desktop-panel.sh` operates native windows/settings;
+its runtime requires an isolated CI user, not a personal desktop session.
 
 ## Automated gate
 
@@ -25,6 +27,10 @@ Local non-destructive checks are `swift run quota-self-check` and `./scripts/che
 - **Selector restoration:** a hosted production Dashboard must position its native scroll
   view on the persisted mode, not just mark a mode button selected. Its minimum height
   must accommodate the complete selector and action row after restoring an old window.
+- **Internal layout:** compare meaningful title frames against their natural text size
+  and local containers across locale/theme/large-font/threshold widths. Shrink and
+  restore the same window; include long status text and expanded Planner fields.
+  A rendered compressed-CJK negative control must fail these same assertions.
 - **Non-black content:** all three layouts × light/dark × minimum/maximum opacity are
   compared against their empty glass surface, including individual quota/trend regions.
   Solid-black negative controls must fail. Updated quota snapshots must change every layout.

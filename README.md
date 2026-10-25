@@ -8,7 +8,7 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 > [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **本地测试候选：v0.6.0（build 48）。** 保留现有品牌、面板与 Planner，补入真实来源观测库及第一批 Insights：历史、条件节奏估计、重置时间轴、导出/清理和可关闭提醒。
+> **本地测试候选：v0.6.0（build 49）。** 保留面板、Planner 与 Monitor/Insights，修复原生选择器标题被挤压的问题；工作区、侧栏与详情共用自适应选择器，并加入内部文字/大字体/窗口恢复门禁。
 > 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
 
 ## 三种尺寸，一个桌面面板
@@ -16,6 +16,8 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 本地测试候选新增 [Planner](docs/PLANNER.md)：读取本机模型目录，结合任务特征、5h/周额度和保留量给出 Model + Effort 建议，可复制配置并记录结果。不自动执行任务，不用额度百分比推算 Token；没有可靠历史时明确显示信息不足。
 
 [Monitor 与 Insights](docs/MONITOR_INSIGHTS.md) 在本机保留最近 30 天的新观测，系统时钟和反复读缓存不伪装成新数据。窗口分别分析，历史不足或陈旧时不预测；Claude 仍为实验性被动接入，不合计多服务额度，也不自动执行任务。
+
+[布局约束与回归](docs/LAYOUT_INVARIANTS.md) 记录原生标签挤压的根因及自动检查，不通过删除用户设置或单纯放大默认窗口来掩盖问题。
 
 | 模式 | 尺寸（pt） | 内容 |
 | --- | --- | --- |

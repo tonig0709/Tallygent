@@ -135,20 +135,18 @@ struct GlassSettingsView: View {
 
             GlassOpticsPreview(settings: currentSettings, tone: tone.wrappedValue.color)
 
-            Picker("预设", selection: preset) {
+            AdaptivePicker("预设", id: "glass.preset", selection: preset) {
                 ForEach(GlassPreset.allCases) { preset in
                     Text(preset.title).tag(preset)
                         .disabled(preset == .custom)
                 }
             }
-            .pickerStyle(.segmented)
 
-            Picker("外观", selection: appearance) {
+            AdaptivePicker("外观", id: "glass.appearance", selection: appearance) {
                 ForEach(GlassAppearanceMode.allCases) { mode in
                     Text(mode.title).tag(mode)
                 }
             }
-            .pickerStyle(.segmented)
 
             controlSection("基础") {
                 slider("不透明度", value: $opacity, range: WidgetGlassOpacity.minimum...WidgetGlassOpacity.maximum, format: .percent)
@@ -158,12 +156,11 @@ struct GlassSettingsView: View {
             }
 
             controlSection("高级设置") {
-                Picker("折射模式", selection: refractionMode) {
+                AdaptivePicker("折射模式", id: "glass.refraction", selection: refractionMode) {
                     ForEach(GlassRefractionMode.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
                 }
-                .pickerStyle(.segmented)
 
                 slider("折射位移", value: $displacement, range: 0...1, format: .percent)
                 slider("磨砂深度", value: $blurAmount, range: 0...1, format: .percent)
@@ -176,18 +173,18 @@ struct GlassSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Picker("玻璃色调", selection: tone) {
+                AdaptivePicker("玻璃色调", id: "glass.tone", selection: tone) {
                     ForEach(GlassTone.allCases) { tone in
                         Text(tone.title).tag(tone)
                     }
                 }
-                .pickerStyle(.segmented)
             }
 
             Button("恢复默认值") { apply(.standard) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
         }
+        .controlLayoutContainer("glass.content.container")
         .onAppear { onSettingsChange(currentSettings) }
         .onChange(of: currentSettings) { onSettingsChange($0) }
     }

@@ -25,6 +25,14 @@ struct PlannerView: View {
     @State private var feedback: PlannerTaskRecord?
     @State private var confirmsClear = false
     @State private var notice: String?
+    @State private var showsFeatures = false
+
+    init(server: QuotaMonitor, store: PlannerStore, isActive: Bool = true, initialDetailsExpanded: Bool = false) {
+        self.server = server
+        self.store = store
+        self.isActive = isActive
+        _showsFeatures = State(initialValue: initialDetailsExpanded)
+    }
 
     private var models: [PlannerModel] {
         PlannerModel.merged(live: server.models, manual: manualModel, provider: server.service)
@@ -53,6 +61,7 @@ struct PlannerView: View {
             .padding(24)
             .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
+            .controlLayoutContainer("planner.content.container")
         }
         .task(id: isActive) {
             guard isActive else { return }
@@ -80,18 +89,32 @@ struct PlannerView: View {
     }
 
     private var header: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("下一项任务，用什么配置？").font(.title2.weight(.semibold))
-                Text("先解释选择，再积累你自己的反馈。不会替你执行任务。")
-                    .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                heading.fixedSize(horizontal: true, vertical: true)
+                Spacer(minLength: 0)
+                providerPicker.fixedSize(horizontal: true, vertical: true)
             }
-            Spacer(minLength: 16)
-            Picker("建议来源", selection: Binding(get: { server.service }, set: server.selectService)) {
-                ForEach(AgentService.allCases) { Text($0.title).tag($0) }
-            }
-            .frame(width: 180)
+            VStack(alignment: .leading, spacing: 16) { heading; providerPicker }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlLayoutContainer("planner.header.container")
+    }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("下一项任务，用什么配置？").font(.title2.weight(.semibold))
+            Text("先解释选择，再积累你自己的反馈。不会替你执行任务。")
+                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var providerPicker: some View {
+        AdaptivePicker("建议来源", id: "planner.provider",
+                       selection: Binding(get: { server.service }, set: server.selectService), prefersSegments: false) {
+                ForEach(AgentService.allCases) { Text($0.title).tag($0) }
+        }
+        .frame(maxWidth: 240, alignment: .leading)
     }
 
     private var composer: some View {
@@ -110,10 +133,12 @@ struct PlannerView: View {
                 .onChange(of: taskText) { _, value in
                     taskText = String(value.prefix(8_000)); advice = nil; override = nil
                 }
+            AdaptivePicker("任务类别", id: "planner.category",
+                           selection: Binding(get: { profile.category }, set: { profile.category = $0; profileIsManual = true }), prefersSegments: false) {
+                ForEach(PlannerCategory.allCases.filter { $0 != .automatic }) { Text($0.title).tag($0) }
+            }
+            .frame(maxWidth: 440, alignment: .leading)
             HStack {
-                Picker("任务类别", selection: Binding(get: { profile.category }, set: { profile.category = $0; profileIsManual = true })) {
-                    ForEach(PlannerCategory.allCases.filter { $0 != .automatic }) { Text($0.title).tag($0) }
-                }
                 Button("本地自动识别") {
                     profileIsManual = false
                     profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
@@ -121,7 +146,7 @@ struct PlannerView: View {
                 Spacer()
                 Toggle("紧急", isOn: $profile.urgent).toggleStyle(.checkbox)
             }
-            DisclosureGroup("任务特征与背景（可选，可覆盖自动识别）") {
+            DisclosureGroup("任务特征与背景（可选，可覆盖自动识别）", isExpanded: $showsFeatures) {
                 VStack(alignment: .leading, spacing: 12) {
                     TextField("补充背景（不保存）", text: $context)
                         .onChange(of: context) { _, value in context = String(value.prefix(2_000)); advice = nil }
@@ -136,9 +161,9 @@ struct PlannerView: View {
                         .font(.caption).foregroundStyle(.secondary)
                 }.padding(.top, 10)
             }
-            Picker("优化偏好", selection: $preference) {
+            AdaptivePicker("优化偏好", id: "planner.preference", selection: $preference) {
                 ForEach(PlannerPreference.allCases) { Text($0.title).tag($0) }
-            }.pickerStyle(.segmented)
+            }
             HStack {
                 Stepper("每个窗口保留 \(reserve)%", value: $reserve, in: 0...50, step: 5)
                     .fixedSize()
@@ -154,7 +179,7 @@ struct PlannerView: View {
     }
 
     private func levelPicker(_ title: String, value: Binding<PlannerLevel>, size: Bool = false) -> some View {
-        Picker(title, selection: value) {
+        AdaptivePicker(title, id: "planner.profile.\(title)", selection: value, prefersSegments: false) {
             ForEach(PlannerLevel.allCases) { Text(size ? $0.sizeTitle : $0.title).tag($0) }
         }
     }
@@ -194,16 +219,16 @@ struct PlannerView: View {
                                 Button("采用") { override = alternative; recommend() }
                             }
                         }
-                        Picker("模型", selection: Binding(get: { selected.model.id }, set: { id in
+                        AdaptivePicker("模型", id: "planner.model", selection: Binding(get: { selected.model.id }, set: { id in
                             if let model = models.first(where: { $0.id == id }) {
                                 override = PlannerConfiguration(model: model, effort: model.defaultEffort); recommend()
                             }
-                        })) {
+                        }), prefersSegments: false) {
                             ForEach(models) { Text($0.name).tag($0.id) }
                         }
-                        Picker("推理强度", selection: Binding(get: { selected.effort }, set: {
+                        AdaptivePicker("推理强度", id: "planner.effort", selection: Binding(get: { selected.effort }, set: {
                             override = PlannerConfiguration(model: selected.model, effort: $0); recommend()
-                        })) {
+                        }), prefersSegments: false) {
                             ForEach(selected.model.efforts, id: \.self) { Text($0).tag($0) }
                         }
                         Button("恢复规则建议") { override = nil; recommend() }
@@ -280,7 +305,7 @@ struct PlannerView: View {
                 }.disabled(models.isEmpty)
                 TextField("模型 ID（必须来自你已确认的本机配置）", text: $manualIdentifier)
                 TextField("支持的 effort，用逗号分隔；第一项为默认档", text: $manualEfforts)
-                Picker("角色（用户声明）", selection: $manualRole) {
+                AdaptivePicker("角色（用户声明）", id: "planner.role", selection: $manualRole, prefersSegments: false) {
                     ForEach(PlannerModelRole.allCases) { Text($0.title).tag($0) }
                 }
                 Button("采用手动目录（仅本窗口会话）") {

@@ -176,7 +176,9 @@ struct ObservationHistoryProbe {
             _ = try ObservationHistory.append(rows(at: epoch, event: "locked"), at: concurrent, now: epoch)
             fatalError("Expected bounded lock refusal")
         } catch ObservationHistoryError.databaseBusy { }
-        assert(Date().timeIntervalSince(began) < 3)
+        let lockWait = Date().timeIntervalSince(began)
+        assert(lockWait < 3)
+        print(String(format: "Observation history global lock wait: %.3fs (<3s)", lockWait))
         sqlite3_exec(locked, "ROLLBACK", nil, nil, nil); sqlite3_close(locked)
         print("Observation history: PASS (source receipts, dedup, missing windows, pause,30d retention, privacy, migrations, recovery, concurrent processes)")
     }

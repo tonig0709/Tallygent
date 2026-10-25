@@ -27,7 +27,7 @@ private actor ObservationIO {
          .claude: try ObservationHistory.initializeCollection(.claude, defaultEnabled: claude, at: url)]
     }
     func clear(now: Date) throws { try ObservationHistory.clear(at: url, now: now) }
-    func export(now: Date) throws -> Data { try ObservationHistory.export(from: url, now: now) }
+    func export(since: Date?, now: Date) throws -> Data { try ObservationHistory.export(from: url, since: since, now: now) }
 }
 
 /// The App owns presentation; the bridge writes directly to the same transactional history.
@@ -40,6 +40,7 @@ final class InsightsStore: ObservableObject {
     @Published private(set) var range = InsightsRange.day
     @Published private(set) var collection: [AgentService: Bool] = [.codex: true, .claude: true]
     @Published private(set) var notificationsEnabled = false
+    @Published private(set) var isConfiguringNotifications = false
     private let io: ObservationIO
     private let defaults: UserDefaults
     private let now: () -> Date
@@ -79,7 +80,8 @@ final class InsightsStore: ObservableObject {
     }
 
     func reload(force: Bool = false) async {
-        guard force || now().timeIntervalSince(lastRead) >= 15 else { return }
+        let elapsed = now().timeIntervalSince(lastRead)
+        guard force || elapsed >= 15 || elapsed < 0 else { return }
         if isLoading { reloadQueued = true; return }
         isLoading = true
         defer { isLoading = false }
@@ -124,12 +126,16 @@ final class InsightsStore: ObservableObject {
         } catch { message = error.localizedDescription }
     }
 
-    func export() async -> Data? {
-        do { return try await io.export(now: now()) }
+    func export(allHistory: Bool = true) async -> Data? {
+        let date = now()
+        do { return try await io.export(since: allHistory ? nil : date.addingTimeInterval(-Double(range.rawValue) * 3_600), now: date) }
         catch { message = error.localizedDescription; return nil }
     }
 
     func setNotifications(_ enabled: Bool) async {
+        guard !isConfiguringNotifications else { return }
+        isConfiguringNotifications = true
+        defer { isConfiguringNotifications = false }
         if enabled {
             do {
                 guard try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) else {

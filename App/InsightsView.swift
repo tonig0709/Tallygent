@@ -34,10 +34,9 @@ struct InsightsView: View {
                             .disabled(store.isLoading)
                         if store.isLoading { ProgressView().controlSize(.small) }
                         Spacer()
-                        Button("导出 30 天记录") {
-                            Task {
-                                if let data = await store.export() { document = ObservationDocument(data: data); showsExporter = true }
-                            }
+                        Menu("导出记录") {
+                            Button("导出当前范围") { export(allHistory: false) }
+                            Button("导出全部 30 天") { export(allHistory: true) }
                         }
                         Button("清空历史", role: .destructive) { showsClear = true }
                             .disabled(store.isLoading)
@@ -60,6 +59,7 @@ struct InsightsView: View {
                         Toggle("低额度与预计重置提醒", isOn: Binding(get: { store.notificationsEnabled }, set: { value in
                             Task { await store.setNotifications(value) }
                         }))
+                        .disabled(store.isConfiguringNotifications)
                         Text("默认关闭。启用后仅提醒新发生的降至 20% 及以下变化，重置时间仅作预计；App 需保持运行。首次启用不补发旧提醒。")
                             .font(.caption).foregroundStyle(.secondary)
                         Text("本机保留 30 天；不保存提示词、对话、代码或登录凭据。订阅比例不是 Token 或费用；文件权限限制不等于加密。")
@@ -194,6 +194,15 @@ struct InsightsView: View {
     private func quotaColor(_ percent: Int?) -> Color {
         guard let percent else { return .secondary }
         return percent >= 60 ? .green : (percent >= 30 ? .orange : .red)
+    }
+
+    private func export(allHistory: Bool) {
+        Task {
+            if let data = await store.export(allHistory: allHistory) {
+                document = ObservationDocument(data: data)
+                showsExporter = true
+            }
+        }
     }
 
     private func chartPoints(_ values: [UsageHistoryPoint]) -> [UsageHistoryPoint] {

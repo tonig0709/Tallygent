@@ -1,5 +1,6 @@
 import CryptoKit
 import Darwin
+import Dispatch
 import Foundation
 import SQLite3
 
@@ -117,6 +118,9 @@ public enum ObservationHistory {
     private static let maximumDatabaseBytes = 536_870_912
     private static let applicationID: Int32 = 0x54414C59
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
+    private final class LockBudget {
+        let deadline = DispatchTime.now().uptimeNanoseconds + 1_500_000_000
+    }
 
     public static var defaultURL: URL {
         ClaudeStatuslineStore.defaultURL.deletingLastPathComponent().appendingPathComponent("observations.sqlite")
@@ -302,8 +306,22 @@ public enum ObservationHistory {
             if let pointer { sqlite3_close(pointer) }
             throw mapError(openStatus)
         }
-        defer { sqlite3_close(db) }
-        sqlite3_busy_timeout(db, 1_500)
+        let lockBudget = Unmanaged.passRetained(LockBudget())
+        defer {
+            sqlite3_busy_handler(db, nil, nil)
+            sqlite3_close(db)
+            lockBudget.release()
+        }
+        // One monotonic budget for the entire connection, not a fresh timeout
+        // for every initialization PRAGMA or transaction statement.
+        try check(sqlite3_busy_handler(db, { context, _ in
+            guard let context else { return 0 }
+            let deadline = Unmanaged<LockBudget>.fromOpaque(context).takeUnretainedValue().deadline
+            let now = DispatchTime.now().uptimeNanoseconds
+            guard now < deadline else { return 0 }
+            usleep(useconds_t(min(10_000, max(1, (deadline - now) / 1_000))))
+            return DispatchTime.now().uptimeNanoseconds < deadline ? 1 : 0
+        }, lockBudget.toOpaque()), db)
         try execute(db, "PRAGMA trusted_schema=OFF; PRAGMA temp_store=MEMORY")
         let version = try integer(db, "PRAGMA user_version")
         guard version == 0 || version == 1 else { throw ObservationHistoryError.incompatibleSchema }

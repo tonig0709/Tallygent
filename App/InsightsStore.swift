@@ -132,6 +132,13 @@ final class InsightsStore: ObservableObject {
         catch { message = error.localizedDescription; return nil }
     }
 
+    func exportFinished(_ result: Result<URL, Error>) {
+        guard case .failure(let error) = result else { return }
+        let value = error as NSError
+        guard value.domain != NSCocoaErrorDomain || value.code != NSUserCancelledError else { return }
+        message = "未能保存导出文件。请检查目标文件夹的权限和可用磁盘空间后重试。"
+    }
+
     func setNotifications(_ enabled: Bool) async {
         guard !isConfiguringNotifications else { return }
         isConfiguringNotifications = true

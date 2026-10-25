@@ -131,6 +131,7 @@ enum UsageInsightsProbe {
         let afterReset = UsageInsights.analyze(observations: [beforeReset.windows[0].latest!], now: resetAt.addingTimeInterval(1))
         let resetEvents = resetAlert.evaluate(report: afterReset, enabled: true, now: afterReset.generatedAt)
         precondition(resetEvents.count == 1 && resetEvents[0].kind == .expectedReset)
+        precondition(resetEvents[0].title.contains("5h 额度"), "reset reminder must identify its quota window")
         precondition(resetAlert.evaluate(report: afterReset, enabled: true, now: afterReset.generatedAt).isEmpty)
         var slept = UsageAlertState()
         _ = slept.evaluate(report: beforeReset, enabled: true, now: now)

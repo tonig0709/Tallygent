@@ -397,5 +397,11 @@ struct MultiProviderProbe {
         let expired = store.report.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }!
         try expect(store.message != nil && !expired.isFresh && expired.forecast == nil,
                    "A failed history read froze old evidence as a fresh balance or prediction")
+        let previousMessage = store.message
+        store.exportFinished(.failure(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)))
+        try expect(store.message == previousMessage, "Canceling the save panel overwrote the actual state with an error")
+        store.exportFinished(.failure(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)))
+        try expect(store.message?.contains("未能保存导出文件") == true,
+                   "Destination write failure after JSON encoding was silently ignored")
     }
 }

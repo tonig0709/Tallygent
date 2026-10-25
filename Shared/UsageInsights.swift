@@ -308,8 +308,9 @@ public struct UsageAlertState: Codable, Sendable {
         for (key, reset) in resets where reset.date <= now {
             let eventID = "reset|\(key)|\(reset.date.timeIntervalSince1970)"
             if !first, now.timeIntervalSince(reset.date) <= 300, delivered[eventID] == nil {
+                let windowTitle = reset.windowID == "fiveHour" ? "5h 额度" : "周额度"
                 events.append(UsageAlertEvent(id: eventID, kind: .expectedReset, provider: reset.provider,
-                    windowID: reset.windowID, title: "\(reset.provider.title) 预计重置时间已到",
+                    windowID: reset.windowID, title: "\(reset.provider.title) \(windowTitle)预计重置时间已到",
                     body: "来源此前预计此时重置；请查看新额度记录确认，不代表额度已经恢复。"))
                 delivered[eventID] = now
             }

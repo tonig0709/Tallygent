@@ -77,7 +77,9 @@ struct InsightsView: View {
             Text("不会清除账户、玻璃设置或 Planner 任务记录；操作不可撤销，可先导出。")
         }
         .fileExporter(isPresented: $showsExporter, document: document, contentType: .json,
-                      defaultFilename: "Tallygent-observations") { _ in }
+                      defaultFilename: "Tallygent-observations") { result in
+            Task { @MainActor in store.exportFinished(result) }
+        }
     }
 
     private func providerSection(_ provider: AgentService, wide: Bool) -> some View {

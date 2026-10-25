@@ -265,10 +265,6 @@ struct DesktopPanelProbe {
                         for (index, width) in sequence.enumerated() {
                             // The same native window and hosting view shrink and restore. Recreating a
                             // new view at each width cannot catch stale container measurements.
-                            window.setContentSize(NSSize(width: width, height: 760))
-                            view.layoutSubtreeIfNeeded()
-                            RunLoop.main.run(until: Date().addingTimeInterval(index == 0 ? 0.3 : 0.12))
-                            view.layoutSubtreeIfNeeded()
                             var prefixes = ["workspace"]
                             var required: Set<String> = ["workspace.label", "workspace.container", "workspace.toolbar.container"]
                             switch section {
@@ -289,7 +285,21 @@ struct DesktopPanelProbe {
                             for id in Array(required) where id.hasSuffix(".label") {
                                 required.insert(String(id.dropLast(".label".count)) + ".container")
                             }
-                            let failures = layoutViolations(measured, width: width, prefixes: prefixes, required: required)
+                            window.setContentSize(NSSize(width: width, height: 760))
+                            let deadline = Date().addingTimeInterval(2)
+                            var settled = false
+                            repeat {
+                                view.layoutSubtreeIfNeeded()
+                                RunLoop.main.run(until: min(deadline, Date().addingTimeInterval(0.02)))
+                                settled = required.isSubset(of: Set(measured.keys)) &&
+                                    abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - 48)) < 2
+                            } while !settled && Date() < deadline
+                            var failures = layoutViolations(measured, width: width, prefixes: prefixes, required: required)
+                            if !settled {
+                                let message = "Layout settle timeout (2s): \(section.rawValue) \(locale) \(theme) font\(fontSize) width\(width); toolbar \(String(describing: measured["workspace.toolbar.container"]?.frame.width)); missing \(required.subtracting(Set(measured.keys)).sorted())"
+                                failures.insert(message, at: 0)
+                                try? FileHandle.standardError.write(contentsOf: Data((message + "\n").utf8))
+                            }
                             if !failures.isEmpty {
                                 print("Control layout failed \(section.rawValue) \(locale) \(theme) font\(fontSize) width\(width):\n\(failures.joined(separator: "\n"))")
                                 fflush(stdout)

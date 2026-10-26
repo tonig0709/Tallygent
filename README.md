@@ -8,8 +8,10 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 > [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **本地测试候选：v0.6.0（build 49）。** 保留面板、Planner 与 Monitor/Insights，修复原生选择器标题被挤压的问题；工作区、侧栏与详情共用自适应选择器，并加入内部文字/大字体/窗口恢复门禁。
+> **待发布候选：v0.7.0（build 50）。** 功能与已安装测试的 build 49 一致，仅递增发布版本号，避免覆盖旧 v0.6.0 / v0.6.1 粒子实验标签。保留面板、Planner 与 Monitor/Insights，以及原生选择器和内部文字/大字体/窗口恢复门禁。
 > 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
+
+稳定版与粒子实验分开维护：build 49 已作为新粒子分支的共同基线保留；旧粒子分支不被覆盖，详见 [粒子开发与合并约定](docs/PARTICLE_DEVELOPMENT.md)。
 
 ## 三种尺寸，一个桌面面板
 

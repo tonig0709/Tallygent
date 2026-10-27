@@ -13,7 +13,9 @@ CODEX_QUOTA_ISOLATED_REGISTRY=1 \
 Run the full gate only in an isolated CI user: it installs a temporary candidate,
 launches a deterministic fake account server and reserves the local snapshot port.
 It must never mutate a real user's PlugInKit registry.
-Local non-destructive checks are `swift run quota-self-check` and `./scripts/check-desktop-panel.sh`.
+Pure non-destructive checks include `swift run quota-self-check` and the isolated-file
+history/Planner checks. `check-desktop-panel.sh` operates native windows/settings;
+its runtime requires an isolated CI user, not a personal desktop session.
 
 ## Automated gate
 
@@ -25,11 +27,20 @@ Local non-destructive checks are `swift run quota-self-check` and `./scripts/che
 - **Selector restoration:** a hosted production Dashboard must position its native scroll
   view on the persisted mode, not just mark a mode button selected. Its minimum height
   must accommodate the complete selector and action row after restoring an old window.
+- **Internal layout:** compare meaningful title frames against their natural text size
+  and local containers across locale/theme/large-font/threshold widths. Shrink and
+  restore the same window; include long status text and expanded Planner fields.
+  A rendered compressed-CJK negative control must fail these same assertions.
 - **Non-black content:** all three layouts × light/dark × minimum/maximum opacity are
   compared against their empty glass surface, including individual quota/trend regions.
   Solid-black negative controls must fail. Updated quota snapshots must change every layout.
 - **Shared settings:** opacity boundaries, thresholds, settings serialization and visible
   optical parameter changes remain covered. Mode selection has a safe large-mode fallback.
+- **Large-panel trends:** seven-day Token / 12h / 24h history × bar/line styles must remain
+  readable in both themes and opacity bounds. Plot-only comparisons must prove history
+  updates independently of the live clock/current quota. Small/medium pixels remain unchanged.
+  Reuse segmented Insights history, match the live account/session, retain empty hours,
+  and keep the panel's 24h cache independent of the Insights page's selected range.
 - **Live data:** fake Codex A→B→C data proves initialization, account read, notifications,
   delayed and queued refreshes, quota progress despite missing trend, preservation of
   last valid trend, unchanged snapshot stability and port-collision recovery.
@@ -66,6 +77,10 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
       Labels must distinguish native system blur from the adjustable haze layer; no private backdrop APIs or screen capture are used.
 - [ ] Generate usage; verify 5h, weekly and large-panel trend refresh within the expected polling cycle.
       Closing a panel must not stop the App's connection.
+- [ ] In panel settings switch the large chart among seven-day Token, 12h and 24h, and
+      bar/line forms; preview and the same placed panel must agree and survive restart.
+      Choosing Insights' 1h range must not truncate the panel; absent history stays blank,
+      resets/gaps remain separate, and percentage history is never labeled Token consumption.
 - [ ] Switch Codex → Claude → Codex in each panel size. The same single panel follows;
       glass settings and position remain unchanged, and unavailable Claude quota is not 0%.
       Claude is visibly experimental and its timestamp is a local receipt time, not a server refresh claim.
@@ -91,3 +106,21 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
 - Test actual Claude subscription input with a subscribing volunteer before
   claiming real-account support. Mock data cannot satisfy this check.
 - Keep bridge setup opt-in; an existing third-party statusLine must remain intact.
+
+## Monitor / Insights checks (build 48 and later)
+
+- Run `sh scripts/check-observation-history.sh` and `sh scripts/check-usage-insights.sh`;
+  both are mandatory in the full gate. Never replace existing panel and Planner checks.
+- Only accepted source responses create history. Verify unchanged new receipts persist,
+  duplicate responses/cache reads/settings/model-list do not, and late responses cannot
+  cross account or process ownership. Keep the actual source receipt time despite usage timeout.
+- SQLite must pass two-process writes, interruption recovery, bounded lock wait,
+  retention, privacy, symlink refusal, version migration and corrupt/future-file preservation.
+- On the real desktop verify Insights loads at compact/wide widths, collection toggles
+  remain independent of displayed service, export works, and clear leaves all panel/Planner settings intact.
+- Cold start, unknown identity, reset, stale source, negative jump and sampling gaps must
+  show unknown estimates, not fabricated zero/infinite capacity. Charts must not join segments.
+- Notifications are opt-in; verify first enable/no backlog, crossings, dedup across restart,
+  disable, account/cycle changes and sleep. Do not claim real OS delivery from pure rule tests.
+- History starts when collection is enabled; do not claim reconstructed past quota,
+  statistical confidence, verified fixed-cycle semantics or real Claude subscription acceptance.

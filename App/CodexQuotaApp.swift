@@ -11,16 +11,18 @@ enum CodexQuotaMain {
 
 struct CodexQuotaApp: App {
     @StateObject private var server = QuotaMonitor()
+    @StateObject private var planner = PlannerStore()
 
     var body: some Scene {
         WindowGroup {
             if AppInstallation.requiresInstalledCopy {
                 InstallLocationView()
             } else {
-                DashboardView(server: server)
+                DashboardView(server: server, planner: planner)
             }
         }
-        .windowResizability(.contentSize)
+        .windowResizability(.contentMinSize)
+        .defaultSize(width: 1_120, height: 760)
 
         MenuBarExtra("Tallygent", image: "CodexMark") {
             CodexQuotaMenuBarContent(server: server, menuSummary: menuSummary)

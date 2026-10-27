@@ -1,30 +1,49 @@
 # Tallygent for macOS
 
-一个本地优先的 macOS 菜单栏应用，用可移动的 Liquid Glass 桌面面板监测 Codex 与 Claude Code 的额度。
+把 Agent 的额度变化放到桌面。Tallygent 是本地优先的 macOS 菜单栏应用，以 **12／24 小时逐时额度追踪**、可移动的 Liquid Glass 面板和可解释的安排建议，帮助你看清 Codex 与 Claude Code 的可用额度。
 
-Native, movable glass panels for agent quotas. One desktop panel, three layouts, shared live controls.
+Track agent quota hour by hour. 12/24-hour history, bar/line charts, and movable Liquid Glass panels for macOS.
 
 > **当前公开稳定版：v0.5.7（build 41）。**
 > [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
 > v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
 >
-> **本地测试候选：v0.6.0（build 46）。** 首次使用 Tallygent 名称；保留原 Bundle ID、设置、面板位置与数据，并安全迁移本应用管理的 Claude 接入路径。
+> **待发布候选：v0.7.1（build 52）。** 新增大型面板 12／24 小时额度历史和柱状／折线切换，保留三种面板、Planner 与 Monitor/Insights。运行时代码与本地 build 51 相同，仅递增发布版本号；不覆盖 v0.7.0 / build 50 或旧粒子实验标签。
 > 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
 
+## 逐时额度追踪：看清过去 12／24 小时的变化
+
+不只看“还剩多少”，也看额度是怎样变化的。大型桌面面板把 Insights 的历史直接放到桌面：
+
+- **12h / 24h 两种视野**：5h 与周额度分别呈现，随同一份本地历史更新。
+- **柱状图或折线图**：小时柱显示该小时最后一次有效观测；折线保留真实连续区段，不跨重置或长时间缺口连线。
+- **一处设置，即时同步**：在「玻璃设置 → 大型面板图表」或面板边缘设置中选择，App 预览与同一个桌面面板同步，重启后保留。
+- **保留七日 Token 图**：仍可随时切回原有七日趋势，默认仍是七日 Token 柱状图。
+
+**12h / 24h 显示的是剩余额度百分比，不是每小时 Token 消耗。** 没有观测的时段留空，不补零、不推算，也不补造启用采集之前的历史。完整含义见 [逐时额度追踪说明](docs/PANEL_TRENDS.md)。
+
+稳定版与粒子实验分开维护：build 49 已作为新粒子分支的共同基线保留；旧粒子分支不被覆盖，详见 [粒子开发与合并约定](docs/PARTICLE_DEVELOPMENT.md)。
+
 ## 三种尺寸，一个桌面面板
+
+[Planner](docs/PLANNER.md) 读取本机模型目录，结合任务特征、5h/周额度和保留量给出 Model + Effort 建议，可复制配置并记录结果。不自动执行任务，不用额度百分比推算 Token；没有可靠历史时明确显示信息不足。
+
+[Monitor 与 Insights](docs/MONITOR_INSIGHTS.md) 在本机保留最近 30 天的新观测，系统时钟和反复读缓存不伪装成新数据。窗口分别分析，历史不足或陈旧时不预测；Claude 仍为实验性被动接入，不合计多服务额度，也不自动执行任务。
+
+[布局约束与回归](docs/LAYOUT_INVARIANTS.md) 记录原生标签挤压的根因及自动检查，不通过删除用户设置或单纯放大默认窗口来掩盖问题。
 
 | 模式 | 尺寸（pt） | 内容 |
 | --- | --- | --- |
 | 小型 | 164 × 164 | 原有双圆环：5h 与周额度，环中保留 Codex 图标 |
 | 中型 | 344 × 164 | Codex 标识、5h 与周额度两条进度条，不显示趋势图 |
-| 大型 | 680 × 300 | 保留现有额度、重置时间、同步状态与近七天趋势 |
+| 大型 | 680 × 300 | 额度、重置时间、同步状态；可选七日 Token 或 12h／24h 额度历史，柱状／折线可切换 |
 
 小、中面板沿用项目原生 macOS 组件的网格尺寸；pt 是逻辑点，Retina 显示不改变布局比例。
 遵循 [Apple 的组件布局原则](https://developer.apple.com/design/human-interface-guidelines/widgets)，根据尺寸减少信息，不拉伸整张大面板来凑小尺寸。
 
 - **像翻照片一样选择**：在 App 预览区用触控板左右滑动，也可点击左右箭头或模式名称。
 - **始终只有一个**：已打开的桌面面板直接切换内容与尺寸，不会创建第二个窗口；保留面板左上角位置。
-- **自由移动**：当前公开版按住顶部拖动；v0.5.9 候选支持在面板正文任意位置按住拖动。鼠标靠近边缘时显示关闭与设置入口，移开自动隐藏。
+- **自由移动**：在面板正文任意位置按住拖动。鼠标靠近边缘时显示关闭与设置入口，移开自动隐藏。
 - **保留全部玻璃参数**：自动/深/浅外观、不透明度（35–100%）、边缘强度、弹性高光、圆角、折射模式、位移、磨砂、色彩增益、色散与色调。
 - **参数即时共用**：三种模式沿用相同参数与现有底层玻璃渲染，切换不重置；也可直接在面板设置弹窗调整。
 - **额度颜色不变**：剩余 ≥60% 为绿色，30–59% 为橙色，<30% 为红色。
@@ -36,7 +55,7 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 ## 多服务与玻璃面板
 
 在 App 中选择 **Codex** 或 **Claude Code（实验性）**，已打开的同一个面板随服务切换；三种尺寸、位置与玻璃参数保持共用。
-候选还调整了中型面板留白，增强 **边缘色散** 和 **磨砂深度** 的可见变化。色散只作用于边缘；磨砂深度控制雾化层，系统背景模糊仍由 macOS 决定。
+中型面板保留协调的留白，**边缘色散** 只作用于边缘；**磨砂深度** 控制雾化层，系统背景模糊仍由 macOS 决定。
 
 Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/statusline)，需要在 App 中主动点击启用接入，再运行能够提供额度字段的 Claude Code 会话。
 
@@ -52,9 +71,9 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 
 ## 下载与安装
 
-请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 下载对应版本的 **Tallygent-…-macOS.dmg**，不要下载旧版或 Source code。
+请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 查看实际已发布版本，并下载对应的 **…-macOS.dmg**，不要下载 Source code。
 
-- 当前公开附件仍使用旧名 **Codex-Quota-v0.5.7-macOS.dmg**；请以实际发布说明与附件为准。
+- 当前公开附件仍是 **Codex-Quota-v0.5.7-macOS.dmg**，不包含本文的逐时图表。v0.7.1 正式发布后，下载 **Tallygent-v0.7.1-macOS.dmg**；草稿不是公开下载。
 - 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
 - 打开 DMG，将 **Tallygent.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
 - 仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证。Ad-hoc 测试版未公证，可能仍需系统首次打开确认。
@@ -64,7 +83,8 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 1. 保持 Tallygent 运行，在 App 中选择小、中或大模式。
 2. 点击 **桌面玻璃面板**；在 App 中换页，已放置面板随之切换。
 3. 用 App 的 **玻璃设置** 或面板边缘的设置按钮调整参数。
-4. 关闭面板不退出主程序；可从 App 或菜单栏重新打开。
+4. 在 **大型面板图表** 中选择七日／12h／24h 和柱状／折线；仅大型面板显示图表。
+5. 关闭面板不退出主程序；可从 App 或菜单栏重新打开。
 
 升级旧小组件版时，请先退出旧 App 并替换整个应用包。已放在桌面的旧 WidgetKit 组件需要手动移除；
 新版不会清空系统组件数据库，也不会删除账户数据来“修复”显示。
@@ -96,7 +116,7 @@ App 每 15 秒轮询，并响应额度变化通知；额度和趋势尽量作为
 
 ```sh
 swift run quota-self-check
-./scripts/check-desktop-panel.sh
+sh scripts/check-panel-trend.sh
 ```
 
 完整发布门禁只能在隔离 CI 用户运行，详见 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。

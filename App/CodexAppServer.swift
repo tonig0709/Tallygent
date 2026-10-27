@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import Network
+import CryptoKit
 
 private final class SnapshotServer: @unchecked Sendable {
     static let port: NWEndpoint.Port = 48_193
@@ -74,11 +75,20 @@ final class CodexAppServer: ObservableObject {
 
     @Published private(set) var state: State = .disconnected
     @Published private(set) var snapshot: UsageSnapshot
+    @Published private(set) var models: [PlannerModel] = []
+    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var isLoadingModels = false
+    /// Called only for a newly accepted source response, never for a cached repaint.
+    var onQuotaObservation: (([QuotaObservation]) -> Void)?
 
     private struct PendingRefresh {
         let rateLimitRequestID: Int
         let usageRequestID: Int
+        let eventID: String
+        let accountGeneration: Int
+        let accountScope: String?
         var rateLimits: RateLimitWindows?
+        var receivedAt: Date?
         var dailyUsage: [DailyUsage]?
     }
 
@@ -91,6 +101,16 @@ final class CodexAppServer: ObservableObject {
     private var refreshQueued = false
     private var refreshTimeout: DispatchWorkItem?
     private var nextRequestID = 3
+    private var initialized = false
+    private var isConnectionEnabled = false
+    private var accountReady = false
+    private var accountGeneration = 0
+    private var wantsModels = false
+    private var modelRequestID: Int?
+    private var accountRequestID: Int?
+    private var catalogBuffer: [PlannerModel] = []
+    private var catalogCursors = Set<String>()
+    private var modelTimeout: DispatchWorkItem?
     private let snapshotServer = SnapshotServer()
 
     init() {
@@ -104,7 +124,10 @@ final class CodexAppServer: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.refresh() }
+            Task { @MainActor [weak self] in
+                guard let self, self.isConnectionEnabled else { return }
+                self.refresh()
+            }
         }
     }
 
@@ -115,14 +138,20 @@ final class CodexAppServer: ObservableObject {
     }
 
     func connect() {
+        isConnectionEnabled = true
         snapshotServer.start()
         guard process == nil else { refresh() ; return }
         guard let executable = findCodex() else {
             state = .failed("未找到 Codex CLI。请先安装 Codex 或 ChatGPT for Mac。")
+            finishModelCatalog(error: "未找到本机 Codex，无法读取目录；可使用手动配置。")
             return
         }
 
         state = .connecting
+        initialized = false
+        accountReady = false
+        accountRequestID = nil
+        models = []
         let process = Process()
         let stdin = Pipe()
         let stdout = Pipe()
@@ -134,27 +163,34 @@ final class CodexAppServer: ObservableObject {
         process.terminationHandler = { [weak self] task in
             let status = task.terminationStatus
             Task { @MainActor [weak self] in
-                self?.process = nil
-                self?.input = nil
-                self?.refreshTimeout?.cancel()
-                self?.refreshTimeout = nil
-                self?.pendingRefresh = nil
-                self?.refreshQueued = false
+                guard let self, self.process === task else { return }
+                self.process = nil
+                self.input = nil
+                self.refreshTimeout?.cancel()
+                self.refreshTimeout = nil
+                self.pendingRefresh = nil
+                self.refreshQueued = false
+                self.initialized = false
+                self.finishModelCatalog(error: "Codex 已断开，目录未刷新")
                 if status != 0 {
-                    self?.state = .failed("Codex app-server 已退出（\(status)）")
+                    self.state = .failed("Codex app-server 已退出（\(status)）")
                 }
             }
         }
 
-        stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
+        stdout.fileHandleForReading.readabilityHandler = { [weak self, weak process] handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
-            Task { @MainActor [weak self] in self?.consume(data) }
+            Task { @MainActor [weak self, weak process] in
+                guard let self, let process, self.process === process else { return }
+                self.consume(data)
+            }
         }
 
         do {
             try process.run()
             self.process = process
+            outputBuffer = Data()
             input = stdin.fileHandleForWriting
             send(method: "initialize", id: 0, params: [
                 "clientInfo": [
@@ -173,6 +209,7 @@ final class CodexAppServer: ObservableObject {
     }
 
     func disconnect() {
+        isConnectionEnabled = false
         refreshTimer?.invalidate()
         refreshTimer = nil
         refreshTimeout?.cancel()
@@ -184,15 +221,56 @@ final class CodexAppServer: ObservableObject {
         process = nil
         input = nil
         state = .disconnected
+        initialized = false
+        accountReady = false
+        finishModelCatalog(error: "Codex 已断开，目录未刷新")
+    }
+
+    func refreshModelCatalog() {
+        guard !isLoadingModels else { return }
+        wantsModels = true
+        guard process != nil else { connect(); return }
+        guard initialized && accountReady else { return }
+        catalogBuffer = []; catalogCursors = []
+        requestModelsPage(cursor: nil)
+    }
+
+    private func requestModelsPage(cursor: String?) {
+        isLoadingModels = true
+        modelCatalogMessage = "正在读取本机 model/list…"
+        let id = nextRequestID
+        nextRequestID += 1
+        modelRequestID = id
+        var params: [String: Any] = ["limit": 100, "includeHidden": false]
+        if let cursor { params["cursor"] = cursor }
+        send(method: "model/list", id: id, params: params)
+        modelTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in self?.finishModelCatalog(error: "模型目录读取超时；额度同步不受影响，可重试或手动配置。") }
+        modelTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: timeout)
+    }
+
+    private func finishModelCatalog(error: String? = nil) {
+        modelTimeout?.cancel(); modelTimeout = nil; modelRequestID = nil
+        isLoadingModels = false
+        wantsModels = false
+        if let error { modelCatalogMessage = error }
+        else {
+            models = catalogBuffer
+            modelCatalogMessage = "本机 model/list · \(models.count) 个可选模型 · 实际推理权限未验证"
+        }
+        catalogBuffer = []
     }
 
     func refresh() {
         guard process != nil else { connect(); return }
+        guard initialized else { refreshQueued = true; return }
         if case .failed = state {
             state = .connecting
             requestAccount()
             return
         }
+        guard accountReady else { refreshQueued = true; return }
         guard pendingRefresh == nil else {
             refreshQueued = true
             return
@@ -207,7 +285,12 @@ final class CodexAppServer: ObservableObject {
         nextRequestID += 2
         pendingRefresh = PendingRefresh(
             rateLimitRequestID: rateLimitRequestID,
-            usageRequestID: usageRequestID
+            usageRequestID: usageRequestID,
+            eventID: UUID().uuidString,
+            accountGeneration: accountGeneration,
+            accountScope: snapshot.email.map { email in
+                SHA256.hash(data: Data(email.lowercased().utf8)).map { String(format: "%02x", $0) }.joined()
+            }
         )
         send(method: "account/rateLimits/read", id: rateLimitRequestID)
         send(method: "account/usage/read", id: usageRequestID)
@@ -260,18 +343,35 @@ final class CodexAppServer: ObservableObject {
             } else if method == "account/rateLimits/updated" {
                 refresh()
             } else if method == "account/updated" {
+                invalidateAccountRequests()
                 requestAccount()
             }
             return
         }
 
         guard let id = (object["id"] as? NSNumber)?.intValue else { return }
+        if id == accountRequestID {
+            accountRequestID = nil
+            handleAccount(object)
+            return
+        }
+        if id == modelRequestID {
+            do {
+                let page = try PlannerModel.parsePage(object, at: .now)
+                catalogBuffer += page.models
+                guard catalogBuffer.count <= 1_000, Set(catalogBuffer.map(\.id)).count == catalogBuffer.count else { throw PlannerError.invalidCatalog }
+                if let cursor = page.cursor {
+                    guard catalogCursors.count < 10, catalogCursors.insert(cursor).inserted else { throw PlannerError.invalidCatalog }
+                    requestModelsPage(cursor: cursor)
+                } else { finishModelCatalog() }
+            } catch { finishModelCatalog(error: error.localizedDescription) }
+            return
+        }
         switch id {
         case 0:
             send(method: "initialized")
+            initialized = true
             requestAccount()
-        case 1:
-            handleAccount(object)
         case 2:
             if let url = AppServerParser.authURL(from: object) {
                 state = .signingIn
@@ -279,8 +379,15 @@ final class CodexAppServer: ObservableObject {
             }
         default:
             guard var pending = pendingRefresh else { return }
-            if id == pending.rateLimitRequestID, let rateLimits = try? AppServerParser.rateLimitWindows(from: object) {
+            guard pending.accountGeneration == accountGeneration else { return }
+            if id == pending.rateLimitRequestID, pending.rateLimits == nil,
+               let rateLimits = try? AppServerParser.rateLimitWindows(from: object) {
                 pending.rateLimits = rateLimits
+                let receivedAt = Date()
+                pending.receivedAt = receivedAt
+                onQuotaObservation?(QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+                    receivedAt: receivedAt, fiveHour: rateLimits.fiveHour, weekly: rateLimits.weekly,
+                    accountScope: pending.accountScope, eventID: pending.eventID))
             } else if id == pending.usageRequestID, let usage = try? AppServerParser.dailyUsage(from: object) {
                 pending.dailyUsage = usage
             } else {
@@ -292,22 +399,38 @@ final class CodexAppServer: ObservableObject {
     }
 
     private func requestAccount() {
-        send(method: "account/read", id: 1, params: ["refreshToken": false])
+        let id = nextRequestID
+        nextRequestID += 1
+        accountRequestID = id
+        send(method: "account/read", id: id, params: ["refreshToken": false])
     }
 
     private func handleAccount(_ object: [String: Any]) {
         guard let account = try? AppServerParser.account(from: object) else {
+            invalidateAccountRequests()
             let message = (object["error"] as? [String: Any])?["message"] as? String
             state = .failed(message.map { "无法读取 Codex 账户：\($0)" } ?? "无法读取 Codex 账户，请重试")
             return
         }
         if account.isLoggedIn {
+            if snapshot.email != account.email {
+                invalidateAccountRequests()
+                models = []
+                snapshot.fiveHour = nil
+                snapshot.weekly = nil
+                snapshot.dailyUsage = []
+                snapshot.receivedAt = .distantPast
+                snapshot.updatedAt = .distantPast
+            }
             snapshot.email = account.email
             snapshot.plan = account.plan
             state = .connected(account.email)
+            accountReady = true
             persist(markDataRefresh: false)
+            if wantsModels { refreshModelCatalog() }
             refresh()
         } else {
+            invalidateAccountRequests()
             state = .signingIn
             send(method: "account/login/start", id: 2, params: [
                 "type": "chatgpt",
@@ -315,6 +438,19 @@ final class CodexAppServer: ObservableObject {
                 "appBrand": "codex"
             ])
         }
+    }
+
+    private func invalidateAccountRequests() {
+        let reloadModels = wantsModels || isLoadingModels || !models.isEmpty
+        accountGeneration += 1
+        accountReady = false
+        pendingRefresh = nil
+        refreshQueued = false
+        refreshTimeout?.cancel()
+        refreshTimeout = nil
+        if isLoadingModels { finishModelCatalog(error: "账户信息变化，目录需要重新读取") }
+        models = []
+        wantsModels = reloadModels
     }
 
     private func persist(markDataRefresh: Bool) {
@@ -354,7 +490,7 @@ final class CodexAppServer: ObservableObject {
         if let rateLimits = pending.rateLimits {
             // A successful read can confirm unchanged values. Keep this separate
             // from updatedAt, which tracks actual data changes and disk writes.
-            snapshot.receivedAt = .now
+            snapshot.receivedAt = pending.receivedAt
             if rateLimits.fiveHour != snapshot.fiveHour {
                 snapshot.fiveHour = rateLimits.fiveHour
                 snapshotChanged = true

@@ -11,10 +11,17 @@ final class CodexAppServer: ObservableObject {
     }
     @Published var state: State = .disconnected
     @Published var snapshot: UsageSnapshot = .empty
+    @Published var models: [PlannerModel] = []
+    @Published var modelCatalogMessage = "test"
+    @Published var isLoadingModels = false
+    var onQuotaObservation: (([QuotaObservation]) -> Void)?
     private(set) var connectCount = 0
     private(set) var refreshCount = 0
+    private(set) var disconnectCount = 0
     func connect() { connectCount += 1; state = .connected(nil) }
+    func disconnect() { disconnectCount += 1; state = .disconnected }
     func refresh() { refreshCount += 1 }
+    func refreshModelCatalog() {}
     func updateGlassSettings(_ settings: GlassRenderSettings) {
         snapshot.glassSettings = settings.sanitized
     }
@@ -36,7 +43,7 @@ struct MultiProviderProbe {
     private static let receivedAt = Date(timeIntervalSince1970: 1_780_000_000)
 
     @MainActor
-    static func main() throws {
+    static func main() async throws {
         guard CommandLine.arguments.count == 2 else {
             throw ProbeFailure(description: "Pass an isolated scratch directory")
         }
@@ -47,7 +54,8 @@ struct MultiProviderProbe {
         try parserAndStore(at: root)
         try setup(at: root)
         try presentation()
-        try coordinator(at: root)
+        try await coordinator(at: root)
+        try await historyFailureAgesEvidence(at: root)
         print("Agent provider probe passed: parser, private cache, reversible setup, selection and freshness.")
     }
 
@@ -263,7 +271,7 @@ struct MultiProviderProbe {
     }
 
     @MainActor
-    private static func coordinator(at root: URL) throws {
+    private static func coordinator(at root: URL) async throws {
         let defaults = MemoryDefaults()
         try expect(SnapshotStore.load(defaults: defaults) == .empty, "A clean install invents cached quota")
         let url = root.appendingPathComponent("coordinator.json")
@@ -275,10 +283,19 @@ struct MultiProviderProbe {
                                        dailyUsage: [.init(startDate: "2026-10-24", tokens: 1_000_000)],
                                        updatedAt: receivedAt.addingTimeInterval(-50), service: .codex)
         let monitor = QuotaMonitor(codex: codex, defaults: defaults, claudeURL: url)
-        monitor.connect()
-        monitor.connect()
+        await monitor.connect()
+        await monitor.connect()
         try expect(codex.connectCount == 1, "Repeated App startup opens duplicate Codex connections")
         monitor.selectService(.claude)
+        try expect(monitor.codexCollectionEnabled && codex.disconnectCount == 0,
+                   "Selecting another display stopped the enabled Codex collector")
+        await monitor.setCollection(.codex, enabled: false)
+        try expect(!monitor.codexCollectionEnabled && codex.disconnectCount == 1,
+                   "Disabling the background collector did not stop Codex while Claude is displayed")
+        let beforeResume = codex.connectCount
+        await monitor.setCollection(.codex, enabled: true)
+        try expect(monitor.codexCollectionEnabled && codex.connectCount == beforeResume + 1,
+                   "Reenabling collection did not resume the existing provider owner")
         try expect(monitor.snapshot.resolvedService == .claude && monitor.snapshot.weekly?.usedPercent == 70,
                    "Selecting Claude still publishes Codex quota")
         try expect(monitor.snapshot.dailyUsage.isEmpty && monitor.snapshot.email == nil && monitor.snapshot.plan == nil,
@@ -343,5 +360,48 @@ struct MultiProviderProbe {
         try expect(expiryMonitor.snapshot == rawSnapshot && Data(contentsOf: expiryURL) == originalBytes &&
                    expiryCodex.connectCount == 0 && expiryCodex.refreshCount == 0,
                    "A local expiry changed the raw record, receipt time, or contacted Codex")
+
+        let pausedRoot = root.appendingPathComponent("paused", isDirectory: true)
+        let pausedURL = pausedRoot.appendingPathComponent("claude.json")
+        let pausedDB = pausedRoot.appendingPathComponent("observations.sqlite")
+        try ObservationHistory.setCollectionEnabled(.codex, enabled: false, at: pausedDB)
+        let staleDefaults = MemoryDefaults()
+        staleDefaults.set("claude", forKey: "selectedAgentService")
+        staleDefaults.set(true, forKey: "monitor.collectCodex")
+        let pausedCodex = CodexAppServer()
+        let pausedMonitor = QuotaMonitor(codex: pausedCodex, defaults: staleDefaults, claudeURL: pausedURL)
+        await pausedMonitor.connect()
+        try expect(!pausedMonitor.codexCollectionEnabled && pausedCodex.connectCount == 0,
+                   "Stale preferences silently reenrolled a paused background collector")
+    }
+
+    @MainActor
+    private static func historyFailureAgesEvidence(at root: URL) async throws {
+        let url = root.appendingPathComponent("failed-insights.sqlite")
+        let scope = String(repeating: "a", count: 64)
+        for index in 0...5 {
+            let values = QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+                receivedAt: receivedAt.addingTimeInterval(Double(index - 5) * 60),
+                fiveHour: .init(usedPercent: 10 + index, windowDurationMinutes: 300, resetsAt: receivedAt.addingTimeInterval(7_200)),
+                weekly: nil, accountScope: scope)
+            try ObservationHistory.append(values, at: url, now: receivedAt)
+        }
+        var clock = receivedAt
+        let store = InsightsStore(url: url, defaults: MemoryDefaults(), now: { clock })
+        await store.reload(force: true)
+        let fresh = store.report.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }!
+        try expect(fresh.isFresh && fresh.forecast != nil, "Insights fixture did not establish a fresh estimate")
+        try Data("corrupt test database; preserve".utf8).write(to: url)
+        clock = receivedAt.addingTimeInterval(301)
+        await store.reload(force: true)
+        let expired = store.report.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }!
+        try expect(store.message != nil && !expired.isFresh && expired.forecast == nil,
+                   "A failed history read froze old evidence as a fresh balance or prediction")
+        let previousMessage = store.message
+        store.exportFinished(.failure(NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError)))
+        try expect(store.message == previousMessage, "Canceling the save panel overwrote the actual state with an error")
+        store.exportFinished(.failure(NSError(domain: NSCocoaErrorDomain, code: NSFileWriteOutOfSpaceError)))
+        try expect(store.message?.contains("未能保存导出文件") == true,
+                   "Destination write failure after JSON encoding was silently ignored")
     }
 }

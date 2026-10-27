@@ -47,15 +47,27 @@ jobs:
       - name: Run release bug gate
         env:
           CODEX_QUOTA_ISOLATED_REGISTRY: "1"
+          TALLYGENT_UI_CHECKS: ${{ github.workspace }}/ui-checks
         run: |
           ./scripts/release-preflight.sh \
             "$PWD/build/Build/Products/Release/Tallygent.app" \
             "$PWD/Tallygent-test.dmg"
+
+      - name: Upload native UI diagnostics
+        if: always() && github.event_name == 'workflow_dispatch' && matrix.os == 'macos-26'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tallygent-ui-checks
+          path: ui-checks/*
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Upload local test DMG
         if: github.event_name == 'workflow_dispatch' && matrix.os == 'macos-26'
         uses: actions/upload-artifact@v4
         with:
           name: Tallygent-local-macOS
-          path: Tallygent-test.dmg
+          path: |
+            Tallygent-test.dmg
+            ui-checks/*.png
           retention-days: 7

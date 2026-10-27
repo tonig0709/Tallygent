@@ -11,7 +11,8 @@ let package = Package(
     targets: [
         .target(
             name: "CodexQuotaCore",
-            path: "Shared"
+            path: "Shared",
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         .executableTarget(
             name: "QuotaSelfCheck",

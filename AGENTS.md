@@ -34,3 +34,13 @@ future feature or branding work. Build 45 has the legacy binary name; build 46
 is the first renamed test candidate. Preserve bundle
 identity, preference keys, data and panel ownership, and explicitly handle the
 Claude bridge's absolute executable path when renaming the installed app.
+
+## Native layout invariant
+
+See `docs/LAYOUT_INVARIANTS.md`. Do not constrain a native Picker's implicit
+title and options to a shared fixed width. Use the existing `AdaptivePicker`
+for bounded fields and preserve accessibility names. Measure semantic labels,
+not only the root window: the desktop gate includes Chinese/English, themes,
+large fonts, narrow/threshold widths, same-window restoration and a known-bad
+negative control. Keep those checks mandatory and run their UI runtime only
+in an isolated CI user. Never delete user preferences to hide a layout bug.

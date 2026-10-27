@@ -6,6 +6,7 @@ struct DesktopGlassPanelView: View {
     static let windowID = "desktop-glass-panel"
 
     @ObservedObject var server: QuotaMonitor
+    @ObservedObject private var insights: InsightsStore
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
@@ -19,11 +20,19 @@ struct DesktopGlassPanelView: View {
     @AppStorage(GlassSettingKeys.cornerRadius) private var cornerRadius = 30.0
     @AppStorage(GlassSettingKeys.tone) private var toneRaw = GlassTone.neutral.rawValue
     @AppStorage(GlassSettingKeys.refractionMode) private var refractionModeRaw = GlassRefractionMode.standard.rawValue
+    @AppStorage(PanelChartSource.defaultsKey) private var chartSourceRaw = PanelChartSource.sevenDayTokens.rawValue
+    @AppStorage(PanelChartStyle.defaultsKey) private var chartStyleRaw = PanelChartStyle.bars.rawValue
     @State private var showsControls = false
     @State private var hoverVector = CGSize.zero
     @State private var isHovering = false
     @State private var showsChrome = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @MainActor
+    init(server: QuotaMonitor) {
+        self.server = server
+        self.insights = server.insights
+    }
 
     private var panelSnapshot: UsageSnapshot {
         var value = server.snapshot
@@ -34,7 +43,7 @@ struct DesktopGlassPanelView: View {
     private var mode: DesktopPanelMode { DesktopPanelMode(rawValue: modeRaw) ?? .large }
 
     var body: some View {
-        QuotaPanelContent(mode: mode, snapshot: panelSnapshot, glassOpacity: glassOpacity)
+        QuotaPanelContent(mode: mode, snapshot: panelSnapshot, glassOpacity: glassOpacity, trend: panelTrend)
             .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
             .frame(width: mode.size.width, height: mode.size.height)
             .background {
@@ -133,6 +142,13 @@ struct DesktopGlassPanelView: View {
 
     private var appearanceMode: GlassAppearanceMode {
         GlassAppearanceMode(rawValue: appearanceRaw) ?? .dark
+    }
+
+    private var panelTrend: PanelTrendPresentation {
+        .make(report: insights.panelReport, provider: server.service, scope: server.plannerQuota().scope,
+              source: PanelChartSource(rawValue: chartSourceRaw) ?? .sevenDayTokens,
+              style: PanelChartStyle(rawValue: chartStyleRaw) ?? .bars,
+              now: insights.panelReport.generatedAt)
     }
 
     private func closePanel() {

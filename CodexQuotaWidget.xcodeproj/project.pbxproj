@@ -20,6 +20,16 @@
 		A10000000000000000000014 /* QuotaMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012; };
 		A10000000000000000000015 /* ClaudeBridgeSetup.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013; };
 		A10000000000000000000016 /* ClaudeStatusline.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014; };
+		A10000000000000000000017 /* Planner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015; };
+		A10000000000000000000018 /* PlannerStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000016; };
+		A10000000000000000000019 /* PlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017; };
+		A1000000000000000000001A /* ObservationHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018; };
+		A1000000000000000000001B /* UsageInsights.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019; };
+		A1000000000000000000001C /* InsightsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001A; };
+		A1000000000000000000001D /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001B; };
+		A1000000000000000000001E /* AdaptiveLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001C; };
+		A1000000000000000000001F /* PanelTrend.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001D; };
+		A10000000000000000000020 /* PanelTrendView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000001E; };
 /* End PBXBuildFile section */
 
 
@@ -41,6 +51,16 @@
 		B10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaMonitor.swift; sourceTree = "<group>"; };
 		B10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeBridgeSetup.swift; sourceTree = "<group>"; };
 		B10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeStatusline.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Planner.swift; sourceTree = "<group>"; };
+		B10000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerStore.swift; sourceTree = "<group>"; };
+		B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerView.swift; sourceTree = "<group>"; };
+		B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservationHistory.swift; sourceTree = "<group>"; };
+		B10000000000000000000019 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageInsights.swift; sourceTree = "<group>"; };
+		B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsStore.swift; sourceTree = "<group>"; };
+		B1000000000000000000001B = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
+		B1000000000000000000001C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdaptiveLayout.swift; sourceTree = "<group>"; };
+		B1000000000000000000001D = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTrend.swift; sourceTree = "<group>"; };
+		B1000000000000000000001E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelTrendView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,8 +78,8 @@
 			);
 			sourceTree = "<group>";
 		};
-		F20000000000000000000002 /* App */ = {isa = PBXGroup; path = App; sourceTree = "<group>"; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000010, B10000000000000000000011, B1000000000000000000000B, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000012, B10000000000000000000013, ); };
-		F20000000000000000000003 /* Shared */ = {isa = PBXGroup; path = Shared; sourceTree = "<group>"; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006, B10000000000000000000014, ); };
+		F20000000000000000000002 /* App */ = {isa = PBXGroup; path = App; sourceTree = "<group>"; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000010, B10000000000000000000011, B1000000000000000000000B, B1000000000000000000000E, B1000000000000000000000F, B10000000000000000000012, B10000000000000000000013, B10000000000000000000016, B10000000000000000000017, B1000000000000000000001A, B1000000000000000000001B, B1000000000000000000001C, ); };
+		F20000000000000000000003 /* Shared */ = {isa = PBXGroup; path = Shared; sourceTree = "<group>"; children = (B10000000000000000000004, B10000000000000000000005, B10000000000000000000006, B10000000000000000000014, B10000000000000000000015, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001D, B1000000000000000000001E, ); };
 		F20000000000000000000005 /* Resources */ = {isa = PBXGroup; path = Resources; sourceTree = "<group>"; children = (B10000000000000000000007, ); };
 		F20000000000000000000006 /* Products */ = {isa = PBXGroup; name = Products; sourceTree = "<group>"; children = (B10000000000000000000009, ); };
 /* End PBXGroup section */
@@ -100,15 +120,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		D30000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, A10000000000000000000014, A10000000000000000000015, A10000000000000000000016, ); runOnlyForDeploymentPostprocessing = 0; };
+		D30000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000010, A10000000000000000000011, A10000000000000000000012, A10000000000000000000013, A10000000000000000000014, A10000000000000000000015, A10000000000000000000016, A10000000000000000000017, A10000000000000000000018, A10000000000000000000019, A1000000000000000000001A, A1000000000000000000001B, A1000000000000000000001C, A1000000000000000000001D, A1000000000000000000001E, A1000000000000000000001F, A10000000000000000000020, ); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 
 /* Begin XCBuildConfiguration section */
 		F40000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_OBJC_ARC = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_VERSION = 5.0; }; name = Debug; };
 		F40000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_OBJC_ARC = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 5.0; }; name = Release; };
-		F40000000000000000000003 /* App Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 46; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Tallygent; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.6.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = Tallygent; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
-		F40000000000000000000004 /* App Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 46; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Tallygent; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.6.0; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = Tallygent; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
+		F40000000000000000000003 /* App Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 52; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Tallygent; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.7.1; OTHER_LDFLAGS = "-lsqlite3"; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = Tallygent; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Debug; };
+		F40000000000000000000004 /* App Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; CODE_SIGN_ENTITLEMENTS = App/CodexQuota.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 52; ENABLE_HARDENED_RUNTIME = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_KEY_CFBundleDisplayName = Tallygent; INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools"; MARKETING_VERSION = 0.7.1; OTHER_LDFLAGS = "-lsqlite3"; PRODUCT_BUNDLE_IDENTIFIER = dev.codexquota.app; PRODUCT_NAME = Tallygent; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */

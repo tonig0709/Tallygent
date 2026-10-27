@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import CryptoKit
 
 /// Owns provider selection. Providers never write into each other's cache.
 @MainActor
@@ -9,6 +10,13 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var state: State = .disconnected
     @Published private(set) var snapshot: UsageSnapshot = .empty
     @Published private(set) var connectionMessage: String?
+    @Published private(set) var models: [PlannerModel] = []
+    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var isLoadingModels = false
+    @Published private(set) var codexCollectionEnabled: Bool
+    @Published private(set) var claudeCollectionEnabled: Bool
+    @Published private(set) var isConfiguringCollection = true
+    let insights: InsightsStore
 
     private let codex: CodexAppServer
     private let defaults: UserDefaults
@@ -20,15 +28,30 @@ final class QuotaMonitor: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var refreshTimer: Timer?
     private var started = false
+    private var collectorsReady = false
 
     init(codex: CodexAppServer? = nil, defaults: UserDefaults = .standard,
-         claudeURL: URL = ClaudeStatuslineStore.defaultURL, now: @escaping () -> Date = { .now }) {
+         claudeURL: URL = ClaudeStatuslineStore.defaultURL, insights: InsightsStore? = nil,
+         now: @escaping () -> Date = { .now }) {
         let codex = codex ?? CodexAppServer()
         self.codex = codex
         self.defaults = defaults
         self.claudeURL = claudeURL
         self.now = now
-        service = AgentService(rawValue: defaults.string(forKey: "selectedAgentService") ?? "") ?? .codex
+        let selectedService = AgentService(rawValue: defaults.string(forKey: "selectedAgentService") ?? "") ?? .codex
+        service = selectedService
+        codexCollectionEnabled = defaults.object(forKey: "monitor.collectCodex") as? Bool ?? (selectedService == .codex)
+        claudeCollectionEnabled = defaults.object(forKey: "monitor.collectClaude") as? Bool ?? true
+        self.insights = insights ?? InsightsStore(url: claudeURL.deletingLastPathComponent().appendingPathComponent("observations.sqlite"), defaults: defaults, now: now)
+        defaults.set(codexCollectionEnabled, forKey: "monitor.collectCodex")
+        defaults.set(claudeCollectionEnabled, forKey: "monitor.collectClaude")
+        codex.onQuotaObservation = { [weak self] rows in
+            guard let self, self.codexCollectionEnabled else { return }
+            self.insights.record(rows)
+        }
+        codex.$models.assign(to: &$models)
+        codex.$modelCatalogMessage.assign(to: &$modelCatalogMessage)
+        codex.$isLoadingModels.assign(to: &$isLoadingModels)
         codex.$snapshot.combineLatest(codex.$state).sink { [weak self] value, state in
             guard let self, self.service == .codex else { return }
             self.snapshot = value
@@ -45,22 +68,75 @@ final class QuotaMonitor: ObservableObject {
         connectionMessage = nil
         readClaude()
         publishSelection()
-        if started && value == .codex { codex.connect() }
+        if collectorsReady && value == .codex { codex.connect() }
+        else if collectorsReady && !codexCollectionEnabled { codex.disconnect() }
     }
 
-    func connect() {
+    func connect() async {
         guard !started else { return }
         started = true
-        if service == .codex { codex.connect() }
+        let configured = await insights.initializeCollection(codex: codexCollectionEnabled, claude: claudeCollectionEnabled)
+        codexCollectionEnabled = configured && insights.collection[.codex] == true
+        claudeCollectionEnabled = configured && insights.collection[.claude] == true
+        if configured {
+            defaults.set(codexCollectionEnabled, forKey: "monitor.collectCodex")
+            defaults.set(claudeCollectionEnabled, forKey: "monitor.collectClaude")
+        }
+        collectorsReady = true
+        isConfiguringCollection = false
+        if codexCollectionEnabled || service == .codex { codex.connect() }
         readClaude()
+        await insights.reload(force: true)
         refreshTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.readClaude() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.readClaude()
+                await self.insights.reload()
+            }
         }
     }
 
     func refresh() {
         if service == .codex { codex.refresh() }
         else { readClaude() }
+    }
+
+    func refreshModelCatalog() { codex.refreshModelCatalog() }
+
+    /// Monitoring choices survive display changes; choosing a card is not starting another owner.
+    func setCollection(_ provider: AgentService, enabled: Bool) async {
+        guard !isConfiguringCollection else { return }
+        isConfiguringCollection = true
+        defer { isConfiguringCollection = false }
+        guard await insights.setCollection(provider, enabled: enabled) else { return }
+        if provider == .codex {
+            codexCollectionEnabled = enabled
+            defaults.set(enabled, forKey: "monitor.collectCodex")
+            if started {
+                if enabled { codex.connect() }
+                else if service != .codex { codex.disconnect() }
+            }
+        } else {
+            claudeCollectionEnabled = enabled
+            defaults.set(enabled, forKey: "monitor.collectClaude")
+        }
+    }
+
+    func plannerQuota() -> PlannerQuota {
+        let scope: String?
+        if service == .codex, let email = snapshot.email {
+            scope = SHA256.hash(data: Data(email.lowercased().utf8)).map { String(format: "%02x", $0) }.joined()
+        } else { scope = service == .claude ? claudeRecord?.sessionFingerprint : nil }
+        let windows = [("fiveHour", "5h 额度", snapshot.fiveHour), ("weekly", "周额度", snapshot.weekly)].compactMap { id, title, window -> PlannerQuotaWindow? in
+            guard let window else { return nil }
+            return PlannerQuotaWindow(id: id, title: title, remainingPercent: window.remainingPercent,
+                                      resetsAt: window.resetsAt, durationMinutes: window.windowDurationMinutes)
+        }
+        let connected: Bool
+        if case .connected = state { connected = true } else { connected = false }
+        return PlannerQuota(provider: service, scope: scope,
+                            source: service == .codex ? "Codex account/rateLimits/read" : "Claude Code statusLine（被动接收）",
+                            receivedAt: snapshot.lastReceivedAt, windows: windows, connected: connected)
     }
 
     func updateGlassSettings(_ settings: GlassRenderSettings) {

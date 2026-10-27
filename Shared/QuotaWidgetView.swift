@@ -48,18 +48,21 @@ public struct QuotaPanelContent: View {
     public let mode: DesktopPanelMode
     public let snapshot: UsageSnapshot
     public let glassOpacity: Double
+    public let trend: PanelTrendPresentation?
 
-    public init(mode: DesktopPanelMode, snapshot: UsageSnapshot, glassOpacity: Double) {
+    public init(mode: DesktopPanelMode, snapshot: UsageSnapshot, glassOpacity: Double,
+                trend: PanelTrendPresentation? = nil) {
         self.mode = mode
         self.snapshot = snapshot
         self.glassOpacity = glassOpacity
+        self.trend = trend
     }
 
     public var body: some View {
         switch mode {
         case .small: QuotaRingWidgetView(snapshot: snapshot, glassOpacity: glassOpacity)
         case .medium: QuotaMediumPanelView(snapshot: snapshot)
-        case .large: QuotaWidgetView(snapshot: snapshot, glassOpacity: glassOpacity)
+        case .large: QuotaWidgetView(snapshot: snapshot, glassOpacity: glassOpacity, trend: trend)
         }
     }
 }
@@ -121,10 +124,13 @@ private struct QuotaMediumPanelView: View {
 public struct QuotaWidgetView: View {
     public let snapshot: UsageSnapshot
     public let glassOpacity: Double
+    public let trend: PanelTrendPresentation?
 
-    public init(snapshot: UsageSnapshot, glassOpacity: Double = WidgetGlassOpacity.defaultValue) {
+    public init(snapshot: UsageSnapshot, glassOpacity: Double = WidgetGlassOpacity.defaultValue,
+                trend: PanelTrendPresentation? = nil) {
         self.snapshot = snapshot
         self.glassOpacity = WidgetGlassOpacity.clamped(glassOpacity)
+        self.trend = trend
     }
 
     private var isLight: Bool { snapshot.resolvedAppearance == .light }
@@ -173,7 +179,10 @@ public struct QuotaWidgetView: View {
                 .frame(maxWidth: 244)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    if snapshot.resolvedService == .claude {
+                    if let trend, trend.source.hours != nil {
+                        PanelTrendView(presentation: trend, isLight: isLight,
+                                       provider: snapshot.resolvedService).equatable()
+                    } else if snapshot.resolvedService == .claude {
                         VStack(alignment: .leading, spacing: 10) {
                             Label("Claude Code · 实验性", systemImage: "flask")
                                 .font(.subheadline.weight(.semibold))
@@ -189,13 +198,25 @@ public struct QuotaWidgetView: View {
                         Text("单位 M").font(.caption2).foregroundStyle(secondaryText)
                     }
                     Chart(snapshot.dailyUsage) { point in
+                        if trend?.style == .line {
+                            LineMark(x: .value("日期", shortDate(point.startDate)),
+                                     y: .value("Tokens (M)", point.millions))
+                                .interpolationMethod(.linear)
+                                .foregroundStyle(chartColor)
+                            PointMark(x: .value("日期", shortDate(point.startDate)),
+                                      y: .value("Tokens (M)", point.millions))
+                                .symbolSize(12)
+                                .foregroundStyle(chartColor)
+                        } else {
                         BarMark(
                             x: .value("日期", shortDate(point.startDate)),
                             y: .value("Tokens (M)", point.millions)
                         )
                         .foregroundStyle(chartColor.gradient)
                         .cornerRadius(3)
+                        }
                     }
+                    .chartYScale(domain: .automatic(includesZero: true))
                     .chartXAxis {
                         AxisMarks(values: .automatic(desiredCount: 7)) {
                             AxisValueLabel().foregroundStyle(secondaryText)

@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 
 public enum AppServerParserError: Error, Equatable {
     case invalidEnvelope
@@ -13,7 +14,7 @@ public struct AccountInfo: Equatable, Sendable {
 
 public struct RateLimitWindows: Equatable, Sendable {
     public let fiveHour: UsageWindow?
-    public let weekly: UsageWindow
+    public let weekly: UsageWindow?
 }
 
 public enum AppServerParser {
@@ -39,26 +40,38 @@ public enum AppServerParser {
     }
 
     public static func rateLimitWindows(from object: [String: Any]) throws -> RateLimitWindows {
-        guard let result = object["result"] as? [String: Any],
+        guard object["error"] == nil,
+              let result = object["result"] as? [String: Any],
               let limits = result["rateLimits"] as? [String: Any]
         else { throw AppServerParserError.missingRateLimits }
 
-        let windows = [limits["primary"], limits["secondary"]]
-            .compactMap { $0 as? [String: Any] }
-
-        guard let weekly = windows.max(by: {
-            int($0["windowDurationMins"]) < int($1["windowDurationMins"])
-        }).flatMap(usageWindow)
-        else { throw AppServerParserError.missingRateLimits }
-
-        return RateLimitWindows(
-            fiveHour: windows.first(where: { int($0["windowDurationMins"]) == 300 }).flatMap(usageWindow),
-            weekly: weekly
-        )
+        var windows: [Int: UsageWindow] = [:]
+        for raw in [limits["primary"], limits["secondary"]] {
+            guard let raw, !(raw is NSNull) else { continue }
+            guard let value = raw as? [String: Any],
+                  let duration = quotaInteger(value["windowDurationMins"]), duration > 0
+            else { throw AppServerParserError.invalidEnvelope }
+            // A new provider duration is unknown, not another name for weekly quota.
+            guard duration == 300 || duration == 10_080 else { continue }
+            guard windows[duration] == nil,
+                  let used = quotaInteger(value["usedPercent"]), (0...100).contains(used)
+            else { throw AppServerParserError.invalidEnvelope }
+            var reset: Date?
+            if let rawReset = value["resetsAt"], !(rawReset is NSNull) {
+                guard let timestamp = quotaInteger(rawReset), (0...4_102_444_800).contains(timestamp)
+                else { throw AppServerParserError.invalidEnvelope }
+                reset = Date(timeIntervalSince1970: TimeInterval(timestamp))
+            }
+            windows[duration] = UsageWindow(usedPercent: used, windowDurationMinutes: duration, resetsAt: reset)
+        }
+        return RateLimitWindows(fiveHour: windows[300], weekly: windows[10_080])
     }
 
     public static func weeklyWindow(from object: [String: Any]) throws -> UsageWindow {
-        try rateLimitWindows(from: object).weekly
+        guard let weekly = try rateLimitWindows(from: object).weekly else {
+            throw AppServerParserError.missingRateLimits
+        }
+        return weekly
     }
 
     public static func dailyUsage(from object: [String: Any]) throws -> [DailyUsage] {
@@ -83,22 +96,11 @@ public enum AppServerParser {
         return URL(string: value)
     }
 
-    private static func int(_ value: Any?) -> Int { intOrNil(value) ?? 0 }
-
-    private static func usageWindow(_ value: [String: Any]) -> UsageWindow? {
-        guard let used = intOrNil(value["usedPercent"]) else { return nil }
-        let reset = intOrNil(value["resetsAt"]).map { Date(timeIntervalSince1970: TimeInterval($0)) }
-        return UsageWindow(
-            usedPercent: used,
-            windowDurationMinutes: intOrNil(value["windowDurationMins"]),
-            resetsAt: reset
-        )
-    }
-
-    private static func intOrNil(_ value: Any?) -> Int? {
-        if let value = value as? Int { return value }
-        if let value = value as? NSNumber { return value.intValue }
-        return nil
+    private static func quotaInteger(_ value: Any?) -> Int? {
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+              number.doubleValue.isFinite, let integer = Int(exactly: number.doubleValue)
+        else { return nil }
+        return integer
     }
 
     private static func int64OrNil(_ value: Any?) -> Int64? {

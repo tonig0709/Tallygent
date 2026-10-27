@@ -1,6 +1,6 @@
 # 逐时额度追踪 — 大型面板图表
 
-Tallygent 的逐时额度追踪将 Insights 的历史带到大型桌面面板。首个本地测试是 build 51；v0.7.1 / build 52 为发布候选，运行时代码不变，仅递增版本元数据。实际公开版本以 [Releases](https://github.com/tonig0709/Tallygent/releases/latest) 为准，不把草稿当成正式版。
+Tallygent 的逐时额度追踪将 Insights 的历史带到大型桌面面板，现已随 [v0.7.1 / build 52](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1) 正式发布。首个本地测试是 build 51；正式包与其运行时代码相同，仅递增发行元数据并更新说明。请从 [Releases](https://github.com/tonig0709/Tallygent/releases/latest) 下载实际公开的 DMG。
 
 既有 v0.7.0 / build 50 标签、安装包及草稿保持不变，粒子实验也不混入此次更新。
 

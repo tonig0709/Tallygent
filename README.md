@@ -4,12 +4,9 @@
 
 Track agent quota hour by hour. 12/24-hour history, bar/line charts, and movable Liquid Glass panels for macOS.
 
-> **当前公开稳定版：v0.5.7（build 41）。**
-> [下载最新正式版](https://github.com/tonig0709/Tallygent/releases/latest)。
-> v0.5.1 及更早的公开正式版是旧的小组件版本；v0.5.6 是旧构建草稿，不包含本次完整更新。
->
-> **待发布候选：v0.7.1（build 52）。** 新增大型面板 12／24 小时额度历史和柱状／折线切换，保留三种面板、Planner 与 Monitor/Insights。运行时代码与本地 build 51 相同，仅递增发布版本号；不覆盖 v0.7.0 / build 50 或旧粒子实验标签。
-> 测试附件不代表正式版已经更新；以上正式版下载入口仍指向已发布版本。
+> **当前公开稳定版：v0.7.1（build 52），macOS 14+。**
+> [下载 macOS 安装包](https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-macOS.dmg) · [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1) · [SHA-256 校验值](https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-checksums.txt)
+> 三种可移动桌面面板，支持逐时额度历史、Monitor/Insights 与 Planner；不是系统 WidgetKit 小组件，也不包含粒子实验。
 
 ## 逐时额度追踪：看清过去 12／24 小时的变化
 
@@ -71,12 +68,12 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 
 ## 下载与安装
 
-请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 查看实际已发布版本，并下载对应的 **…-macOS.dmg**，不要下载 Source code。
+请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 下载 **Tallygent-v0.7.1-macOS.dmg**，不要下载 Source code。
 
-- 当前公开附件仍是 **Codex-Quota-v0.5.7-macOS.dmg**，不包含本文的逐时图表。v0.7.1 正式发布后，下载 **Tallygent-v0.7.1-macOS.dmg**；草稿不是公开下载。
+- Apple Silicon 与 Intel 通用构建，要求 macOS 14 或更新系统；随附 `Tallygent-v0.7.1-checksums.txt`。
 - 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
 - 打开 DMG，将 **Tallygent.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
-- 仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证。Ad-hoc 测试版未公证，可能仍需系统首次打开确认。
+- 本次正式包为 **ad-hoc 签名、未经过 Apple 公证**，可能仍需系统首次打开确认。仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证；不要关闭 Gatekeeper。
 
 面板版使用方式：
 
@@ -88,6 +85,7 @@ Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/sta
 
 升级旧小组件版时，请先退出旧 App 并替换整个应用包。已放在桌面的旧 WidgetKit 组件需要手动移除；
 新版不会清空系统组件数据库，也不会删除账户数据来“修复”显示。
+由旧名称 Codex Quota 升级时，退出并移走旧名称的应用包，只保留一个活跃安装，不要删除本地数据目录。
 
 ## 数据同步
 
@@ -122,6 +120,7 @@ sh scripts/check-panel-trend.sh
 完整发布门禁只能在隔离 CI 用户运行，详见 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。
 它检查三种布局的非黑屏、单面板、尺寸、关闭重开、滑动选择、实时数据链路、签名、双架构和 DMG 精确载荷。
 最终鼠标悬停、原生拖动、透光与连续滑杆效果仍必须在真实桌面人工验收；自动检查不冒充系统桌面实测。
+v0.7.1 与本地 build 51 使用相同功能源码，本次未追加 build 52 人工交互验收；具体自动检查与验证边界见 [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1)。
 
 ## 独立性与许可
 

@@ -113,9 +113,15 @@ enum PanelTrendProbe {
             point("h3", date: date("2026-10-27T12:10:00Z"), percent: 60),
             point("h4", date: hourlyDomain.end, percent: 50)
         ], domain: hourlyDomain, calendar: utc)
-        precondition(hourly.map(\.remainingPercent) == [77, 50], "Bars are last observed remaining values, not usage deltas or zero-filled gaps")
+        precondition(hourly.map(\.remainingPercent) == [77, 60], "An exact right-edge observation belongs to the new hour, not the previous hour")
         precondition(hourly[0].endDate <= hourly[1].startDate && hourly[1].endDate == hourlyDomain.end)
         precondition(hourly.allSatisfy { $0.startDate < $0.endDate && $0.date >= hourlyDomain.start && $0.date <= hourlyDomain.end })
+        let boundaryReset = PanelTrendPresentation.hourlyBuckets([
+            point("exhausted", date: date("2026-10-27T12:55:00Z"), percent: 0, segment: "old-cycle"),
+            point("reset-at-13", date: hourlyDomain.end, percent: 100, segment: "new-cycle")
+        ], domain: hourlyDomain, calendar: utc)
+        precondition(boundaryReset.count == 1 && boundaryReset[0].remainingPercent == 0,
+                     "A reset at the next hour cannot refill the previous hourly bar")
         var newYork = Calendar(identifier: .gregorian); newYork.timeZone = TimeZone(identifier: "America/New_York")!
         let fallDomain = DateInterval(start: date("2026-11-01T04:00:00Z"), end: date("2026-11-01T09:00:00Z"))
         let fall = PanelTrendPresentation.hourlyBuckets([

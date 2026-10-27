@@ -90,6 +90,12 @@ struct PanelTrendView: View, Equatable {
                                     .symbolSize(6).foregroundStyle(plotColor)
                             }
                         }
+                        if series.bars.isEmpty, let point = series.points.last {
+                            // A valid point at an exact hour boundary has no positive-width hourly bar yet.
+                            PointMark(x: .value("收到时间", point.date),
+                                      y: .value("剩余比例", point.remainingPercent))
+                                .symbolSize(9).foregroundStyle(plotColor)
+                        }
                     }
                 }
                 .chartXScale(domain: presentation.domain.start...presentation.domain.end)

@@ -139,9 +139,8 @@ public struct PanelTrendPresentation: Equatable, Sendable {
         for point in points.sorted(by: { $0.date == $1.date ? $0.id < $1.id : $0.date < $1.date }) {
             guard point.date >= domain.start, point.date <= domain.end,
                   point.date.timeIntervalSince1970.isFinite, (0...100).contains(point.remainingPercent) else { continue }
-            // An observation exactly on the right edge belongs to the final visible hour, not a zero-width next bar.
-            let probe = point.date == domain.end ? point.date.addingTimeInterval(-0.000_001) : point.date
-            guard let hour = calendar.dateInterval(of: .hour, for: probe) else { continue }
+            // Clock hours are half-open: an exact 13:00 observation must not rewrite the 12:00 hour.
+            guard let hour = calendar.dateInterval(of: .hour, for: point.date) else { continue }
             let start = max(hour.start, domain.start), end = min(hour.end, domain.end)
             guard start < end else { continue }
             hours[hour.start] = PanelTrendHour(id: String(hour.start.timeIntervalSinceReferenceDate),

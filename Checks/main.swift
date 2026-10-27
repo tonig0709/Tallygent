@@ -164,6 +164,7 @@ func hasReadableContrast(_ bitmap: NSBitmapImageRep, in region: CGRect) -> Bool 
 }
 
 @MainActor
+@discardableResult
 func checkRender<Content: View, Background: View>(
     _ content: Content,
     on background: Background,
@@ -171,7 +172,7 @@ func checkRender<Content: View, Background: View>(
     height: CGFloat,
     label: String,
     regions: [(String, CGRect)]
-) {
+) -> NSBitmapImageRep {
     // Native Glass is resolved by the desktop compositor, not ImageRenderer.
     // This check covers content visibility and contrast only; the release
     // checklist owns the real wallpaper-transmission smoke test.
@@ -202,6 +203,33 @@ func checkRender<Content: View, Background: View>(
         precondition(changedPixels(rendered, baseline, in: region) > regionPixels / 500, "\(label) lacks visible \(name) content")
         precondition(hasReadableContrast(rendered, in: region), "\(label) lacks readable \(name) contrast")
     }
+    return rendered
+}
+
+@MainActor
+func saveTrendPreview(_ bitmap: NSBitmapImageRep, name: String) {
+    guard let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"] else { return }
+    let directory = URL(fileURLWithPath: output, isDirectory: true)
+    try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(name + ".png"))
+}
+
+let panelTrendFixtureScope = String(repeating: "e", count: 64)
+
+func panelTrendFixture(at now: Date, changedHistory: Bool = false) -> UsageInsightsReport {
+    let start = now.addingTimeInterval(-18 * 3_600)
+    let rows = (0...216).filter { !(90...101).contains($0) }.flatMap { index in
+        let date = start.addingTimeInterval(Double(index) * 300)
+        let adjustment = changedHistory && (60...119).contains(index) ? 10 : 0
+        return QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+            receivedAt: date,
+            fiveHour: UsageWindow(usedPercent: 5 + index % 60 + adjustment, windowDurationMinutes: 300,
+                                  resetsAt: start.addingTimeInterval(Double(index / 60 + 1) * 18_000)),
+            weekly: UsageWindow(usedPercent: 10 + index / 6 + adjustment, windowDurationMinutes: 10_080,
+                                resetsAt: now.addingTimeInterval(6 * 86_400)),
+            accountScope: panelTrendFixtureScope)
+    }
+    return UsageInsights.analyze(observations: rows, now: now)
 }
 
 await MainActor.run {
@@ -248,6 +276,87 @@ await MainActor.run {
                     regions: regions
                 )
             }
+        }
+    }
+
+    let trendNow = Date()
+    let trendReport = panelTrendFixture(at: trendNow)
+    let changedTrendReport = panelTrendFixture(at: trendNow, changedHistory: true)
+    var trendBoundary = boundary
+    trendBoundary.dailyUsage = (0..<7).map {
+        DailyUsage(startDate: String(trendNow.addingTimeInterval(Double($0 - 6) * 86_400).ISO8601Format().prefix(10)),
+                   tokens: Int64(($0 + 1) * 1_000_000))
+    }
+    // Keep the clock/header out of history-liveness comparisons. Both fixtures have
+    // the same latest quota; only historical plot geometry is allowed to differ.
+    let historicalPlot = CGRect(x: 0.52, y: 0.36, width: 0.42, height: 0.40)
+    for appearance in [WidgetAppearance.dark, .light] {
+        var snapshot = trendBoundary
+        snapshot.appearance = appearance
+        let light = appearance == .light
+        for source in PanelChartSource.allCases {
+            for style in PanelChartStyle.allCases {
+                let trend = PanelTrendPresentation.make(report: trendReport, provider: .codex,
+                    scope: panelTrendFixtureScope, source: source, style: style, now: trendNow)
+                if source.hours != nil {
+                    precondition(!trend.isEmpty && trend.series.allSatisfy { !$0.points.isEmpty }, "history render fixture is empty")
+                }
+                for opacity in opacities {
+                    let image = checkRender(
+                        QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: opacity.value, trend: trend),
+                        on: LiquidGlassSurface(isLight: light, opacity: opacity.value, accent: .blue),
+                        width: 680, height: 300,
+                        label: "large \(source.rawValue) \(style.rawValue) \(appearance.rawValue) \(opacity.name)",
+                        regions: largeRegions
+                    )
+                    if opacity.value == WidgetGlassOpacity.maximum {
+                        if source == .quota12Hours, style == .line, !light { saveTrendPreview(image, name: "panel-trend-12h-line-dark") }
+                        if source == .quota24Hours, style == .bars, light { saveTrendPreview(image, name: "panel-trend-24h-bars-light") }
+                        if source == .sevenDayTokens, style == .line, !light { saveTrendPreview(image, name: "panel-trend-seven-day-line-dark") }
+                    }
+                }
+                if source.hours != nil {
+                    let changed = PanelTrendPresentation.make(report: changedTrendReport, provider: .codex,
+                        scope: panelTrendFixtureScope, source: source, style: style, now: trendNow)
+                    precondition(zip(trend.series, changed.series).allSatisfy { pair in pair.0.currentRemainingPercent == pair.1.currentRemainingPercent },
+                                 "liveness fixture changed its current quota instead of only its history")
+                    let before = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1, trend: trend), width: 680, height: 300)
+                    let after = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1, trend: changed), width: 680, height: 300)
+                    precondition(changedPixels(before, after, in: historicalPlot) > 50,
+                                 "\(source.rawValue) \(style.rawValue) plot ignores refreshed source history")
+                }
+                for mode in [DesktopPanelMode.small, .medium] {
+                    let before = render(QuotaPanelContent(mode: mode, snapshot: snapshot, glassOpacity: 1), width: mode.size.width, height: mode.size.height)
+                    let after = render(QuotaPanelContent(mode: mode, snapshot: snapshot, glassOpacity: 1, trend: trend), width: mode.size.width, height: mode.size.height)
+                    precondition(changedPixels(before, after, in: CGRect(x: 0, y: 0, width: 1, height: 1)) == 0,
+                                 "large-panel chart preferences changed the \(mode.rawValue) panel")
+                }
+            }
+            let bars = PanelTrendPresentation.make(report: trendReport, provider: .codex, scope: panelTrendFixtureScope,
+                                                    source: source, style: .bars, now: trendNow)
+            let line = PanelTrendPresentation.make(report: trendReport, provider: .codex, scope: panelTrendFixtureScope,
+                                                    source: source, style: .line, now: trendNow)
+            let barImage = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1, trend: bars), width: 680, height: 300)
+            let lineImage = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1, trend: line), width: 680, height: 300)
+            let upperPlot = CGRect(x: 0.52, y: 0.40, width: 0.42, height: 0.20)
+            precondition(changedPixels(barImage, lineImage, in: upperPlot) > 50,
+                         "\(source.rawValue) ignores the bar/line selection")
+            if source == .sevenDayTokens {
+                let legacy = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1), width: 680, height: 300)
+                precondition(changedPixels(legacy, barImage, in: historicalPlot) == 0,
+                             "default chart preferences changed the existing seven-day bars")
+            }
+        }
+        for (source, style) in [(PanelChartSource.quota12Hours, PanelChartStyle.line), (.quota24Hours, .bars)] {
+            let empty = PanelTrendPresentation.make(report: nil, provider: .codex, scope: panelTrendFixtureScope,
+                                                    source: source, style: style, now: trendNow)
+            let image = checkRender(
+                QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 0.35, trend: empty),
+                on: LiquidGlassSurface(isLight: light, opacity: 0.35, accent: .blue),
+                width: 680, height: 300, label: "large empty-history \(source.rawValue) \(appearance.rawValue)",
+                regions: largeRegions
+            )
+            if !light, source == .quota12Hours { saveTrendPreview(image, name: "panel-trend-empty-dark") }
         }
     }
 

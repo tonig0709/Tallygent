@@ -126,6 +126,7 @@ pass "the last mutable artifact is gated before a draft release can be created"
 section "Panel source, parser, and visual render checks"
 sh scripts/check-observation-history.sh
 sh scripts/check-usage-insights.sh
+sh scripts/check-panel-trend.sh
 sh scripts/check-planner.sh
 sh scripts/check-agent-providers.sh
 sh scripts/check-codex-discovery.sh
@@ -133,7 +134,9 @@ sh scripts/check-desktop-panel.sh
 swift run quota-self-check
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     Gate/PanelSnapshotProbe.swift Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
-    -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
+    Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/UsageInsights.swift \
+    Shared/ObservationHistory.swift Shared/ClaudeStatusline.swift \
+    -lsqlite3 -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
 require_text 'NSVisualEffectView' App/DesktopGlassPanelView.swift "native desktop material is missing"
 require_text 'view.blendingMode = .behindWindow' App/DesktopGlassPanelView.swift "wallpaper sampling is missing"
 require_text 'Slider(value: value' App/GlassSettingsView.swift "native live sliders are missing"

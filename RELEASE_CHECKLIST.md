@@ -36,6 +36,11 @@ its runtime requires an isolated CI user, not a personal desktop session.
   Solid-black negative controls must fail. Updated quota snapshots must change every layout.
 - **Shared settings:** opacity boundaries, thresholds, settings serialization and visible
   optical parameter changes remain covered. Mode selection has a safe large-mode fallback.
+- **Large-panel trends:** seven-day Token / 12h / 24h history × bar/line styles must remain
+  readable in both themes and opacity bounds. Plot-only comparisons must prove history
+  updates independently of the live clock/current quota. Small/medium pixels remain unchanged.
+  Reuse segmented Insights history, match the live account/session, retain empty hours,
+  and keep the panel's 24h cache independent of the Insights page's selected range.
 - **Live data:** fake Codex A→B→C data proves initialization, account read, notifications,
   delayed and queued refreshes, quota progress despite missing trend, preservation of
   last valid trend, unchanged snapshot stability and port-collision recovery.
@@ -72,6 +77,10 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
       Labels must distinguish native system blur from the adjustable haze layer; no private backdrop APIs or screen capture are used.
 - [ ] Generate usage; verify 5h, weekly and large-panel trend refresh within the expected polling cycle.
       Closing a panel must not stop the App's connection.
+- [ ] In panel settings switch the large chart among seven-day Token, 12h and 24h, and
+      bar/line forms; preview and the same placed panel must agree and survive restart.
+      Choosing Insights' 1h range must not truncate the panel; absent history stays blank,
+      resets/gaps remain separate, and percentage history is never labeled Token consumption.
 - [ ] Switch Codex → Claude → Codex in each panel size. The same single panel follows;
       glass settings and position remain unchanged, and unavailable Claude quota is not 0%.
       Claude is visibly experimental and its timestamp is a local receipt time, not a server refresh claim.

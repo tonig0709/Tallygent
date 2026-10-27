@@ -14,9 +14,14 @@ private actor ObservationIO {
     let url: URL
     init(url: URL) { self.url = url }
     func append(_ values: [QuotaObservation], now: Date) throws { try ObservationHistory.append(values, at: url, now: now) }
-    func load(since: Date, now: Date) throws -> ([QuotaObservation], UsageInsightsReport) {
-        let values = try ObservationHistory.load(from: url, since: since, now: now)
-        return (values, UsageInsights.analyze(observations: values, now: now))
+    func load(since: Date, now: Date) throws -> ([QuotaObservation], UsageInsightsReport, UsageInsightsReport, [QuotaObservation]) {
+        let panelSince = now.addingTimeInterval(-24 * 3_600)
+        let values = try ObservationHistory.load(from: url, since: min(since, panelSince), now: now)
+        let selected = values.filter { $0.receivedAt >= since }
+        let report = UsageInsights.analyze(observations: selected, now: now)
+        let panelValues = values.filter { $0.receivedAt >= panelSince }
+        let panelReport = since == panelSince ? report : UsageInsights.analyze(observations: panelValues, now: now)
+        return (selected, report, panelReport, panelValues)
     }
     func setEnabled(_ provider: AgentService, _ enabled: Bool) throws {
         try ObservationHistory.setCollectionEnabled(provider, enabled: enabled, at: url)
@@ -35,6 +40,8 @@ private actor ObservationIO {
 final class InsightsStore: ObservableObject {
     @Published private(set) var observations: [QuotaObservation] = []
     @Published private(set) var report = UsageInsights.analyze(observations: [], now: .now)
+    /// Independent 24h presentation cache; changing the Insights range must not truncate the placed panel.
+    @Published private(set) var panelReport = UsageInsights.analyze(observations: [], now: .now)
     @Published private(set) var isLoading = false
     @Published private(set) var message: String?
     @Published private(set) var range = InsightsRange.day
@@ -46,6 +53,7 @@ final class InsightsStore: ObservableObject {
     private let now: () -> Date
     private var lastRead = Date.distantPast
     private var reloadQueued = false
+    private var panelObservations: [QuotaObservation] = []
     private var alertState: UsageAlertState
 
     init(url: URL = ObservationHistory.defaultURL, defaults: UserDefaults = .standard,
@@ -96,11 +104,15 @@ final class InsightsStore: ObservableObject {
                 if requestedRange == range {
                     observations = result.0
                     report = result.1
+                    panelReport = result.2
+                    panelObservations = result.3
                     message = nil
                     deliverAlerts(at: date)
                 } else { reloadQueued = true }
             } catch {
                 report = UsageInsights.analyze(observations: observations, now: date)
+                // Re-evaluate expiry without turning a failed history read into a fresh source observation.
+                panelReport = UsageInsights.analyze(observations: panelObservations, now: date)
                 message = error.localizedDescription
             }
         } while reloadQueued
@@ -120,6 +132,8 @@ final class InsightsStore: ObservableObject {
         do {
             try await io.clear(now: now())
             observations = []
+            panelObservations = []
+            panelReport = UsageInsights.analyze(observations: [], now: now())
             alertState = UsageAlertState()
             defaults.removeObject(forKey: "insights.alertState")
             await reload(force: true)

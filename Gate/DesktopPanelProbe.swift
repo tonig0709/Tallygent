@@ -4,6 +4,7 @@ import SwiftUI
 // No account connection or persistent settings are needed for this window probe.
 @MainActor
 final class QuotaMonitor: ObservableObject {
+    static let fixtureScope = String(repeating: "b", count: 64)
     enum State: Equatable {
         case disconnected, connecting, signingIn, connected(String?), failed(String)
     }
@@ -18,16 +19,18 @@ final class QuotaMonitor: ObservableObject {
     @Published var claudeCollectionEnabled = true
     @Published var isConfiguringCollection = false
     let insights: InsightsStore
+    let historyURL: URL
     init() {
         let path = ProcessInfo.processInfo.environment["TALLYGENT_HISTORY_DB"] ?? FileManager.default.temporaryDirectory.appendingPathComponent("tallygent-ui-\(UUID().uuidString)/history.sqlite").path
         let url = URL(fileURLWithPath: path)
+        historyURL = url
         let date = Date()
         for index in 0...40 {
             let values = QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
                 receivedAt: date.addingTimeInterval(Double(index - 40) * 60),
                 fiveHour: .init(usedPercent: 18 - (40 - index) / 3, windowDurationMinutes: 300, resetsAt: date.addingTimeInterval(14_400)),
                 weekly: .init(usedPercent: 28 - (40 - index) / 10, windowDurationMinutes: 10_080, resetsAt: date.addingTimeInterval(6 * 86_400)),
-                accountScope: String(repeating: "b", count: 64))
+                accountScope: Self.fixtureScope)
             try! ObservationHistory.append(values, at: url, now: date)
         }
         insights = InsightsStore(url: url)
@@ -36,7 +39,7 @@ final class QuotaMonitor: ObservableObject {
     func setCollection(_ provider: AgentService, enabled: Bool) async {}
     func refreshModelCatalog() {}
     func plannerQuota() -> PlannerQuota {
-        PlannerQuota(provider: service, scope: nil, source: "隔离测试", receivedAt: .distantPast, windows: [], connected: false)
+        PlannerQuota(provider: service, scope: Self.fixtureScope, source: "隔离测试", receivedAt: .distantPast, windows: [], connected: false)
     }
     func selectService(_ value: AgentService) { service = value }
     func enableClaudeBridge() {}
@@ -128,6 +131,7 @@ struct DesktopPanelProbe {
         controller.show(server: server)
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
+        verifyLiveTrendPanel(server: server)
         for width in [760.0, 1_030, 1_120, 1_400] {
             var frames: [DesktopPanelMode: CGRect] = [:]
             let dashboard = NSHostingView(rootView: DashboardView(server: server, onGalleryLayout: { frames[$0] = $1 })
@@ -202,6 +206,99 @@ struct DesktopPanelProbe {
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 
+    @MainActor
+    private static func verifyLiveTrendPanel(server: QuotaMonitor) {
+        let defaults = UserDefaults.standard
+        let keys = [DesktopPanelMode.defaultsKey, PanelChartSource.defaultsKey, PanelChartStyle.defaultsKey]
+        let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+        let controller = DesktopPanelController.shared
+        defer {
+            controller.close()
+            for (key, value) in saved {
+                if let value { defaults.set(value, forKey: key) }
+                else { defaults.removeObject(forKey: key) }
+            }
+        }
+        defaults.set(DesktopPanelMode.large.rawValue, forKey: DesktopPanelMode.defaultsKey)
+        defaults.set(PanelChartSource.quota12Hours.rawValue, forKey: PanelChartSource.defaultsKey)
+        defaults.set(PanelChartStyle.line.rawValue, forKey: PanelChartStyle.defaultsKey)
+        let ready = Date().addingTimeInterval(3)
+        while server.insights.panelReport.windows.filter({ $0.provider == .codex }).allSatisfy({ $0.history.isEmpty }) && Date() < ready {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        precondition(server.insights.panelReport.windows.contains { $0.provider == .codex && !$0.history.isEmpty },
+                     "placed-panel history fixture did not load")
+        controller.show(server: server)
+        let panel = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+        let view = panel.contentView!
+        func capture() -> NSBitmapImageRep {
+            view.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            view.layoutSubtreeIfNeeded()
+            let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            return bitmap
+        }
+        let line = capture()
+        defaults.set(PanelChartStyle.bars.rawValue, forKey: PanelChartStyle.defaultsKey)
+        let bars = capture()
+        precondition(changedPlotPixels(line, bars) > 50, "placed panel ignores live bar/line preferences")
+        defaults.set(PanelChartSource.quota24Hours.rawValue, forKey: PanelChartSource.defaultsKey)
+        let day = capture()
+        precondition(changedPlotPixels(bars, day) > 50, "placed panel ignores the live 12h/24h selection")
+        let previousCount = server.insights.panelReport.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }!.history.count
+        let now = Date()
+        let earlier = QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+            receivedAt: now.addingTimeInterval(-2 * 3_600),
+            fiveHour: .init(usedPercent: 55, windowDurationMinutes: 300, resetsAt: now.addingTimeInterval(14_400)),
+            weekly: .init(usedPercent: 45, windowDurationMinutes: 10_080, resetsAt: now.addingTimeInterval(6 * 86_400)),
+            accountScope: QuotaMonitor.fixtureScope)
+        try! ObservationHistory.append(earlier, at: server.historyURL, now: now)
+        Task { await server.insights.reload(force: true) }
+        let deadline = Date().addingTimeInterval(3)
+        while (server.insights.panelReport.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }?.history.count ?? 0) <= previousCount && Date() < deadline {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+        }
+        precondition((server.insights.panelReport.windows.first { $0.provider == .codex && $0.windowID == "fiveHour" }?.history.count ?? 0) > previousCount,
+                     "new history never reached the placed-panel presentation store")
+        let updated = capture()
+        precondition(changedPlotPixels(day, updated) > 50, "placed panel did not observe refreshed history")
+        precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1,
+                     "chart changes created a second desktop panel")
+
+        let settings = NSHostingView(rootView: ScrollView {
+            GlassSettingsView(compact: true).padding(20)
+        }.preferredColorScheme(.light).background(Color(nsColor: .windowBackgroundColor)))
+        settings.frame = NSRect(x: 0, y: 0, width: 360, height: 640)
+        let settingsWindow = NSWindow(contentRect: settings.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
+        settingsWindow.isReleasedWhenClosed = false
+        settingsWindow.appearance = NSAppearance(named: .aqua)
+        settingsWindow.contentView = settings
+        settingsWindow.makeKeyAndOrderFront(nil)
+        settings.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        saveLayoutImage(settings, name: "panel-settings-compact")
+        settingsWindow.close()
+        print("Placed-panel trend preferences and observed history refresh: PASS")
+    }
+
+    /// The symmetric central band excludes both clock and footer in either bitmap orientation.
+    @MainActor
+    private static func changedPlotPixels(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep) -> Int {
+        precondition(lhs.pixelsWide == rhs.pixelsWide && lhs.pixelsHigh == rhs.pixelsHigh)
+        var count = 0
+        for y in Int(Double(lhs.pixelsHigh) * 0.40)..<Int(Double(lhs.pixelsHigh) * 0.60) {
+            for x in Int(Double(lhs.pixelsWide) * 0.52)..<Int(Double(lhs.pixelsWide) * 0.94) {
+                guard let a = lhs.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                      let b = rhs.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                let difference = abs(a.redComponent - b.redComponent) + abs(a.greenComponent - b.greenComponent) +
+                    abs(a.blueComponent - b.blueComponent) + abs(a.alphaComponent - b.alphaComponent)
+                if difference > 0.12 { count += 1 }
+            }
+        }
+        return count
+    }
+
     private struct MeasuredControl {
         let frame: CGRect
         let ideal: CGSize
@@ -273,8 +370,9 @@ struct DesktopPanelProbe {
                                 prefixes += ["monitor"]
                                 required.formUnion(["monitor.service.label", "monitor.service.container", "monitor.content.container", "monitor.actions.container"])
                                 if DashboardLayout.hasInlineInspector(width: width) {
-                                    prefixes += ["glass"]
-                                    required.formUnion(["glass.preset.label", "glass.appearance.label", "glass.refraction.label", "glass.tone.label"])
+                                    prefixes += ["glass", "panel"]
+                                    required.formUnion(["glass.preset.label", "glass.appearance.label", "glass.refraction.label", "glass.tone.label",
+                                                        "panel.chart.source.label", "panel.chart.style.label"])
                                 }
                             case .planner:
                                 prefixes += ["planner"]

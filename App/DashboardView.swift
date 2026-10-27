@@ -19,6 +19,7 @@ enum DashboardLayout {
 @MainActor
 struct DashboardView: View {
     @ObservedObject var server: QuotaMonitor
+    @ObservedObject private var insights: InsightsStore
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
@@ -31,6 +32,8 @@ struct DashboardView: View {
     @AppStorage(GlassSettingKeys.cornerRadius) private var cornerRadius = 30.0
     @AppStorage(GlassSettingKeys.tone) private var toneRaw = GlassTone.neutral.rawValue
     @AppStorage(GlassSettingKeys.refractionMode) private var refractionModeRaw = GlassRefractionMode.standard.rawValue
+    @AppStorage(PanelChartSource.defaultsKey) private var chartSourceRaw = PanelChartSource.sevenDayTokens.rawValue
+    @AppStorage(PanelChartStyle.defaultsKey) private var chartStyleRaw = PanelChartStyle.bars.rawValue
     @State private var showsGlassInspector = true
     @State private var showsGlassSheet = false
     @State var section = WorkspaceSection.monitor
@@ -45,6 +48,7 @@ struct DashboardView: View {
          onGalleryLayout: ((DesktopPanelMode, CGRect) -> Void)? = nil,
          onControlLayout: ((String, CGRect, CGSize) -> Void)? = nil) {
         self.server = server
+        self.insights = server.insights
         self.planner = planner ?? PlannerStore()
         self.onGalleryLayout = onGalleryLayout
         self.onControlLayout = onControlLayout
@@ -123,7 +127,8 @@ struct DashboardView: View {
     }
 
     private func monitorContent(wide: Bool) -> some View {
-        VStack(spacing: 20) {
+        let trend = panelTrend
+        return VStack(spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 AdaptivePicker("监测服务", id: "monitor.service",
                                selection: Binding(get: { server.service }, set: server.selectService)) {
@@ -154,7 +159,8 @@ struct DashboardView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(DesktopPanelMode.allCases) { page in
-                            QuotaPanelContent(mode: page, snapshot: previewSnapshot, glassOpacity: glassOpacity)
+                            QuotaPanelContent(mode: page, snapshot: previewSnapshot, glassOpacity: glassOpacity,
+                                              trend: trend)
                                 .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
                                 .frame(width: page.size.width, height: page.size.height)
                                 .background {
@@ -282,6 +288,13 @@ struct DashboardView: View {
     }
 
     private var mode: DesktopPanelMode { DesktopPanelMode(rawValue: modeRaw) ?? .large }
+
+    private var panelTrend: PanelTrendPresentation {
+        .make(report: insights.panelReport, provider: server.service, scope: server.plannerQuota().scope,
+              source: PanelChartSource(rawValue: chartSourceRaw) ?? .sevenDayTokens,
+              style: PanelChartStyle(rawValue: chartStyleRaw) ?? .bars,
+              now: insights.panelReport.generatedAt)
+    }
 
     private func select(_ offset: Int) {
         let modes = DesktopPanelMode.allCases

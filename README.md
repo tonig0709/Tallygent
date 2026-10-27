@@ -13,6 +13,8 @@ Native, movable glass panels for agent quotas. One desktop panel, three layouts,
 
 稳定版与粒子实验分开维护：build 49 已作为新粒子分支的共同基线保留；旧粒子分支不被覆盖，详见 [粒子开发与合并约定](docs/PARTICLE_DEVELOPMENT.md)。
 
+**新增本地测试：build 51。** 大型面板可在七日 Token 与 12h / 24h 额度历史之间切换，并统一选择柱状图或折线图；默认外观不变。此功能不改动 v0.7.0 / build 50 标签与草稿，详见 [大型面板图表](docs/PANEL_TRENDS.md)。
+
 ## 三种尺寸，一个桌面面板
 
 本地测试候选新增 [Planner](docs/PLANNER.md)：读取本机模型目录，结合任务特征、5h/周额度和保留量给出 Model + Effort 建议，可复制配置并记录结果。不自动执行任务，不用额度百分比推算 Token；没有可靠历史时明确显示信息不足。

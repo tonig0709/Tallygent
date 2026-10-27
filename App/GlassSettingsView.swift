@@ -122,15 +122,29 @@ struct GlassSettingsView: View {
     @AppStorage(GlassSettingKeys.cornerRadius) private var cornerRadius = 30.0
     @AppStorage(GlassSettingKeys.tone) private var toneRaw = GlassTone.neutral.rawValue
     @AppStorage(GlassSettingKeys.refractionMode) private var refractionModeRaw = GlassRefractionMode.standard.rawValue
+    @AppStorage(PanelChartSource.defaultsKey) private var chartSourceRaw = PanelChartSource.sevenDayTokens.rawValue
+    @AppStorage(PanelChartStyle.defaultsKey) private var chartStyleRaw = PanelChartStyle.bars.rawValue
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 14 : 18) {
             if !compact {
-                Text("玻璃外观")
+                Text("面板设置")
                     .font(.title3.weight(.semibold))
-                Text("三种桌面面板共用这些参数；将指针移入预览可查看高光与弹性。")
+                Text("图表仅影响大型面板；三种面板共用下方的玻璃参数。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+
+            controlSection("大型面板图表") {
+                AdaptivePicker("图表内容", id: "panel.chart.source", selection: chartSource, prefersSegments: false) {
+                    ForEach(PanelChartSource.allCases) { Text($0.title).tag($0) }
+                }
+                AdaptivePicker("图形样式", id: "panel.chart.style", selection: chartStyle) {
+                    ForEach(PanelChartStyle.allCases) { Text($0.title).tag($0) }
+                }
+                Text("12h / 24h 使用 Insights 的剩余百分比历史，不是 Token 消耗；无观测时保留空白。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             GlassOpticsPreview(settings: currentSettings, tone: tone.wrappedValue.color)
@@ -183,6 +197,7 @@ struct GlassSettingsView: View {
             Button("恢复默认值") { apply(.standard) }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
+                .help("仅恢复玻璃参数，图表内容和样式保持不变")
         }
         .controlLayoutContainer("glass.content.container")
         .onAppear { onSettingsChange(currentSettings) }
@@ -252,6 +267,16 @@ struct GlassSettingsView: View {
             get: { GlassAppearanceMode(rawValue: appearanceRaw) ?? .dark },
             set: { appearanceRaw = $0.rawValue }
         )
+    }
+
+    private var chartSource: Binding<PanelChartSource> {
+        Binding(get: { PanelChartSource(rawValue: chartSourceRaw) ?? .sevenDayTokens },
+                set: { chartSourceRaw = $0.rawValue })
+    }
+
+    private var chartStyle: Binding<PanelChartStyle> {
+        Binding(get: { PanelChartStyle(rawValue: chartStyleRaw) ?? .bars },
+                set: { chartStyleRaw = $0.rawValue })
     }
 
     private var tone: Binding<GlassTone> {

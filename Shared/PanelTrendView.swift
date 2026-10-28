@@ -23,7 +23,7 @@ struct PanelTrendView: View, Equatable {
                 Text("过去 \(presentation.source.hours ?? 24) 小时")
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 8)
-                Text("剩余额度 %").font(.caption2).foregroundStyle(secondaryText)
+                Text("剩余额度（%）").font(.caption2).foregroundStyle(secondaryText)
             }
             if presentation.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
@@ -38,7 +38,7 @@ struct PanelTrendView: View, Equatable {
                 ForEach(presentation.series) { series in
                     quotaPlot(series)
                 }
-                Text(presentation.style == .bars ? "每小时最后一次有效观测" : "按真实观测分段 · 缺口不连线")
+                Text(presentation.style == .bars ? "横轴：本地时间 · 每小时末次有效观测" : "横轴：本地时间 · 缺口不连线")
                     .font(.system(size: 9)).foregroundStyle(secondaryText)
                     .lineLimit(1)
             }
@@ -104,18 +104,19 @@ struct PanelTrendView: View, Equatable {
                 .chartXAxis {
                     AxisMarks(values: .stride(by: .hour, count: presentation.source.hours == 12 ? 3 : 6)) {
                         AxisGridLine().foregroundStyle(gridColor)
-                        AxisValueLabel(format: .dateTime.hour()).foregroundStyle(secondaryText)
+                        AxisValueLabel(format: UsageChartAxis.localTime).foregroundStyle(secondaryText)
                             .font(.system(size: 9))
                     }
                 }
                 .chartYAxis {
                     AxisMarks(position: .trailing, values: [0, 50, 100]) {
                         AxisGridLine().foregroundStyle(gridColor)
-                        AxisValueLabel().foregroundStyle(secondaryText).font(.system(size: 9))
+                        AxisValueLabel(format: UsageChartAxis.remainingPercent)
+                            .foregroundStyle(secondaryText).font(.system(size: 9))
                     }
                 }
                 .frame(height: 54)
-                .accessibilityLabel("\(provider.title) \(series.title) 剩余百分比历史，\(presentation.style.title)，重置和缺口处分段")
+                .accessibilityLabel("\(provider.title) \(series.title) 剩余百分比历史，\(presentation.style.title)，横轴为本地时间，纵轴为剩余额度百分比，重置和缺口处分段")
             }
         }
     }

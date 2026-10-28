@@ -1,5 +1,13 @@
 import Foundation
 
+/// Shared native axis formats; source quota values are already in the 0...100 range.
+enum UsageChartAxis {
+    static let remainingPercent = FloatingPointFormatStyle<Double>.Percent()
+        .scale(1).precision(.fractionLength(0))
+    static let localTime = Date.FormatStyle().hour().minute()
+    static let localDateTime = Date.FormatStyle().month(.twoDigits).day(.twoDigits).hour().minute()
+}
+
 public enum PanelChartSource: String, CaseIterable, Identifiable, Codable, Sendable {
     case sevenDayTokens, quota12Hours, quota24Hours
     public static let defaultsKey = "desktopPanelChartSource"

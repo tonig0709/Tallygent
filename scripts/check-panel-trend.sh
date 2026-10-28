@@ -10,3 +10,10 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     -framework Foundation -framework CryptoKit -framework Combine -framework UserNotifications -lsqlite3 \
     -o "$probe_dir/panel-trend-probe"
 "$probe_dir/panel-trend-probe" "$probe_dir"
+for source in Shared/PanelTrendView.swift App/InsightsView.swift; do
+    grep -Fq 'AxisValueLabel(format: UsageChartAxis.remainingPercent)' "$source" || {
+        echo "Quota chart lost its explicit percentage axis: $source" >&2; exit 1;
+    }
+done
+grep -Fq 'Text("Token（百万）")' Shared/QuotaWidgetView.swift
+grep -Fq 'Text("日期（月/日）")' Shared/QuotaWidgetView.swift

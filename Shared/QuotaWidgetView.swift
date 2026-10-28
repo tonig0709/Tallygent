@@ -195,7 +195,7 @@ public struct QuotaWidgetView: View {
                     HStack {
                         Text("近 7 天趋势").font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text("单位 M").font(.caption2).foregroundStyle(secondaryText)
+                        Text("Token（百万）").font(.caption2).foregroundStyle(secondaryText)
                     }
                     Chart(snapshot.dailyUsage) { point in
                         if trend?.style == .line {
@@ -222,13 +222,16 @@ public struct QuotaWidgetView: View {
                             AxisValueLabel().foregroundStyle(secondaryText)
                         }
                     }
+                    .chartXAxisLabel(position: .bottom, alignment: .trailing) {
+                        Text("日期（月/日）").font(.caption2).foregroundStyle(secondaryText)
+                    }
                     .chartYAxis {
                         AxisMarks(position: .leading) {
                             AxisGridLine().foregroundStyle(gridColor)
                             AxisValueLabel().foregroundStyle(secondaryText)
                         }
                     }
-                    .accessibilityLabel("近七天 Codex Token 用量")
+                    .accessibilityLabel("近七天 Codex Token 用量，横轴为日期（月/日），纵轴单位为百万 Token")
                     }
                 }
             }

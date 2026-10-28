@@ -138,15 +138,38 @@ struct InsightsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             if !value.history.isEmpty {
+                let showsDates = value.history.first.map { first in
+                    !Calendar.current.isDate(first.date, inSameDayAs: value.history.last?.date ?? first.date)
+                } ?? false
                 Chart(chartPoints(value.history)) { point in
                     LineMark(x: .value("收到时间", point.date), y: .value("剩余比例", point.remainingPercent),
                              series: .value("连续观测区段", point.segmentID))
                         .foregroundStyle(value.provider == .codex ? Color.blue : Color.orange)
                 }
                 .chartYScale(domain: 0...100)
-                .chartYAxis { AxisMarks(values: [0, 50, 100]) }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 3)) {
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: showsDates ? UsageChartAxis.localDateTime : UsageChartAxis.localTime)
+                    }
+                }
+                .chartXAxisLabel(position: .bottom, alignment: .trailing) {
+                    Text("观测时间（本地）")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .chartYAxis {
+                    AxisMarks(values: [0, 50, 100]) {
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: UsageChartAxis.remainingPercent)
+                    }
+                }
+                .chartYAxisLabel(position: .leading) {
+                    Text("剩余额度（%）").font(.caption2).foregroundStyle(.secondary)
+                }
                 .frame(height: 120)
-                .accessibilityLabel("\(value.provider.title) \(value.title) 剩余额度历史，重置和缺口处分段")
+                .accessibilityLabel("\(value.provider.title) \(value.title) 剩余额度历史，横轴为本地时间或日期，纵轴为剩余额度百分比，重置和缺口处分段")
                 if value.history.count > 720 {
                     Text("图形已抽样；速度分析仍使用全部已加载观测。")
                         .font(.caption).foregroundStyle(.secondary)

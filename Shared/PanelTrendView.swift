@@ -102,9 +102,12 @@ struct PanelTrendView: View, Equatable {
                 .chartYScale(domain: 0...100)
                 .chartLegend(.hidden)
                 .chartXAxis {
-                    AxisMarks(values: .stride(by: .hour, count: presentation.source.hours == 12 ? 3 : 6)) {
+                    AxisMarks(values: .stride(by: .hour, count: presentation.source.hours == 12 ? 3 : 6)) { value in
                         AxisGridLine().foregroundStyle(gridColor)
-                        AxisValueLabel(format: UsageChartAxis.localTime).foregroundStyle(secondaryText)
+                        AxisValueLabel(format: UsageChartAxis.localTime,
+                                       anchor: UnitPoint(x: CGFloat(UsageChartAxis.labelAnchorX(index: value.index, count: value.count)), y: 0),
+                                       collisionResolution: .greedy)
+                            .foregroundStyle(secondaryText)
                             .font(.system(size: 9))
                     }
                 }

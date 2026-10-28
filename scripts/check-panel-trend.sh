@@ -14,6 +14,8 @@ for source in Shared/PanelTrendView.swift App/InsightsView.swift; do
     grep -Fq 'AxisValueLabel(format: UsageChartAxis.remainingPercent)' "$source" || {
         echo "Quota chart lost its explicit percentage axis: $source" >&2; exit 1;
     }
+    grep -Fq 'UsageChartAxis.labelAnchorX(' "$source"
+    grep -Fq 'collisionResolution: .greedy' "$source"
 done
 grep -Fq 'Text("Token（百万）")' Shared/QuotaWidgetView.swift
 grep -Fq 'Text("日期（月/日）")' Shared/QuotaWidgetView.swift

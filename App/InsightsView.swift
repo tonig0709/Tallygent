@@ -148,10 +148,12 @@ struct InsightsView: View {
                 }
                 .chartYScale(domain: 0...100)
                 .chartXAxis {
-                    AxisMarks(values: .automatic(desiredCount: 3)) {
+                    AxisMarks(values: .automatic(desiredCount: 3)) { axis in
                         AxisGridLine()
                         AxisTick()
-                        AxisValueLabel(format: showsDates ? UsageChartAxis.localDateTime : UsageChartAxis.localTime)
+                        AxisValueLabel(format: showsDates ? UsageChartAxis.localDateTime : UsageChartAxis.localTime,
+                                       anchor: UnitPoint(x: CGFloat(UsageChartAxis.labelAnchorX(index: axis.index, count: axis.count)), y: 0),
+                                       collisionResolution: .greedy)
                     }
                 }
                 .chartXAxisLabel(position: .bottom, alignment: .trailing) {

@@ -6,6 +6,12 @@ enum UsageChartAxis {
         .scale(1).precision(.fractionLength(0))
     static let localTime = Date.FormatStyle().hour().minute()
     static let localDateTime = Date.FormatStyle().month(.twoDigits).day(.twoDigits).hour().minute()
+
+    // Native tick labels at the two edges must extend inward, not outside the plot.
+    static func labelAnchorX(index: Int, count: Int) -> Double {
+        guard count > 1 else { return 0.5 }
+        return index == 0 ? 0 : (index == count - 1 ? 1 : 0.5)
+    }
 }
 
 public enum PanelChartSource: String, CaseIterable, Identifiable, Codable, Sendable {

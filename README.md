@@ -1,128 +1,142 @@
-# Tallygent for macOS
+<p align="center">
+  <img src="Resources/Assets.xcassets/AppIcon.appiconset/icon-128.png" alt="Tallygent app icon" width="88" height="88">
+</p>
 
-把 Agent 的额度变化放到桌面。Tallygent 是本地优先的 macOS 菜单栏应用，以 **12／24 小时逐时额度追踪**、可移动的 Liquid Glass 面板和可解释的安排建议，帮助你看清 Codex 与 Claude Code 的可用额度。
+<h1 align="center">Tallygent</h1>
 
-Track agent quota hour by hour. 12/24-hour history, bar/line charts, and movable Liquid Glass panels for macOS.
+<p align="center">Your agent quota, in view. Your next move, explained.</p>
 
-> **当前公开稳定版：v0.7.1（build 52），macOS 14+。**
-> [下载 macOS 安装包](https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-macOS.dmg) · [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1) · [SHA-256 校验值](https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-checksums.txt)
-> 三种可移动桌面面板，支持逐时额度历史、Monitor/Insights 与 Planner；不是系统 WidgetKit 小组件，也不包含粒子实验。
+<p align="center">
+  <a href="https://github.com/tonig0709/Tallygent/releases/latest"><img src="https://img.shields.io/github/v/release/tonig0709/Tallygent" alt="Latest stable release"></a>
+  <a href="https://github.com/tonig0709/Tallygent/actions/workflows/test.yml?query=branch%3Amain"><img src="https://github.com/tonig0709/Tallygent/actions/workflows/test.yml/badge.svg?branch=main" alt="Main branch checks"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-black" alt="Requires macOS 14 or later">
+  <img src="https://img.shields.io/badge/Apple_Silicon_%2B_Intel-Universal-blue" alt="Universal app for Apple Silicon and Intel">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT source license"></a>
+</p>
 
-## 逐时额度追踪：看清过去 12／24 小时的变化
+<p align="center">
+  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-macOS.dmg"><strong>Download for macOS</strong></a> ·
+  <a href="https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1">Release notes</a> ·
+  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-checksums.txt">SHA-256 checksums</a>
+</p>
 
-不只看“还剩多少”，也看额度是怎样变化的。大型桌面面板把 Insights 的历史直接放到桌面：
+Tallygent is a local-first macOS app for monitoring **Codex** and, experimentally, **Claude Code**. Follow your **12/24-hour quota history**, keep a movable Liquid Glass panel on your desktop, and get explainable model-and-effort suggestions without granting permission to run tasks.
 
-- **12h / 24h 两种视野**：5h 与周额度分别呈现，随同一份本地历史更新。
-- **柱状图或折线图**：小时柱显示该小时最后一次有效观测；折线保留真实连续区段，不跨重置或长时间缺口连线。
-- **一处设置，即时同步**：在「玻璃设置 → 大型面板图表」或面板边缘设置中选择，App 预览与同一个桌面面板同步，重启后保留。
-- **保留七日 Token 图**：仍可随时切回原有七日趋势，默认仍是七日 Token 柱状图。
+<p align="center">
+  <img src="docs/screenshots/panel-12h-dark.png" alt="Dark large Tallygent panel showing 5-hour and weekly remaining quota, with separate 12-hour line charts" width="850">
+</p>
 
-**12h / 24h 显示的是剩余额度百分比，不是每小时 Token 消耗。** 没有观测的时段留空，不补零、不推算，也不补造启用采集之前的历史。完整含义见 [逐时额度追踪说明](docs/PANEL_TRENDS.md)。
+Native UI snapshots below use demo data from **v0.7.1 / build 52**, not a personal account. The capture uses Chinese UI labels. [Capture details and limitations](docs/SCREENSHOTS.md).
 
-稳定版与粒子实验分开维护：build 49 已作为新粒子分支的共同基线保留；旧粒子分支不被覆盖，详见 [粒子开发与合并约定](docs/PARTICLE_DEVELOPMENT.md)。
+## Why Tallygent?
 
-## 三种尺寸，一个桌面面板
+- **See how your quota changes.** Switch the large panel between 12-hour or 24-hour history, with bars or lines. Keep the original seven-day Token chart when you want daily totals instead.
+- **Keep just enough on your desktop.** Choose small dual rings, medium quota bars, or a large quota-and-history panel. Swipe between sizes in the app; only one desktop panel is open at a time.
+- **Make the glass yours.** Light, dark, or automatic appearance; live opacity, corner, frost, edge, and highlight controls. Drag from the panel body. Edge controls appear on hover and disappear when you move away.
+- **Go from monitoring to planning.** Insights explains observed usage pace. Planner combines your task, available local models, quota windows, and reserve preference to suggest a Model + Effort configuration, with reasons and explicit uncertainty.
+- **Stay in control.** History stays local. Tallygent does not start agents, execute code, or move tasks between providers automatically.
 
-[Planner](docs/PLANNER.md) 读取本机模型目录，结合任务特征、5h/周额度和保留量给出 Model + Effort 建议，可复制配置并记录结果。不自动执行任务，不用额度百分比推算 Token；没有可靠历史时明确显示信息不足。
+**Hourly history means remaining-quota percentages, not hourly Token consumption.** Missing observations stay empty; resets and long gaps are not joined into a misleading line. See [chart semantics](docs/PANEL_TRENDS.md).
 
-[Monitor 与 Insights](docs/MONITOR_INSIGHTS.md) 在本机保留最近 30 天的新观测，系统时钟和反复读缓存不伪装成新数据。窗口分别分析，历史不足或陈旧时不预测；Claude 仍为实验性被动接入，不合计多服务额度，也不自动执行任务。
+## Screenshots
 
-[布局约束与回归](docs/LAYOUT_INVARIANTS.md) 记录原生标签挤压的根因及自动检查，不通过删除用户设置或单纯放大默认窗口来掩盖问题。
+### A lighter view, with 24-hour bars
 
-| 模式 | 尺寸（pt） | 内容 |
+<img src="docs/screenshots/panel-24h-light.png" alt="Light Tallygent panel with separate hourly bars for 5-hour and weekly remaining quota over the past 24 hours" width="850">
+
+Each bar is the last valid quota observation in that hour. The 5-hour and weekly limits remain separate constraints, not a combined balance.
+
+### Insights: history with context
+
+<img src="docs/screenshots/insights.png" alt="Tallygent Insights showing separate Codex quota histories, observation freshness, consumption pace and a conditional depletion estimate" width="1024">
+
+Inspect observation freshness, history, and recent pace. Estimates are withheld when history is insufficient or stale; they are not promises that a task will fit.
+
+### Live glass and chart controls
+
+<img src="docs/screenshots/glass-settings.png" alt="Tallygent settings with chart range and bar-or-line selection, glass presets, appearance, opacity, edge intensity and elastic highlight sliders" width="360">
+
+The app preview and the single desktop panel share settings. These are native rendered views, not AI-generated mockups; actual wallpaper blending and pointer effects require the installed app on a real desktop.
+
+## Download and get started
+
+**Current stable release: [v0.7.1 (build 52)](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1).** Requires **macOS 14+**; one universal app supports **Apple Silicon and Intel**. There is no Windows or iOS build.
+
+1. [Download the DMG](https://github.com/tonig0709/Tallygent/releases/download/v0.7.1/Tallygent-v0.7.1-macOS.dmg). Choose the `.dmg` asset, not GitHub's **Source code** archive.
+2. Drag **Tallygent.app** into **Applications**, eject the disk image, then launch the installed app.
+3. For Codex, install and sign in to Codex CLI or a supported Codex/ChatGPT Mac app that includes Codex. Select **Codex** in Tallygent.
+4. Choose a panel size and click **Desktop Glass Panel** (`桌面玻璃面板`). Use **Glass Settings** (`玻璃设置`) to adjust its appearance and chart.
+5. Keep Tallygent running to collect new observations. Closing the panel does not quit the app; reopen it from the app or menu bar.
+
+> **Signing notice:** the current DMG is **ad-hoc signed, not Apple-notarized**. macOS may require an additional first-open approval. Verify the published checksum and source before opening; do not disable Gatekeeper. A checksum verifies file integrity, not Apple's approval. See [Security](SECURITY.md).
+
+**Upgrading from Codex Quota?** Tallygent is the renamed app. Quit the old copy and keep only one active installation. Preferences, panel ownership, and data identities are preserved; do not delete local data to upgrade. Remove any old desktop WidgetKit widgets manually: the current product uses independent movable panels, **not the system widget gallery**. Stable Liquid Glass and the [particle experiment](docs/PARTICLE_DEVELOPMENT.md) remain separate.
+
+## Choose your panel
+
+| Size | Dimensions | What you see |
 | --- | --- | --- |
-| 小型 | 164 × 164 | 原有双圆环：5h 与周额度，环中保留 Codex 图标 |
-| 中型 | 344 × 164 | Codex 标识、5h 与周额度两条进度条，不显示趋势图 |
-| 大型 | 680 × 300 | 额度、重置时间、同步状态；可选七日 Token 或 12h／24h 额度历史，柱状／折线可切换 |
+| Small | 164 × 164 pt | Dual rings for 5-hour and weekly quota |
+| Medium | 344 × 164 pt | Provider identity and two quota bars, without a chart |
+| Large | 680 × 300 pt | Quota, reset times, status, and seven-day Token or 12/24-hour quota charts |
 
-小、中面板沿用项目原生 macOS 组件的网格尺寸；pt 是逻辑点，Retina 显示不改变布局比例。
-遵循 [Apple 的组件布局原则](https://developer.apple.com/design/human-interface-guidelines/widgets)，根据尺寸减少信息，不拉伸整张大面板来凑小尺寸。
+Swipe left or right in the preview, or use its arrows and size buttons. Switching size updates the same panel and preserves its top-left position. Glass parameters are shared across sizes. Remaining quota is **green at ≥60%, orange at 30–<60%, and red below 30%**.
 
-- **像翻照片一样选择**：在 App 预览区用触控板左右滑动，也可点击左右箭头或模式名称。
-- **始终只有一个**：已打开的桌面面板直接切换内容与尺寸，不会创建第二个窗口；保留面板左上角位置。
-- **自由移动**：在面板正文任意位置按住拖动。鼠标靠近边缘时显示关闭与设置入口，移开自动隐藏。
-- **保留全部玻璃参数**：自动/深/浅外观、不透明度（35–100%）、边缘强度、弹性高光、圆角、折射模式、位移、磨砂、色彩增益、色散与色调。
-- **参数即时共用**：三种模式沿用相同参数与现有底层玻璃渲染，切换不重置；也可直接在面板设置弹窗调整。
-- **额度颜色不变**：剩余 ≥60% 为绿色，30–59% 为橙色，<30% 为红色。
+## Providers and refresh behavior
 
-当前源码已移除 WidgetKit 扩展、组件库入口与登记修复逻辑，全部改用动态桌面面板。
-这不是系统“编辑小组件”中的组件；不需要搜索组件库，也不会改变其他图标的透明度。
-粒子实验不包含在本次稳定玻璃面板实现中。
+### Codex
 
-## 多服务与玻璃面板
+The main app owns the Codex app-server connection. It polls every **15 seconds** and responds to quota-change notifications; the desktop panel observes the same state directly, without WidgetKit refresh budgets. Valid observations feed the local history and charts automatically. If Token history times out, new quota can still appear while the last valid Token chart is retained.
 
-在 App 中选择 **Codex** 或 **Claude Code（实验性）**，已打开的同一个面板随服务切换；三种尺寸、位置与玻璃参数保持共用。
-中型面板保留协调的留白，**边缘色散** 只作用于边缘；**磨砂深度** 控制雾化层，系统背景模糊仍由 macOS 决定。
+Actual freshness depends on the provider, network, and available account data. The large panel's **second-by-second Mac clock is not a quota refresh indicator**; hover over the status to inspect the actual data-update time.
 
-Claude Code 使用官方 [statusLine 数据](https://code.claude.com/docs/en/statusline)，需要在 App 中主动点击启用接入，再运行能够提供额度字段的 Claude Code 会话。
+### Claude Code · experimental
 
-- 读取 `five_hour`、`seven_day` 的额度与重置时间；没有订阅或未提供这些字段时显示暂无数据，不显示虚假的 0%。
-- 第一次有效数据绑定一个会话；多个会话不会自动合并，切换前使用 **重新绑定会话**。
-- 已有第三方 `statusLine` 时拒绝覆盖。启用前保存原配置；移除接入只恢复本应用管理的状态栏项，保留其他设置及最后额度记录。
-- App 每 2 秒查看本地记录。接收时间表示 Claude Code 最近写入记录的时间，点击刷新不会向 Claude 服务器重新查询；会话退出后只能显示最后记录。
-- 已过重置时间的 Claude 窗口显示“—／待更新”，不会把旧百分比当成新周期余额；较旧记录有独立提示。
-- 暂不提供 Claude 七日 Token 趋势，不会把额度百分比换算成 Token。
-- 不访问私人 OAuth 接口、浏览器 Cookie 或登录凭据，不使用 API 推理请求猜测订阅额度。
+Opt in to the local [statusLine bridge](https://code.claude.com/docs/en/statusline), then run a Claude Code session that supplies `five_hour` and `seven_day` subscription-limit fields.
 
-当前 Claude 接入通过模拟数据与隔离门禁验证；真实订阅额度、实际刷新节奏和多版本 Claude Code 兼容性仍待真实账户验收，功能保持实验性。
+- This is **passive session input**, not background polling of Claude's subscription server. The app checks the local cache every two seconds; Refresh cannot force new upstream data.
+- No subscription or missing fields means **unavailable**, never a fabricated 0%. Expired reset windows show pending data rather than carrying an old balance into a new cycle.
+- One session is bound at a time. Rebind explicitly to switch; multiple sessions are not silently merged.
+- An existing third-party `statusLine` is not overwritten. Setup backs up the local settings, and removal restores only Tallygent-managed configuration.
+- Real subscription behavior and compatibility across Claude Code versions still need real-account validation. No Claude seven-day Token chart is claimed.
 
-## 下载与安装
+## Local data, clear limits
 
-请在 [最新正式版页面](https://github.com/tonig0709/Tallygent/releases/latest) 下载 **Tallygent-v0.7.1-macOS.dmg**，不要下载 Source code。
+- Codex manages its own login and credential refresh. Tallygent's Codex integration does not read or store its OAuth tokens.
+- Normalized observations are retained locally for up to **30 days**. History begins when collection is enabled; it cannot reconstruct earlier quota usage. Insights provides export and clear-history controls.
+- Quota percentages are not converted into Token counts or money, and balances from different providers are not added together.
+- The Claude bridge stores normalized quota, receipt time, and a session hash, not raw prompts or project paths. Its `settings.json` backup may contain secrets already present in your configuration; it remains local with `0600` permissions.
+- A compatibility diagnostic endpoint remains at `127.0.0.1:48193/snapshot`, with email and plan removed. Desktop panels do not depend on this endpoint.
+- Planner reads the local model catalog and explains suggestions. It can record outcomes, but does not execute tasks or invent calibrated cost predictions from insufficient feedback.
 
-- Apple Silicon 与 Intel 通用构建，要求 macOS 14 或更新系统；随附 `Tallygent-v0.7.1-checksums.txt`。
-- 开发者可从当前源码构建；不要将 GitHub 的 Source code 压缩包当作可运行 App。
-- 打开 DMG，将 **Tallygent.app** 拖到 **应用程序**，弹出 DMG，再从“应用程序”打开。
-- 本次正式包为 **ad-hoc 签名、未经过 Apple 公证**，可能仍需系统首次打开确认。仅当版本明确标注 **Developer ID signed and Apple-notarized** 时，才可将其描述为 Apple 签名并公证；不要关闭 Gatekeeper。
+For the threat model and disclosure guidance, see [SECURITY.md](SECURITY.md).
 
-面板版使用方式：
+## Build and contribute
 
-1. 保持 Tallygent 运行，在 App 中选择小、中或大模式。
-2. 点击 **桌面玻璃面板**；在 App 中换页，已放置面板随之切换。
-3. 用 App 的 **玻璃设置** 或面板边缘的设置按钮调整参数。
-4. 在 **大型面板图表** 中选择七日／12h／24h 和柱状／折线；仅大型面板显示图表。
-5. 关闭面板不退出主程序；可从 App 或菜单栏重新打开。
+Requires **full Xcode 16+**, not just Command Line Tools. Open `CodexQuotaWidget.xcodeproj`, choose the `CodexQuota` scheme, and configure your development team. These historical internal names are retained for compatibility; the product is Tallygent and the project builds an app-only target.
 
-升级旧小组件版时，请先退出旧 App 并替换整个应用包。已放在桌面的旧 WidgetKit 组件需要手动移除；
-新版不会清空系统组件数据库，也不会删除账户数据来“修复”显示。
-由旧名称 Codex Quota 升级时，退出并移走旧名称的应用包，只保留一个活跃安装，不要删除本地数据目录。
-
-## 数据同步
-
-主 App 是唯一的 Codex 连接所有者。面板直接观察同一份账户快照，不经过 WidgetKit 时间线或系统刷新预算。
-App 每 15 秒轮询，并响应额度变化通知；额度和趋势尽量作为同一快照提交。
-若趋势响应超时，新的额度仍会更新，并保留最后有效趋势。实际新鲜度仍受 Codex 服务、网络和账户数据可用性影响，不承诺逐秒刷新。
-
-大型面板右上角单独显示 Mac 系统时钟，每秒更新并显示秒数；它不是额度刷新频率。
-悬停可查看额度数据的实际更新时间，时钟走动不代表账户数据已经重新获取。
-
-## 隐私与安全
-
-- Codex 登录和凭据刷新仍由本机 Codex 处理；Codex 接入不读取或保存其 OAuth token。
-- App 与面板在同一进程内共享数据，不向第三方服务发送账户数据。
-- Claude 候选接入只缓存规范化额度、接收时间和会话哈希，不保存原始状态栏输入、提示词或项目路径。启用时会读取并备份完整 `~/.claude/settings.json`；其中可能包含你原有的环境变量或密钥，备份仅保存在本机，权限为 `0600`。
-- 现有只读兼容/诊断接口保留在 `127.0.0.1:48193/snapshot`，仅输出去除邮箱和套餐的快照；面板不依赖该接口刷新。
-- 完整威胁模型、签名与公证说明见 [SECURITY.md](SECURITY.md)。
-
-## 从源码构建
-
-要求 macOS 14+、完整 Xcode 16+。使用 Codex 时需已安装 Codex CLI 或附带 Codex 的 ChatGPT/Codex Mac App；Claude 实验接入另需能提供订阅额度字段的 Claude Code 会话。
-
-1. 用 Xcode 打开 `CodexQuotaWidget.xcodeproj`（保留历史工程名，现已只有 App target）。
-2. 选择 `CodexQuota` scheme，配置自己的开发团队后构建运行。
-3. 安装到“应用程序”再启动；不要从临时 DMG 副本运行账户连接。
+For the non-desktop regression checks:
 
 ```sh
 swift run quota-self-check
 sh scripts/check-panel-trend.sh
 ```
 
-完整发布门禁只能在隔离 CI 用户运行，详见 [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md)。
-它检查三种布局的非黑屏、单面板、尺寸、关闭重开、滑动选择、实时数据链路、签名、双架构和 DMG 精确载荷。
-最终鼠标悬停、原生拖动、透光与连续滑杆效果仍必须在真实桌面人工验收；自动检查不冒充系统桌面实测。
-v0.7.1 与本地 build 51 使用相同功能源码，本次未追加 build 52 人工交互验收；具体自动检查与验证边界见 [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.7.1)。
+CI builds universal apps and runs the full release gate on **macOS 14, 15, and 26**. Native runtime probes must run in an **isolated CI user**, not a personal account: they launch a fake account server, use port 48193, and create a temporary installation. See the [release checklist](RELEASE_CHECKLIST.md) before packaging or tagging. Real-desktop dragging, hover controls, wallpaper blending, and continuous sliders still need human acceptance; headless checks do not replace it.
 
-## 独立性与许可
+Found a bug? [Open an issue](https://github.com/tonig0709/Tallygent/issues) with the app version/build, macOS version, and reproduction steps. Redact account details and credentials. Report security issues through the guidance in [SECURITY.md](SECURITY.md), not a public log dump.
 
-本项目是独立开源项目，不隶属于 OpenAI，也未获 OpenAI 背书。源码采用 MIT 许可；
-Claude Code 实验性接入也不代表 Anthropic 背书。Codex 图标属于 OpenAI 商标资产，不包含在 MIT 授权中，见 [TRADEMARKS.md](TRADEMARKS.md)。
+## Documentation
+
+Detailed implementation notes are currently primarily in Chinese.
+
+- [Hourly charts and data semantics](docs/PANEL_TRENDS.md)
+- [Monitor and Insights](docs/MONITOR_INSIGHTS.md)
+- [Planner](docs/PLANNER.md)
+- [Product roadmap](docs/TALLYGENT_ROADMAP.md)
+- [Native layout invariants](docs/LAYOUT_INVARIANTS.md)
+- [Screenshot provenance](docs/SCREENSHOTS.md)
+
+## License and independence
+
+Tallygent's source is [MIT-licensed](LICENSE). It is an independent project, not affiliated with or endorsed by OpenAI or Anthropic. Provider names and icons belong to their respective owners; the Codex trademark assets are **not** included in the MIT grant. See [TRADEMARKS.md](TRADEMARKS.md).

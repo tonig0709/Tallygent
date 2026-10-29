@@ -1,13 +1,13 @@
 # README screenshot provenance
 
-The README shows native UI snapshots of **Tallygent v0.7.1 / build 52**, using deterministic demo data rather than a personal account.
+The README gallery retains native UI snapshots of **Tallygent v0.7.1 / build 52**, using deterministic demo data rather than a personal account. They predate v0.8.0 localization and are visual references, not demonstrations of every current translated label.
 
 - Source: [`142091a94d8ab41893d5bc754d1b9bea2507095f`](https://github.com/tonig0709/Tallygent/commit/142091a94d8ab41893d5bc754d1b9bea2507095f), also tagged `v0.7.1`.
 - Capture run: [isolated macOS CI 40524844261](https://github.com/tonig0709/Tallygent/actions/runs/40524844261), `Tallygent-ui-checks` artifact on macOS 26.
 - The existing native regression probes render the product's SwiftUI views. These are not AI-generated designs or recreated HTML mockups. They are **not screenshots of a user's installed desktop**.
 - UI labels follow the capture environment and are primarily Chinese; this does not imply that every application label is localized into English.
 - Actual wallpaper sampling, application-bundle service icons, dragging, and pointer highlights can differ from standalone native rendering. These images do not substitute for the real-desktop acceptance checklist.
-- The screenshots deliberately use the public stable version, not the unpublished build 53 axis-label refinement or the particle experiment.
+- The screenshots use a known published version, not the particle experiment. Later releases can refine axis labels or translate copy without changing this gallery's recorded provenance.
 - Files are copied unchanged from the capture artifact. No account email, credentials, private project names, or user wallpaper are included.
 
 | Repository image | Original artifact filename | Dimensions |

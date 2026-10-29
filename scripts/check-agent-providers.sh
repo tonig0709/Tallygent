@@ -5,7 +5,7 @@ probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/codex-quota-providers.XXXXXX")
 trap 'rm -rf "$probe_dir"' EXIT
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     -module-cache-path "$probe_dir/module-cache" \
-    Gate/MultiProviderProbe.swift Shared/UsageSnapshot.swift Shared/ClaudeStatusline.swift Shared/Planner.swift \
+    Gate/MultiProviderProbe.swift Shared/Localization.swift Shared/UsageSnapshot.swift Shared/ClaudeStatusline.swift Shared/Planner.swift \
     Shared/ObservationHistory.swift Shared/UsageInsights.swift Shared/PanelTrend.swift App/InsightsStore.swift \
     App/ClaudeBridgeSetup.swift App/QuotaMonitor.swift \
     -lsqlite3 -framework UserNotifications -framework Foundation -framework Combine -framework CryptoKit \

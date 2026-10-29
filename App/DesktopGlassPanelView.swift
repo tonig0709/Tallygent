@@ -499,7 +499,7 @@ final class DesktopPanelController {
                 contentRect: NSRect(origin: .zero, size: size),
                 styleMask: [.borderless], backing: .buffered, defer: false
             )
-            window.title = "Tallygent 桌面玻璃面板"
+            window.title = L("Tallygent 桌面玻璃面板")
             window.identifier = NSUserInterfaceItemIdentifier(DesktopGlassPanelView.windowID)
             window.isReleasedWhenClosed = false
             window.hidesOnDeactivate = false

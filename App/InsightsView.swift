@@ -100,17 +100,17 @@ struct InsightsView: View {
     private func providerSection(_ provider: AgentService, wide: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(provider == .claude ? "Claude Code · 实验性" : provider.title).font(.headline)
+                Text(provider == .claude ? L("Claude Code · 实验性") : provider.title).font(.headline)
                 Spacer()
-                Toggle(provider == .codex ? "连续记录" : "记录接入事件", isOn: Binding(
+                Toggle(provider == .codex ? L("连续记录") : L("记录接入事件"), isOn: Binding(
                     get: { provider == .codex ? server.codexCollectionEnabled : server.claudeCollectionEnabled },
                     set: { enabled in Task { await server.setCollection(provider, enabled: enabled) } }
                 )).toggleStyle(.switch).controlSize(.small)
                     .disabled(server.isConfiguringCollection)
             }
-            Text(provider == .codex
+            Text(L(provider == .codex
                  ? "记录开启后，切换到其他服务仍继续采集。暂停记录不妨碍手动查看当前 Codex 额度。"
-                 : "只记录已启用桥接收到的会话事件；未运行 Claude Code 时不会主动查询订阅服务器。")
+                 : "只记录已启用桥接收到的会话事件；未运行 Claude Code 时不会主动查询订阅服务器。"))
                 .font(.caption).foregroundStyle(.secondary)
             let windows = store.report.windows.filter { $0.provider == provider }
             if wide {
@@ -126,27 +126,52 @@ struct InsightsView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text(value.title).font(.headline)
                 Spacer()
-                Text(value.currentRemainingPercent.map { value.isFresh ? "\($0)% 剩余" : "上次 \($0)%" } ?? "当前未知")
+                Text(value.currentRemainingPercent.map { value.isFresh ? LF("%lld%% 剩余", Int64($0)) : LF("上次 %lld%%", Int64($0)) } ?? L("当前未知"))
                     .font(.headline.monospacedDigit())
                     .foregroundStyle(quotaColor(value.isFresh ? value.currentRemainingPercent : nil))
             }
             if let latest = value.latest {
-                Text("最近收到 \(latest.receivedAt.formatted(date: .abbreviated, time: .standard)) · \(value.isFresh ? "新鲜" : "较旧或不可用")")
+                Text(LF("最近收到 %@ · %@", latest.receivedAt.formatted(date: .abbreviated, time: .standard), L(value.isFresh ? "新鲜" : "较旧或不可用")))
                     .font(.caption).foregroundStyle(.secondary)
                 Text(value.scopeLabel).font(.caption).foregroundStyle(.secondary)
-                Text(latest.source == .codexRateLimits ? "来源：Codex 额度响应" : "来源：Claude Code statusLine 被动事件")
+                Text(L(latest.source == .codexRateLimits ? "来源：Codex 额度响应" : "来源：Claude Code statusLine 被动事件"))
                     .font(.caption).foregroundStyle(.secondary)
             }
             if !value.history.isEmpty {
+                let showsDates = value.history.first.map { first in
+                    !Calendar.current.isDate(first.date, inSameDayAs: value.history.last?.date ?? first.date)
+                } ?? false
                 Chart(chartPoints(value.history)) { point in
-                    LineMark(x: .value("收到时间", point.date), y: .value("剩余比例", point.remainingPercent),
-                             series: .value("连续观测区段", point.segmentID))
+                    LineMark(x: .value(L("收到时间"), point.date), y: .value(L("剩余比例"), point.remainingPercent),
+                             series: .value(L("连续观测区段"), point.segmentID))
                         .foregroundStyle(value.provider == .codex ? Color.blue : Color.orange)
                 }
                 .chartYScale(domain: 0...100)
-                .chartYAxis { AxisMarks(values: [0, 50, 100]) }
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 3)) { axis in
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: showsDates ? UsageChartAxis.localDateTime : UsageChartAxis.localTime,
+                                       anchor: UnitPoint(x: CGFloat(UsageChartAxis.labelAnchorX(index: axis.index, count: axis.count)), y: 0),
+                                       collisionResolution: .greedy)
+                    }
+                }
+                .chartXAxisLabel(position: .bottom, alignment: .trailing) {
+                    Text("观测时间（本地）")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .chartYAxis {
+                    AxisMarks(values: [0, 50, 100]) {
+                        AxisGridLine()
+                        AxisTick()
+                        AxisValueLabel(format: UsageChartAxis.remainingPercent)
+                    }
+                }
+                .chartYAxisLabel(position: .leading) {
+                    Text("剩余额度（%）").font(.caption2).foregroundStyle(.secondary)
+                }
                 .frame(height: 120)
-                .accessibilityLabel("\(value.provider.title) \(value.title) 剩余额度历史，重置和缺口处分段")
+                .accessibilityLabel(LF("%@ %@ 剩余额度历史，横轴为本地时间或日期，纵轴为剩余额度百分比，重置和缺口处分段", value.provider.title, value.title))
                 if value.history.count > 720 {
                     Text("图形已抽样；速度分析仍使用全部已加载观测。")
                         .font(.caption).foregroundStyle(.secondary)
@@ -155,18 +180,18 @@ struct InsightsView: View {
                 Text("尚无连续观测。开启记录并使用对应服务后，这里会逐步形成历史。")
                     .font(.callout).foregroundStyle(.secondary).padding(.vertical, 10)
             }
-            Text("\(value.sampleCount) 次观测 · 当前连续区段 \(value.segmentSamples) 次")
+            Text(LF("%lld 次观测 · 当前连续区段 %lld 次", Int64(value.sampleCount), Int64(value.segmentSamples)))
                 .font(.caption).foregroundStyle(.secondary)
             if let rate = value.ratePerHour {
-                Text("近期消耗 \(rate.formatted(.number.precision(.fractionLength(1)))) 个百分点 / 小时")
+                Text(LF("近期消耗 %@ 个百分点 / 小时", rate.formatted(.number.precision(.fractionLength(1)))))
                     .font(.callout)
             }
             if let estimate = value.forecast {
-                Text("按近期节奏，预计 \(estimate.earliest.formatted(date: .abbreviated, time: .shortened))–\(estimate.latest.formatted(date: .abbreviated, time: .shortened)) 耗尽")
+                Text(LF("按近期节奏，预计 %@–%@ 耗尽", estimate.earliest.formatted(date: .abbreviated, time: .shortened), estimate.latest.formatted(date: .abbreviated, time: .shortened)))
                     .font(.callout.weight(.medium))
                 ForEach(estimate.assumptions, id: \.self) { Text($0).font(.caption).foregroundStyle(.secondary) }
             } else {
-                Text(value.unavailableReason ?? "暂无法估计耗尽时间")
+                Text(value.unavailableReason ?? L("暂无法估计耗尽时间"))
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
@@ -186,7 +211,7 @@ struct InsightsView: View {
                     Spacer()
                     Text(event.resetsAt, format: .dateTime.month().day().hour().minute())
                         .monospacedDigit()
-                    Text(event.isFresh ? "预计" : "旧记录 · 待确认").foregroundStyle(.secondary)
+                    Text(L(event.isFresh ? "预计" : "旧记录 · 待确认")).foregroundStyle(.secondary)
                 }.font(.callout)
             }
             Text(store.report.pacingExplanation).font(.caption).foregroundStyle(.secondary)
@@ -197,11 +222,11 @@ struct InsightsView: View {
         let value = store.report.backtest
         return VStack(alignment: .leading, spacing: 8) {
             Text("规则回放").font(.headline)
-            Text("\(value.horizonMinutes) 分钟后比例回放：\(value.evaluatedCount) / \(value.attemptedCount) 个可比较点；其余暂不可估计。")
+            Text(LF("%lld 分钟后比例回放：%lld / %lld 个可比较点；其余暂不可估计。", Int64(value.horizonMinutes), Int64(value.evaluatedCount), Int64(value.attemptedCount)))
                 .font(.callout)
             if let error = value.meanAbsoluteErrorPercentagePoints,
                let baseline = value.baselineMeanAbsoluteErrorPercentagePoints {
-                Text("平均绝对误差 \(error.formatted(.number.precision(.fractionLength(1)))) 个百分点；保持上次值基线 \(baseline.formatted(.number.precision(.fractionLength(1)))) 个百分点。")
+                Text(LF("平均绝对误差 %@ 个百分点；保持上次值基线 %@ 个百分点。", error.formatted(.number.precision(.fractionLength(1))), baseline.formatted(.number.precision(.fractionLength(1)))))
                     .font(.callout)
             }
             Text(value.explanation).font(.caption).foregroundStyle(.secondary)

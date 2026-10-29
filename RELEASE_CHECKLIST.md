@@ -19,6 +19,8 @@ its runtime requires an isolated CI user, not a personal desktop session.
 
 ## Automated gate
 
+- **Native languages:** English, Simplified Chinese and Traditional Chinese tables have identical key coverage and type-compatible placeholders. Packaged tables match source. Isolated native bundles select each language through AppleLanguages; layout checks use real translations, not only a changed Locale environment.
+
 - **Three layouts:** small 164×164, medium 344×164 and existing large 680×300 logical points.
   Small reuses both quota rings, medium omits the trend, large retains it.
 - **One panel:** repeated show calls do not create a second window; close/reopen works.
@@ -58,6 +60,8 @@ its runtime requires an isolated CI user, not a personal desktop session.
 CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
 
 ## Required real-desktop smoke test before publishing
+
+- [ ] Launch the candidate in English, Simplified Chinese and Traditional Chinese without changing global system preferences. Verify navigation, menu bar, all panel sizes, glass settings, Insights, Planner, errors and chart units; dates/numbers follow region settings. Check long English labels and Traditional Chinese at narrow widths. Switching language must preserve data, panel position and settings.
 
 - [ ] Install only the checked candidate in Applications; eject its DMG.
 - [ ] In the App, swipe left/right through all three modes, including a fast reversal.

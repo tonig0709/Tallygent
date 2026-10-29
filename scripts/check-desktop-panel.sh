@@ -5,8 +5,22 @@ if [ "${CODEX_QUOTA_ISOLATED_REGISTRY:-}" != 1 ]; then
     echo 'Desktop runtime probes require an isolated CI user; do not run against personal app settings.' >&2
     exit 1
 fi
-probe_dir=$(mktemp -d)
-trap 'rm -f "$probe_dir/panel-probe" "$probe_dir/history.sqlite" "$probe_dir/history.sqlite-journal"; rmdir "$probe_dir"' EXIT
+probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/tallygent-desktop.XXXXXX")
+trap 'rm -rf "$probe_dir"' EXIT
+probe_app="$probe_dir/Tallygent Localization Gate.app"
+probe_executable="$probe_app/Contents/MacOS/panel-probe"
+mkdir -p "$probe_app/Contents/MacOS" "$probe_app/Contents/Resources"
+# Use a genuine native bundle so SwiftUI and Foundation both resolve AppleLanguages.
+# Merely changing SwiftUI's locale environment does not localize dynamic String values.
+/usr/bin/plutil -create xml1 "$probe_app/Contents/Info.plist"
+/usr/bin/plutil -insert CFBundleIdentifier -string "dev.tallygent.localization-gate.$$" "$probe_app/Contents/Info.plist"
+/usr/bin/plutil -insert CFBundleExecutable -string panel-probe "$probe_app/Contents/Info.plist"
+/usr/bin/plutil -insert CFBundlePackageType -string APPL "$probe_app/Contents/Info.plist"
+/usr/bin/plutil -insert CFBundleDevelopmentRegion -string en "$probe_app/Contents/Info.plist"
+/usr/bin/plutil -insert CFBundleLocalizations -json '["en","zh-Hans","zh-Hant"]' "$probe_app/Contents/Info.plist"
+for language in en zh-Hans zh-Hant; do
+    /usr/bin/ditto "Resources/$language.lproj" "$probe_app/Contents/Resources/$language.lproj"
+done
 set --
 if [ -f App/GlassSettingsView.swift ]; then
     set -- -D CODEX_QUOTA_ADVANCED_GLASS App/GlassSettingsView.swift
@@ -15,14 +29,25 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     "$@" Gate/DesktopPanelProbe.swift App/AdaptiveLayout.swift App/DesktopGlassPanelView.swift App/DashboardView.swift \
     App/PlannerView.swift App/PlannerStore.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
     App/InsightsView.swift App/InsightsStore.swift Shared/ObservationHistory.swift Shared/UsageInsights.swift \
-    Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift Shared/PanelTrend.swift Shared/PanelTrendView.swift \
+    Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/Localization.swift \
     -lsqlite3 -framework UserNotifications -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI \
-    -o "$probe_dir/panel-probe"
+    -o "$probe_executable"
+codesign --force --sign - "$probe_app"
 if [ -n "${TALLYGENT_UI_CHECKS:-}" ]; then
     mkdir -p "$TALLYGENT_UI_CHECKS"
-    /usr/bin/ditto "$probe_dir/panel-probe" "$TALLYGENT_UI_CHECKS/panel-probe"
+    /usr/bin/ditto "$probe_executable" "$TALLYGENT_UI_CHECKS/panel-probe"
 fi
-TALLYGENT_HISTORY_DB="$probe_dir/history.sqlite" "$probe_dir/panel-probe"
+# Run unrelated mouse/live/window behavior once. Each process still performs the
+# complete semantic-label/theme/font/resize matrix in its actual bundle language.
+TALLYGENT_PROBE_LANGUAGE=zh-Hans TALLYGENT_HISTORY_DB="$probe_dir/history-zh-Hans.sqlite" \
+    "$probe_executable" -AppleLanguages '("zh-Hans")' -AppleLocale zh_CN
+for language in en zh-Hant; do
+    locale=en_US
+    [ "$language" != zh-Hant ] || locale=zh_TW
+    TALLYGENT_PROBE_LANGUAGE="$language" TALLYGENT_LAYOUT_ONLY=1 \
+        TALLYGENT_HISTORY_DB="$probe_dir/history-$language.sqlite" \
+        "$probe_executable" -AppleLanguages "(\"$language\")" -AppleLocale "$locale"
+done
 # Choice labels must not share a fixed-width native Picker allocation again.
 if grep -Eq '\.frame\(width:[[:space:]]*(320|340)(\.0)?[[:space:]]*[,)]' App/DashboardView.swift ||
    grep -Eq '\.frame\(width:[[:space:]]*180(\.0)?[[:space:]]*[,)]' App/PlannerView.swift; then
@@ -30,7 +55,7 @@ if grep -Eq '\.frame\(width:[[:space:]]*(320|340)(\.0)?[[:space:]]*[,)]' App/Das
     exit 1
 fi
 awk '
-    /Picker\(title, selection: selection\)/ {
+    /Picker\((L\()?title\)?, selection: selection\)/ {
         count++
         getline
         if ($0 !~ /\.labelsHidden\(\)/) exit 1
@@ -43,7 +68,7 @@ awk '
 # Actual WindowServer dragging/closing still needs the desktop smoke test.
 grep -q 'Button(action: closePanel)' App/DesktopGlassPanelView.swift
 grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift
-grep -q 'Button("关闭桌面玻璃面板")' App/CodexQuotaApp.swift
+grep -Eq 'Button\((L\()?"关闭桌面玻璃面板"' App/CodexQuotaApp.swift
 grep -q 'window.styleMask.remove(.titled)' App/DesktopGlassPanelView.swift
 grep -q '.scrollTargetBehavior(.viewAligned)' App/DashboardView.swift
 grep -Fq '.accessibilityHidden(section != .planner)' App/DashboardView.swift

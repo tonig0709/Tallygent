@@ -99,13 +99,13 @@ public enum ObservationHistoryError: LocalizedError {
     case unsafeFile, invalidObservation, incompatibleSchema, corruptDatabase, databaseBusy, capacity, storageFailure
     public var errorDescription: String? {
         switch self {
-        case .unsafeFile: return "历史文件不是当前用户私有的安全普通文件；未修改原件。"
-        case .invalidObservation: return "观测字段无效，未写入历史。"
-        case .incompatibleSchema: return "历史数据库来自不兼容版本；未覆盖原件。"
-        case .corruptDatabase: return "历史数据库损坏，未覆盖原件；请先导出或保留备份。"
-        case .databaseBusy: return "历史数据库忙；本次历史未保存，额度显示不受影响。"
-        case .capacity: return "历史存储或导出达到安全上限；请缩短导出范围或清理历史。"
-        case .storageFailure: return "无法读写本地额度历史；额度显示不受影响。"
+        case .unsafeFile: return L("历史文件不是当前用户私有的安全普通文件；未修改原件。")
+        case .invalidObservation: return L("观测字段无效，未写入历史。")
+        case .incompatibleSchema: return L("历史数据库来自不兼容版本；未覆盖原件。")
+        case .corruptDatabase: return L("历史数据库损坏，未覆盖原件；请先导出或保留备份。")
+        case .databaseBusy: return L("历史数据库忙；本次历史未保存，额度显示不受影响。")
+        case .capacity: return L("历史存储或导出达到安全上限；请缩短导出范围或清理历史。")
+        case .storageFailure: return L("无法读写本地额度历史；额度显示不受影响。")
         }
     }
 }

@@ -20,9 +20,9 @@ enum GlassAppearanceMode: String, CaseIterable, Identifiable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .automatic: "自动"
-        case .dark: "深色"
-        case .light: "浅色"
+        case .automatic: L("自动")
+        case .dark: L("深色")
+        case .light: L("浅色")
         }
     }
 
@@ -41,9 +41,9 @@ enum GlassTone: String, CaseIterable, Identifiable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .cool: "冷"
-        case .neutral: "中性"
-        case .warm: "暖"
+        case .cool: L("冷")
+        case .neutral: L("中性")
+        case .warm: L("暖")
         }
     }
     var color: Color {
@@ -58,9 +58,9 @@ enum GlassTone: String, CaseIterable, Identifiable {
 extension GlassRefractionMode {
     var title: String {
         switch self {
-        case .standard: "标准"
-        case .polar: "环形"
-        case .prominent: "鲜明"
+        case .standard: L("标准")
+        case .polar: L("环形")
+        case .prominent: L("鲜明")
         }
     }
 }
@@ -98,10 +98,10 @@ private enum GlassPreset: String, CaseIterable, Identifiable {
     var id: Self { self }
     var title: String {
         switch self {
-        case .clear: "清透"
-        case .standard: "标准"
-        case .vivid: "鲜明"
-        case .custom: "自定"
+        case .clear: L("清透")
+        case .standard: L("标准")
+        case .vivid: L("鲜明")
+        case .custom: L("自定")
         }
     }
 }
@@ -207,7 +207,7 @@ struct GlassSettingsView: View {
     @ViewBuilder
     private func controlSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title.uppercased())
+            Text(L(title).uppercased())
                 .font(.caption2.weight(.semibold))
                 .tracking(0.8)
                 .foregroundStyle(.secondary)
@@ -227,7 +227,7 @@ struct GlassSettingsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
-                Text(title)
+                Text(L(title))
                 Spacer()
                 switch format {
                 case .percent:
@@ -240,7 +240,7 @@ struct GlassSettingsView: View {
             }
             .monospacedDigit()
             Slider(value: value, in: range)
-                .accessibilityLabel(title)
+                .accessibilityLabel(L(title))
         }
     }
 

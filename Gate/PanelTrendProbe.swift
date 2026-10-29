@@ -33,6 +33,22 @@ enum PanelTrendProbe {
 
     @MainActor
     static func main() async throws {
+        precondition((0..<4).map { UsageChartAxis.labelAnchorX(index: $0, count: 4) } == [0, 0.5, 0.5, 1],
+                     "First/last time labels must anchor inward rather than truncate outside the plot")
+        precondition(UsageChartAxis.labelAnchorX(index: 0, count: 1) == 0.5)
+        for identifier in ["zh_CN", "en_US"] {
+            let percent = UsageChartAxis.remainingPercent.locale(Locale(identifier: identifier))
+            precondition([0.0, 50.0, 100.0].map { $0.formatted(percent) } == ["0%", "50%", "100%"],
+                         "Quota axis values are percentages, not fractional ratios or unitless numbers")
+        }
+        var clockFormat = UsageChartAxis.localTime.locale(Locale(identifier: "en_US_POSIX"))
+        clockFormat.timeZone = TimeZone(secondsFromGMT: 0)!
+        precondition(now.formatted(clockFormat).contains(":"), "Time-axis ticks must include minutes")
+        var dateFormat = UsageChartAxis.localDateTime.locale(Locale(identifier: "en_US_POSIX"))
+        dateFormat.timeZone = TimeZone(secondsFromGMT: 0)!
+        precondition(now.formatted(dateFormat) != now.addingTimeInterval(86_400).formatted(dateFormat),
+                     "Multi-day axis ticks must distinguish dates, not repeat only clock time")
+
         let suite = "dev.tallygent.panel-trend-probe." + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
         // Test-only disposable suite; cleanup never targets production preferences.
@@ -155,6 +171,6 @@ enum PanelTrendProbe {
         try saved.write(to: database)
         await store.clear()
         precondition(store.observations.isEmpty && store.panelReport.windows.allSatisfy { $0.history.isEmpty })
-        print("Panel trend regression passed: preferences, independent 12h/24h cache, live scope, gaps, reset, bounded samples, hourly remaining values and DST.")
+        print("Panel trend regression passed: axis units/edges, preferences, independent 12h/24h cache, live scope, gaps, reset, bounded samples, hourly remaining values and DST.")
     }
 }

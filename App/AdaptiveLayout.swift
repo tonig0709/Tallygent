@@ -23,14 +23,14 @@ struct AdaptivePicker<Selection: Hashable, Options: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if showsTitle {
-                Text(title)
+                Text(L(title))
                     .fixedSize(horizontal: true, vertical: true)
                     .controlLayoutProbe(id + ".label")
             }
             Group {
                 if prefersSegments {
                     ViewThatFits(in: .horizontal) {
-                        Picker(title, selection: selection) { options }
+                        Picker(L(title), selection: selection) { options }
                             .labelsHidden()
                             .pickerStyle(.segmented)
                             .fixedSize(horizontal: true, vertical: true)
@@ -38,14 +38,14 @@ struct AdaptivePicker<Selection: Hashable, Options: View>: View {
                     }
                 } else { menu }
             }
-            .accessibilityLabel(title)
+            .accessibilityLabel(L(title))
             .controlLayoutContainer(id + ".picker.container")
         }
         .controlLayoutContainer(id + ".container")
     }
 
     private var menu: some View {
-        Picker(title, selection: selection) { options }
+        Picker(L(title), selection: selection) { options }
             .labelsHidden().pickerStyle(.menu)
             .frame(maxWidth: .infinity, alignment: .leading)
     }

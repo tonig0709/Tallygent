@@ -1,14 +1,28 @@
 import Foundation
 
+/// Shared native axis formats; source quota values are already in the 0...100 range.
+enum UsageChartAxis {
+    static let remainingPercent = FloatingPointFormatStyle<Double>.Percent()
+        .scale(1).precision(.fractionLength(0))
+    static let localTime = Date.FormatStyle().hour().minute()
+    static let localDateTime = Date.FormatStyle().month(.twoDigits).day(.twoDigits).hour().minute()
+
+    // Native tick labels at the two edges must extend inward, not outside the plot.
+    static func labelAnchorX(index: Int, count: Int) -> Double {
+        guard count > 1 else { return 0.5 }
+        return index == 0 ? 0 : (index == count - 1 ? 1 : 0.5)
+    }
+}
+
 public enum PanelChartSource: String, CaseIterable, Identifiable, Codable, Sendable {
     case sevenDayTokens, quota12Hours, quota24Hours
     public static let defaultsKey = "desktopPanelChartSource"
     public var id: Self { self }
     public var title: String {
         switch self {
-        case .sevenDayTokens: "近 7 天 Token"
-        case .quota12Hours: "过去 12 小时额度"
-        case .quota24Hours: "过去 24 小时额度"
+        case .sevenDayTokens: L("近 7 天 Token")
+        case .quota12Hours: L("过去 12 小时额度")
+        case .quota24Hours: L("过去 24 小时额度")
         }
     }
     public var hours: Int? {
@@ -23,7 +37,7 @@ public enum PanelChartStyle: String, CaseIterable, Identifiable, Codable, Sendab
     case bars, line
     public static let defaultsKey = "desktopPanelChartStyle"
     public var id: Self { self }
-    public var title: String { self == .bars ? "柱状图" : "折线图" }
+    public var title: String { self == .bars ? L("柱状图") : L("折线图") }
     public static func stored(in defaults: UserDefaults = .standard) -> Self {
         Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .bars
     }
@@ -68,17 +82,17 @@ public struct PanelTrendPresentation: Equatable, Sendable {
         guard source.hours != nil else { return Self(source: source, style: style, domain: domain, series: [], message: nil) }
         let values = ["fiveHour", "weekly"].map { windowID -> PanelTrendSeries in
             let value = report?.windows.first { $0.provider == provider && $0.windowID == windowID }
-            let title = windowID == "fiveHour" ? "5h 额度" : "周额度"
+            let title = windowID == "fiveHour" ? L("5h 额度") : L("周额度")
             func empty(_ message: String) -> PanelTrendSeries {
                 PanelTrendSeries(windowID: windowID, title: title, points: [], bars: [], isFresh: false,
                                  latest: nil, currentRemainingPercent: nil, observedCount: 0, message: message)
             }
-            guard let scope, !scope.isEmpty else { return empty("当前身份范围未知，暂无可核实历史") }
+            guard let scope, !scope.isEmpty else { return empty(L("当前身份范围未知，暂无可核实历史")) }
             guard let value, let latest = value.latest,
                   (provider == .codex ? latest.accountScope : latest.sessionScope) == scope else {
-                return empty("等待当前账户或会话的历史观测")
+                return empty(L("等待当前账户或会话的历史观测"))
             }
-            guard latest.receivedAt <= date else { return empty("等待当前时间内的历史观测") }
+            guard latest.receivedAt <= date else { return empty(L("等待当前时间内的历史观测")) }
             // Analyze before matching the live scope: filtering raw A→B→A rows first would erase the switch boundary.
             let visible = value.history.filter {
                 $0.date >= domain.start && $0.date <= date && $0.date.timeIntervalSince1970.isFinite &&
@@ -88,10 +102,10 @@ public struct PanelTrendPresentation: Equatable, Sendable {
             let expired = latest.resetsAt.map { $0 <= date } ?? false
             let fresh = valid && !expired && date.timeIntervalSince(latest.receivedAt) <= UsageInsights.freshnessInterval(for: provider)
             let message: String?
-            if visible.isEmpty { message = "所选时段暂无有效观测" }
-            else if !valid { message = "当前窗口暂无数据；仅保留已收到的历史" }
-            else if expired { message = "重置时间已到，等待来源确认" }
-            else if !fresh { message = "历史记录较旧，等待新观测" }
+            if visible.isEmpty { message = L("所选时段暂无有效观测") }
+            else if !valid { message = L("当前窗口暂无数据；仅保留已收到的历史") }
+            else if expired { message = L("重置时间已到，等待来源确认") }
+            else if !fresh { message = L("历史记录较旧，等待新观测") }
             else { message = nil }
             return PanelTrendSeries(windowID: windowID, title: title, points: sampledPoints(visible),
                 bars: hourlyBuckets(visible, domain: domain), isFresh: fresh, latest: latest,
@@ -99,7 +113,7 @@ public struct PanelTrendPresentation: Equatable, Sendable {
                 observedCount: visible.count, message: message)
         }
         let message = values.allSatisfy { $0.points.isEmpty }
-            ? "历史从启用采集后积累；空白不代表 0%" : nil
+            ? L("历史从启用采集后积累；空白不代表 0%") : nil
         return Self(source: source, style: style, domain: domain, series: values, message: message)
     }
 

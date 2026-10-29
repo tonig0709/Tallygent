@@ -76,7 +76,7 @@ final class CodexAppServer: ObservableObject {
     @Published private(set) var state: State = .disconnected
     @Published private(set) var snapshot: UsageSnapshot
     @Published private(set) var models: [PlannerModel] = []
-    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var modelCatalogMessage = L("尚未读取本机模型目录")
     @Published private(set) var isLoadingModels = false
     /// Called only for a newly accepted source response, never for a cached repaint.
     var onQuotaObservation: (([QuotaObservation]) -> Void)?
@@ -142,8 +142,8 @@ final class CodexAppServer: ObservableObject {
         snapshotServer.start()
         guard process == nil else { refresh() ; return }
         guard let executable = findCodex() else {
-            state = .failed("未找到 Codex CLI。请先安装 Codex 或 ChatGPT for Mac。")
-            finishModelCatalog(error: "未找到本机 Codex，无法读取目录；可使用手动配置。")
+            state = .failed(L("未找到 Codex CLI。请先安装 Codex 或 ChatGPT for Mac。"))
+            finishModelCatalog(error: L("未找到本机 Codex，无法读取目录；可使用手动配置。"))
             return
         }
 
@@ -171,9 +171,9 @@ final class CodexAppServer: ObservableObject {
                 self.pendingRefresh = nil
                 self.refreshQueued = false
                 self.initialized = false
-                self.finishModelCatalog(error: "Codex 已断开，目录未刷新")
+                self.finishModelCatalog(error: L("Codex 已断开，目录未刷新"))
                 if status != 0 {
-                    self.state = .failed("Codex app-server 已退出（\(status)）")
+                    self.state = .failed(LF("Codex app-server 已退出（%d）", status))
                 }
             }
         }
@@ -223,7 +223,7 @@ final class CodexAppServer: ObservableObject {
         state = .disconnected
         initialized = false
         accountReady = false
-        finishModelCatalog(error: "Codex 已断开，目录未刷新")
+        finishModelCatalog(error: L("Codex 已断开，目录未刷新"))
     }
 
     func refreshModelCatalog() {
@@ -237,7 +237,7 @@ final class CodexAppServer: ObservableObject {
 
     private func requestModelsPage(cursor: String?) {
         isLoadingModels = true
-        modelCatalogMessage = "正在读取本机 model/list…"
+        modelCatalogMessage = L("正在读取本机 model/list…")
         let id = nextRequestID
         nextRequestID += 1
         modelRequestID = id
@@ -245,7 +245,7 @@ final class CodexAppServer: ObservableObject {
         if let cursor { params["cursor"] = cursor }
         send(method: "model/list", id: id, params: params)
         modelTimeout?.cancel()
-        let timeout = DispatchWorkItem { [weak self] in self?.finishModelCatalog(error: "模型目录读取超时；额度同步不受影响，可重试或手动配置。") }
+        let timeout = DispatchWorkItem { [weak self] in self?.finishModelCatalog(error: L("模型目录读取超时；额度同步不受影响，可重试或手动配置。")) }
         modelTimeout = timeout
         DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: timeout)
     }
@@ -257,7 +257,7 @@ final class CodexAppServer: ObservableObject {
         if let error { modelCatalogMessage = error }
         else {
             models = catalogBuffer
-            modelCatalogMessage = "本机 model/list · \(models.count) 个可选模型 · 实际推理权限未验证"
+            modelCatalogMessage = LF("本机 model/list · %lld 个可选模型 · 实际推理权限未验证", Int64(models.count))
         }
         catalogBuffer = []
     }
@@ -339,7 +339,7 @@ final class CodexAppServer: ObservableObject {
         if let method = object["method"] as? String {
             if method == "account/login/completed" {
                 let success = (object["params"] as? [String: Any])?["success"] as? Bool ?? false
-                success ? requestAccount() : (state = .failed("Codex 登录未完成"))
+                success ? requestAccount() : (state = .failed(L("Codex 登录未完成")))
             } else if method == "account/rateLimits/updated" {
                 refresh()
             } else if method == "account/updated" {
@@ -409,7 +409,7 @@ final class CodexAppServer: ObservableObject {
         guard let account = try? AppServerParser.account(from: object) else {
             invalidateAccountRequests()
             let message = (object["error"] as? [String: Any])?["message"] as? String
-            state = .failed(message.map { "无法读取 Codex 账户：\($0)" } ?? "无法读取 Codex 账户，请重试")
+            state = .failed(message.map { LF("无法读取 Codex 账户：%@", $0) } ?? L("无法读取 Codex 账户，请重试"))
             return
         }
         if account.isLoggedIn {
@@ -448,7 +448,7 @@ final class CodexAppServer: ObservableObject {
         refreshQueued = false
         refreshTimeout?.cancel()
         refreshTimeout = nil
-        if isLoadingModels { finishModelCatalog(error: "账户信息变化，目录需要重新读取") }
+        if isLoadingModels { finishModelCatalog(error: L("账户信息变化，目录需要重新读取")) }
         models = []
         wantsModels = reloadModels
     }

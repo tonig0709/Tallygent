@@ -24,16 +24,16 @@ public enum ClaudeBridgeError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .oversizedInput: return "Claude Code 状态栏输入过大。"
-        case .invalidData: return "Claude Code 额度数据无效。"
-        case .sessionUnavailable: return "状态栏未提供会话标识，无法安全关联额度。"
-        case .differentSession: return "检测到另一个 Claude Code 会话。请在 App 中选择“重新绑定会话”后切换。"
-        case .outdatedRecord: return "已忽略延迟到达的旧会话记录。"
-        case .unsafeFile: return "Claude 桥接文件不是安全的普通文件。"
-        case .existingStatusLine: return "已有 Claude Code 状态栏配置。为保留原配置，请先在 Claude Code 中移除现有状态栏，再连接。"
-        case .changedConfiguration: return "Claude Code 状态栏配置已被外部修改；保留原文件，请先检查配置。"
-        case .bridgePathChanged: return "应用的桥接路径已变化。请先移除现有桥接配置，再重新连接。"
-        case .missingBackup: return "没有本应用创建的状态栏备份，未更改 Claude Code 设置。"
+        case .oversizedInput: return L("Claude Code 状态栏输入过大。")
+        case .invalidData: return L("Claude Code 额度数据无效。")
+        case .sessionUnavailable: return L("状态栏未提供会话标识，无法安全关联额度。")
+        case .differentSession: return L("检测到另一个 Claude Code 会话。请在 App 中选择“重新绑定会话”后切换。")
+        case .outdatedRecord: return L("已忽略延迟到达的旧会话记录。")
+        case .unsafeFile: return L("Claude 桥接文件不是安全的普通文件。")
+        case .existingStatusLine: return L("已有 Claude Code 状态栏配置。为保留原配置，请先在 Claude Code 中移除现有状态栏，再连接。")
+        case .changedConfiguration: return L("Claude Code 状态栏配置已被外部修改；保留原文件，请先检查配置。")
+        case .bridgePathChanged: return L("应用的桥接路径已变化。请先移除现有桥接配置，再重新连接。")
+        case .missingBackup: return L("没有本应用创建的状态栏备份，未更改 Claude Code 设置。")
         }
     }
 }
@@ -124,7 +124,7 @@ public enum ClaudeStatuslineStore {
                                               now: record.receivedAt)
             } catch {
                 // Static diagnostic only: never print raw input, session IDs or filesystem paths.
-                try? FileHandle.standardError.write(contentsOf: Data("Tallygent: 本次 Claude 历史未保存；额度缓存仍会更新。\n".utf8))
+                try? FileHandle.standardError.write(contentsOf: Data(L("Tallygent: 本次 Claude 历史未保存；额度缓存仍会更新。\n").utf8))
             }
             try ClaudeBridgeFiles.write(JSONEncoder().encode(record), to: url)
         }
@@ -155,10 +155,10 @@ public enum ClaudeStatuslineBridge {
             }
             let record = try ClaudeStatuslineParser.parse(input)
             try ClaudeStatuslineStore.save(record, to: cacheURL)
-            let parts = [("5h", record.fiveHour), ("周", record.weekly)].compactMap { label, window in
-                window.map { "\(label) 剩余 \($0.remainingPercent)%" }
+            let parts = [("5h", record.fiveHour), (L("周"), record.weekly)].compactMap { label, window in
+                window.map { LF("%@ 剩余 %lld%%", label, $0.remainingPercent) }
             }
-            let output = parts.isEmpty ? "Claude Code · 暂无额度数据" : "Claude Code · " + parts.joined(separator: " · ")
+            let output = parts.isEmpty ? L("Claude Code · 暂无额度数据") : "Claude Code · " + parts.joined(separator: " · ")
             try FileHandle.standardOutput.write(contentsOf: Data((output + "\n").utf8))
             return 0
         } catch {

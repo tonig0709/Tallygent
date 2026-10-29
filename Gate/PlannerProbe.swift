@@ -23,6 +23,9 @@ struct PlannerProbe {
         let models = [model("fixture-efficient", role: .efficient), model("fixture-balanced", role: .balanced, defaultModel: true), model("fixture-quality", role: .quality)]
         let routine = PlannerProfile.classify("修正文案拼写 typo")
         let architecture = PlannerProfile.classify("设计支付认证系统架构 architecture auth")
+        let traditional = PlannerProfile.classify("設計支付認證系統架構")
+        expect(traditional.category == .architecture && traditional.risk == .high,
+               "Traditional Chinese input bypassed the existing architecture/security rules")
         let taskB = PlannerProfile.resolved("修正文案拼写 typo", previous: architecture, manual: false)
         expect(taskB.category == .routine && taskB.complexity == .low && taskB.uncertainty == .low,
                "Task B inherited task A's automatic profile")

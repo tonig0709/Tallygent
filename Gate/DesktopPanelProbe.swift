@@ -58,6 +58,13 @@ struct DesktopPanelProbe {
     @MainActor
     static func main() {
         _ = NSApplication.shared
+        verifyNativeLocalization()
+        verifyLocalizedPanelRenders()
+        if ProcessInfo.processInfo.environment["TALLYGENT_LAYOUT_ONLY"] == "1" {
+            verifyMeaningfulControlLayouts(server: QuotaMonitor())
+            print("Native localized layout probe passed: \(probeLanguage)")
+            return
+        }
         let window = DragProbeWindow(
             contentRect: NSRect(x: 100, y: 100, width: 680, height: 300),
             styleMask: [.borderless], backing: .buffered, defer: false
@@ -206,6 +213,93 @@ struct DesktopPanelProbe {
         print("Desktop panel mouse routing and window-level probe passed.")
     }
 
+    private static var probeLanguage: String {
+        ProcessInfo.processInfo.environment["TALLYGENT_PROBE_LANGUAGE"] ?? "zh-Hans"
+    }
+
+    private static var probeLocale: String {
+        switch probeLanguage {
+        case "en": return "en_US"
+        case "zh-Hant": return "zh_TW"
+        default: return "zh_CN"
+        }
+    }
+
+    /// Assert real native resource resolution, not only an environment locale redraw.
+    private static func verifyNativeLocalization() {
+        let expected = ["en": "Weekly quota", "zh-Hans": "周额度", "zh-Hant": "每週額度"]
+        guard let weekly = expected[probeLanguage] else { preconditionFailure("unsupported probe language") }
+        precondition(Bundle.main.preferredLocalizations.first == probeLanguage,
+                     "native bundle did not resolve the requested language")
+        precondition(L("周额度") == weekly, "dynamic text did not load the native language resource")
+        let percentage = LF("剩余 %lld%%", Int64(25))
+        precondition(percentage.contains("25%") && !percentage.contains("%lld"),
+                     "localized integer/escaped-percent formatting is broken")
+        precondition(Bundle.main.localizations.contains("en") && Bundle.main.localizations.contains("zh-Hans") &&
+                     Bundle.main.localizations.contains("zh-Hant"), "native probe bundle is missing a supported language")
+        print("Native localization resource: PASS (\(probeLanguage), \(weekly))")
+    }
+
+    @MainActor
+    private static func verifyLocalizedPanelRenders() {
+        func render<V: View>(_ content: V, size: CGSize) -> NSBitmapImageRep {
+            let renderer = ImageRenderer(content: content.frame(width: size.width, height: size.height)
+                .environment(\.locale, Locale(identifier: probeLocale)))
+            renderer.scale = 1
+            guard let data = renderer.nsImage?.tiffRepresentation,
+                  let bitmap = NSBitmapImageRep(data: data) else {
+                preconditionFailure("localized panel produced no native image")
+            }
+            return bitmap
+        }
+        func evidence(_ image: NSBitmapImageRep, baseline: NSBitmapImageRep) -> (changed: Int, dark: Int, bright: Int) {
+            var result = (changed: 0, dark: 0, bright: 0)
+            for y in 0..<image.pixelsHigh {
+                for x in 0..<image.pixelsWide {
+                    guard let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                          let base = baseline.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                    let difference = abs(color.redComponent - base.redComponent) + abs(color.greenComponent - base.greenComponent) +
+                        abs(color.blueComponent - base.blueComponent) + abs(color.alphaComponent - base.alphaComponent)
+                    if difference > 0.12 { result.changed += 1 }
+                    let luminance = color.redComponent * 0.2126 + color.greenComponent * 0.7152 + color.blueComponent * 0.0722
+                    if luminance < 0.6 { result.dark += 1 }
+                    if luminance > 0.6 { result.bright += 1 }
+                }
+            }
+            return result
+        }
+        for light in [false, true] {
+            var snapshot = UsageSnapshot.placeholder
+            snapshot.appearance = light ? .light : .dark
+            for mode in DesktopPanelMode.allCases {
+                let background = ZStack {
+                    light ? Color.white : Color.black
+                    LiquidGlassSurface(isLight: light, opacity: 1, accent: .blue)
+                }
+                let baseline = render(background, size: mode.size)
+                let content = render(ZStack {
+                    background
+                    QuotaPanelContent(mode: mode, snapshot: snapshot, glassOpacity: 1)
+                }.preferredColorScheme(light ? .light : .dark), size: mode.size)
+                let counts = evidence(content, baseline: baseline)
+                let pixels = content.pixelsWide * content.pixelsHigh
+                let readableFloor = max(8, pixels / 1_000)
+                precondition(counts.changed > pixels / 300 && min(counts.dark, counts.bright) > readableFloor,
+                             "localized \(probeLanguage) \(mode.rawValue) panel is blank or unreadable")
+                let solid = render(Color.black, size: mode.size)
+                let negative = evidence(solid, baseline: baseline)
+                precondition(min(negative.dark, negative.bright) == 0, "localized render gate accepted solid black")
+                if let output = ProcessInfo.processInfo.environment["TALLYGENT_UI_CHECKS"] {
+                    let directory = URL(fileURLWithPath: output, isDirectory: true)
+                    try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                    try! content.representation(using: .png, properties: [:])!.write(to:
+                        directory.appendingPathComponent("\(probeLanguage)-panel-\(mode.rawValue)-\(light ? "light" : "dark").png"))
+                }
+            }
+        }
+        print("Localized small/medium/large light/dark content and solid-black negative control: PASS (\(probeLanguage))")
+    }
+
     @MainActor
     private static func verifyLiveTrendPanel(server: QuotaMonitor) {
         let defaults = UserDefaults.standard
@@ -335,7 +429,7 @@ struct DesktopPanelProbe {
     private static func verifyMeaningfulControlLayouts(server: QuotaMonitor) {
         let widths: [CGFloat] = [1_400, 1_120, 1_080, 1_079, 1_030, 900, 760, 1_400]
         let sizes: [CGFloat] = [13, 21]
-        let locales = ["zh_CN", "en_US"]
+        let locales = [probeLocale]
         let appearances: [(String, ColorScheme, NSAppearance.Name)] = [("light", .light, .aqua), ("dark", .dark, .darkAqua)]
         var verified = 0
         // A long but synthetic account label exercises the footer without touching a real account.
@@ -423,7 +517,7 @@ struct DesktopPanelProbe {
                             precondition(abs(view.frame.width - width) < 2, "native hosting view did not follow the requested width")
                             precondition(view.fittingSize.width <= width + 2, "window has horizontal overflow after resize")
                             verified += 1
-                            if section == .monitor, locale == "zh_CN", theme == "dark", fontSize == 21 {
+                            if section == .monitor, theme == "dark", fontSize == 21 {
                                 if width == 900 { saveLayoutImage(view, name: "monitor-cn21-900") }
                                 if index == sequence.count - 1 { saveLayoutImage(view, name: "monitor-cn21-restored-1400") }
                             }
@@ -476,7 +570,7 @@ struct DesktopPanelProbe {
                     precondition(abs(view.frame.width - width) < 2, "expanded Planner hosting view did not follow the requested width")
                     precondition(view.fittingSize.width <= width + 2, "expanded Planner overflows its window")
                     verified += 1
-                    if locale == "zh_CN", theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }
+                    if theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }
                 }
                 window.close()
             }
@@ -486,10 +580,10 @@ struct DesktopPanelProbe {
         // The CJK Text must compress or leave its field; the very same validator must reject it.
         var broken: [String: MeasuredControl] = [:]
         let negative = HStack(spacing: 12) {
-            Text("监测服务").controlLayoutProbe("negative.label")
-            Picker("监测服务", selection: .constant(AgentService.codex)) {
+            Text(L("监测服务")).controlLayoutProbe("negative.label")
+            Picker(L("监测服务"), selection: .constant(AgentService.codex)) {
                 Text("Codex").tag(AgentService.codex)
-                Text("Claude Code · 实验性").tag(AgentService.claude)
+                Text(L("Claude Code · 实验性")).tag(AgentService.claude)
             }
             .labelsHidden().pickerStyle(.segmented).fixedSize()
         }
@@ -539,7 +633,8 @@ struct DesktopPanelProbe {
         let directory = URL(fileURLWithPath: output, isDirectory: true)
         try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         view.cacheDisplay(in: view.bounds, to: bitmap)
-        try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(name + ".png"))
+        let prefix = probeLanguage == "zh-Hans" ? "" : probeLanguage + "-"
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(prefix + name + ".png"))
     }
 }
 

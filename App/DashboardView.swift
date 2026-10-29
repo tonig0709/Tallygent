@@ -4,7 +4,7 @@ enum WorkspaceSection: String, CaseIterable, Identifiable {
     case monitor, insights, planner
     var id: Self { self }
     var title: String {
-        switch self { case .monitor: "额度与面板"; case .insights: "Insights"; case .planner: "Planner" }
+        switch self { case .monitor: L("额度与面板"); case .insights: L("Insights"); case .planner: L("Planner") }
     }
 }
 
@@ -133,7 +133,7 @@ struct DashboardView: View {
                 AdaptivePicker("监测服务", id: "monitor.service",
                                selection: Binding(get: { server.service }, set: server.selectService)) {
                     ForEach(AgentService.allCases) { service in
-                        Text(service == .claude ? "Claude Code · 实验性" : service.title).tag(service)
+                        Text(service == .claude ? L("Claude Code · 实验性") : service.title).tag(service)
                     }
                 }
                 .frame(maxWidth: 440, alignment: .leading)
@@ -331,13 +331,13 @@ struct DashboardView: View {
             if case .failed(let message) = server.state { return message }
             return server.snapshot.hasQuota
                 ? "\(server.snapshot.statusLabel(at: .now)) · \(server.snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))"
-                : "等待 Claude Code 会话数据"
+                : L("等待 Claude Code 会话数据")
         }
         return switch server.state {
-        case .disconnected: "尚未连接"
-        case .connecting: "正在连接 Codex…"
-        case .signingIn: "请在浏览器完成登录"
-        case .connected(let email): email.map { "已连接 · \($0)" } ?? "已连接"
+        case .disconnected: L("尚未连接")
+        case .connecting: L("正在连接 Codex…")
+        case .signingIn: L("请在浏览器完成登录")
+        case .connected(let email): email.map { LF("已连接 · %@", $0) } ?? L("已连接")
         case .failed(let message): message
         }
     }

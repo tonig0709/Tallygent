@@ -11,7 +11,7 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var snapshot: UsageSnapshot = .empty
     @Published private(set) var connectionMessage: String?
     @Published private(set) var models: [PlannerModel] = []
-    @Published private(set) var modelCatalogMessage = "尚未读取本机模型目录"
+    @Published private(set) var modelCatalogMessage = L("尚未读取本机模型目录")
     @Published private(set) var isLoadingModels = false
     @Published private(set) var codexCollectionEnabled: Bool
     @Published private(set) var claudeCollectionEnabled: Bool
@@ -148,7 +148,7 @@ final class QuotaMonitor: ObservableObject {
         do {
             guard let executable = Bundle.main.executableURL else { return }
             try ClaudeBridgeSetup.install(executableURL: executable)
-            connectionMessage = "接入已启用；请开启 Claude Code 会话。首次接收后绑定该会话。"
+            connectionMessage = L("接入已启用；请开启 Claude Code 会话。首次接收后绑定该会话。")
         } catch {
             connectionMessage = error.localizedDescription
         }
@@ -157,7 +157,7 @@ final class QuotaMonitor: ObservableObject {
     func removeClaudeBridge() {
         do {
             try ClaudeBridgeSetup.remove()
-            connectionMessage = "已移除本应用的状态栏接入；最后记录仍保留。"
+            connectionMessage = L("已移除本应用的状态栏接入；最后记录仍保留。")
         } catch {
             connectionMessage = error.localizedDescription
         }
@@ -168,7 +168,7 @@ final class QuotaMonitor: ObservableObject {
             try ClaudeStatuslineStore.reset(at: claudeURL)
             claudeRecord = nil
             claudeError = nil
-            connectionMessage = "已清除 Claude 会话记录；下一次有效数据将绑定新会话。"
+            connectionMessage = L("已清除 Claude 会话记录；下一次有效数据将绑定新会话。")
             publishSelection()
         } catch {
             connectionMessage = error.localizedDescription
@@ -185,7 +185,7 @@ final class QuotaMonitor: ObservableObject {
             claudeRecord = record
             if service == .claude { publishSelection() }
         } catch {
-            claudeError = "无法读取 Claude 会话记录，请重新绑定会话。"
+            claudeError = L("无法读取 Claude 会话记录，请重新绑定会话。")
             if service == .claude { state = .failed(claudeError!) }
         }
     }

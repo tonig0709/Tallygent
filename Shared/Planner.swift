@@ -5,15 +5,15 @@ public enum PlannerCategory: String, Codable, CaseIterable, Identifiable, Sendab
     public var id: Self { self }
     public var title: String {
         switch self {
-        case .automatic: "自动识别"
-        case .routine: "日常修改"
-        case .ui: "界面开发"
-        case .feature: "功能实现"
-        case .debugging: "排查 Bug"
-        case .refactor: "代码重构"
-        case .architecture: "架构设计"
-        case .review: "测试与审查"
-        case .other: "其他"
+        case .automatic: L("自动识别")
+        case .routine: L("日常修改")
+        case .ui: L("界面开发")
+        case .feature: L("功能实现")
+        case .debugging: L("排查 Bug")
+        case .refactor: L("代码重构")
+        case .architecture: L("架构设计")
+        case .review: L("测试与审查")
+        case .other: L("其他")
         }
     }
 }
@@ -21,15 +21,15 @@ public enum PlannerCategory: String, Codable, CaseIterable, Identifiable, Sendab
 public enum PlannerLevel: Int, Codable, CaseIterable, Identifiable, Sendable {
     case low, medium, high
     public var id: Self { self }
-    public var title: String { ["低", "中", "高"][rawValue] }
-    public var sizeTitle: String { ["小", "中", "大"][rawValue] }
+    public var title: String { [L("低"), L("中"), L("高")][rawValue] }
+    public var sizeTitle: String { [L("小"), L("中"), L("大")][rawValue] }
 }
 
 public enum PlannerPreference: String, Codable, CaseIterable, Identifiable, Sendable {
     case quality, balanced, efficiency
     public var id: Self { self }
     public var title: String {
-        switch self { case .quality: "质量优先"; case .balanced: "平衡"; case .efficiency: "效率优先" }
+        switch self { case .quality: L("质量优先"); case .balanced: L("平衡"); case .efficiency: L("效率优先") }
     }
 }
 
@@ -49,7 +49,7 @@ public struct PlannerProfile: Codable, Equatable, Sendable {
     }
 
     public static func classify(_ text: String) -> Self {
-        let text = text.lowercased()
+        let text = (text.applyingTransform(StringTransform("Hant-Hans"), reverse: false) ?? text).lowercased()
         func contains(_ words: [String]) -> Bool { words.contains { text.contains($0) } }
         let category: PlannerCategory
         if contains(["架构", "architecture", "分布式", "系统设计"]) { category = .architecture }
@@ -66,7 +66,7 @@ public struct PlannerProfile: Codable, Equatable, Sendable {
         return Self(category: category, complexity: large ? .high : (category == .routine ? .low : .medium),
                     uncertainty: uncertain ? .high : (category == .routine ? .low : .medium),
                     risk: sensitive ? .high : .low,
-                    signals: ["本地关键词规则；未扫描项目或发送任务文本"] + (sensitive ? ["检测到安全或关键业务信号"] : []))
+                    signals: [L("本地关键词规则；未扫描项目或发送任务文本")] + (sensitive ? [L("检测到安全或关键业务信号")] : []))
     }
 
     public static func resolved(_ text: String, previous: Self, manual: Bool) -> Self {
@@ -81,7 +81,7 @@ public enum PlannerModelRole: String, Codable, CaseIterable, Identifiable, Senda
     case unknown, efficient, balanced, quality
     public var id: Self { self }
     public var title: String {
-        switch self { case .unknown: "未标注"; case .efficient: "偏效率"; case .balanced: "通用"; case .quality: "偏复杂任务" }
+        switch self { case .unknown: L("未标注"); case .efficient: L("偏效率"); case .balanced: L("通用"); case .quality: L("偏复杂任务") }
     }
 }
 
@@ -158,7 +158,7 @@ public struct PlannerConfiguration: Codable, Equatable, Identifiable, Sendable {
     public var isValid: Bool { model.isValid && model.efforts.contains(effort) }
     public var copyText: String {
         model.provider == .codex ? "model = \"\(model.identifier)\"\nmodel_reasoning_effort = \"\(effort)\""
-            : "Provider: \(model.provider.title)\nModel: \(model.identifier)\nReasoning effort: \(effort)\nUser-declared configuration; apply manually."
+            : LF("Provider: %@\nModel: %@\nReasoning effort: %@\nUser-declared configuration; apply manually.", model.provider.title, model.identifier, effort)
     }
 }
 
@@ -184,23 +184,23 @@ public struct PlannerQuota: Codable, Equatable, Sendable {
     }
 
     public func warnings(reserve: Int, at date: Date) -> [String] {
-        guard !windows.isEmpty else { return ["额度数据缺失；本建议未通过额度校验。"] }
+        guard !windows.isEmpty else { return [L("额度数据缺失；本建议未通过额度校验。")] }
         var warnings: [String] = []
-        if !isFresh(at: date) { warnings.append("额度记录较旧或来源未连接；请刷新后再判断可用量。") }
-        for (id, title) in [("fiveHour", "5h 额度"), ("weekly", "周额度")] where !windows.contains(where: { $0.id == id }) {
-            warnings.append("来源未提供\(title)窗口，无法校验该约束；不能仅凭另一个窗口判断可运行。")
+        if !isFresh(at: date) { warnings.append(L("额度记录较旧或来源未连接；请刷新后再判断可用量。")) }
+        for (id, title) in [("fiveHour", L("5h 额度")), ("weekly", L("周额度"))] where !windows.contains(where: { $0.id == id }) {
+            warnings.append(LF("来源未提供%@窗口，无法校验该约束；不能仅凭另一个窗口判断可运行。", title))
         }
         for window in windows {
             if let reset = window.resetsAt, reset <= date {
-                warnings.append("\(window.title)已到重置点，等待来源确认新周期。")
+                warnings.append(LF("%@已到重置点，等待来源确认新周期。", L(window.title)))
             } else if window.remainingPercent <= reserve {
-                warnings.append("\(window.title)剩余 \(window.remainingPercent)% ≤ 保留量 \(reserve)%：建议等待或手动调整预算。")
+                warnings.append(LF("%@剩余 %lld%% ≤ 保留量 %lld%%：建议等待或手动调整预算。", L(window.title), window.remainingPercent, reserve))
             } else if window.remainingPercent < 30 {
-                warnings.append("\(window.title)仅剩 \(window.remainingPercent)%；不能只看另一个较充足的窗口。")
+                warnings.append(LF("%@仅剩 %lld%%；不能只看另一个较充足的窗口。", L(window.title), window.remainingPercent))
             }
         }
-        if scope == nil { warnings.append("账户/会话范围未知，不能把本次额度变化归因给任务。") }
-        warnings.append("任务预计额度消耗未知；百分比不是可用 Token 数，也不保证任务可完成。")
+        if scope == nil { warnings.append(L("账户/会话范围未知，不能把本次额度变化归因给任务。")) }
+        warnings.append(L("任务预计额度消耗未知；百分比不是可用 Token 数，也不保证任务可完成。"))
         return warnings
     }
 
@@ -214,8 +214,8 @@ public enum PlannerOutcome: String, Codable, CaseIterable, Identifiable, Sendabl
     public var id: Self { self }
     public var title: String {
         switch self {
-        case .planned: "待开始"; case .running: "进行中"; case .succeeded: "完成"; case .partial: "部分完成"
-        case .failed: "失败"; case .notEvaluated: "未评估"; case .interrupted: "中断待确认"
+        case .planned: L("待开始"); case .running: L("进行中"); case .succeeded: L("完成"); case .partial: L("部分完成")
+        case .failed: L("失败"); case .notEvaluated: L("未评估"); case .interrupted: L("中断待确认")
         }
     }
     public var isEvaluated: Bool { [.succeeded, .partial, .failed].contains(self) }
@@ -224,7 +224,7 @@ public enum PlannerOutcome: String, Codable, CaseIterable, Identifiable, Sendabl
 public enum PlannerVerification: String, Codable, CaseIterable, Identifiable, Sendable {
     case notRun, passed, failed
     public var id: Self { self }
-    public var title: String { switch self { case .notRun: "未验证"; case .passed: "验证通过"; case .failed: "验证失败" } }
+    public var title: String { switch self { case .notRun: L("未验证"); case .passed: L("验证通过"); case .failed: L("验证失败") } }
 }
 
 public struct PlannerTokenUsage: Codable, Equatable, Sendable {
@@ -255,17 +255,17 @@ public struct PlannerTaskRecord: Codable, Equatable, Identifiable, Sendable {
     public var tokens: PlannerTokenUsage?
 
     public var attribution: String {
-        guard let before, let after, let startedAt, let completedAt else { return "无完整执行区间" }
-        guard before.provider == after.provider, let scope = before.scope, after.scope == scope else { return "账户或会话范围变化/未知" }
-        guard before.isFresh(at: startedAt), after.isFresh(at: completedAt) else { return "起止额度记录过期" }
+        guard let before, let after, let startedAt, let completedAt else { return L("无完整执行区间") }
+        guard before.provider == after.provider, let scope = before.scope, after.scope == scope else { return L("账户或会话范围变化/未知") }
+        guard before.isFresh(at: startedAt), after.isFresh(at: completedAt) else { return L("起止额度记录过期") }
         for window in before.windows {
             guard let end = after.windows.first(where: { $0.id == window.id }), let reset = window.resetsAt,
                   end.resetsAt == reset, end.durationMinutes == window.durationMinutes,
                   reset > completedAt, end.remainingPercent <= window.remainingPercent else {
-                return "跨重置或窗口变化，不可归因"
+                return L("跨重置或窗口变化，不可归因")
             }
         }
-        return "期间账户变化；并发/其他设备未隔离，不用于额度成本预测"
+        return L("期间账户变化；并发/其他设备未隔离，不用于额度成本预测")
     }
 
     public var isValid: Bool {
@@ -316,8 +316,8 @@ public enum PlannerEngine {
         let desiredRank = conservative || profile.complexity == .high || preference == .quality ? 4 : minimumRank
         let desiredRole: PlannerModelRole = conservative || preference == .quality ? .quality : (preference == .efficiency || profile.urgent ? .efficient : .balanced)
         var warnings = quota.warnings(reserve: reserve, at: date)
-        var reasons = ["\(profile.category.title) · 规模\(profile.complexity.sizeTitle) · 不确定性\(profile.uncertainty.title) · 风险\(profile.risk.title)。",
-                       "模型角色仅依据目录描述或用户配置；没有测量过的模型质量、速度和额度价格不作精确比较。"]
+        var reasons = [LF("%@ · 规模%@ · 不确定性%@ · 风险%@。", profile.category.title, profile.complexity.sizeTitle, profile.uncertainty.title, profile.risk.title),
+                       L("模型角色仅依据目录描述或用户配置；没有测量过的模型质量、速度和额度价格不作精确比较。")]
         func configuration(_ model: PlannerModel, target: Int) -> PlannerConfiguration? {
             let options = model.efforts.filter { PlannerModel.effortRank($0) < 99 && PlannerModel.effortRank($0) >= minimumRank }
             guard let effort = options.min(by: {
@@ -339,28 +339,28 @@ public enum PlannerEngine {
         if let override {
             if let current = available.first(where: { $0.id == override.model.id && $0.efforts.contains(override.effort) }), override.isValid {
                 chosen = PlannerConfiguration(model: current, effort: override.effort)
-                reasons.append("用户手动选择；没有自动修改 Codex 的模型设置。")
-                if PlannerModel.effortRank(override.effort) == 99 { warnings.append("此 effort 的推理深度语义未知，只保留你的手动选择，不作资源或质量判断。") }
+                reasons.append(L("用户手动选择；没有自动修改 Codex 的模型设置。"))
+                if PlannerModel.effortRank(override.effort) == 99 { warnings.append(L("此 effort 的推理深度语义未知，只保留你的手动选择，不作资源或质量判断。")) }
                 if PlannerModel.effortRank(override.effort) < minimumRank {
-                    warnings.append("手动配置低于此任务的保守推理建议；高风险约束仍需你确认。")
+                    warnings.append(L("手动配置低于此任务的保守推理建议；高风险约束仍需你确认。"))
                 }
-            } else { warnings.append("手动配置已不在当前目录或不支持此 effort，未采用。") }
+            } else { warnings.append(L("手动配置已不在当前目录或不支持此 effort，未采用。")) }
         }
         guard let chosen else {
             return PlannerAdvice(recommended: nil, alternatives: [], reasons: reasons,
-                                 warnings: ["没有新鲜且支持所需 effort 的模型目录。请刷新目录，或手动填入已确认的模型配置。"] + warnings,
-                                 evidence: "信息不足", shouldWait: quota.shouldWait(reserve: reserve, at: date))
+                                 warnings: [L("没有新鲜且支持所需 effort 的模型目录。请刷新目录，或手动填入已确认的模型配置。")] + warnings,
+                                 evidence: L("信息不足"), shouldWait: quota.shouldWait(reserve: reserve, at: date))
         }
-        reasons.append("选择 \(chosen.model.name)：\(chosen.model.isDefault ? "本机目录的默认候选" : chosen.model.role.title)；\(preference.title)只作规则取舍，不代表性能保证。")
-        reasons.append("选择 \(chosen.effort)：在该模型实际支持的档位中匹配任务需求；复杂任务不默认使用最高档。")
-        if conservative { reasons.append("风险或不确定性较高，效率偏好不会自动降低质量底线。") }
+        reasons.append(LF("选择 %@：%@；%@只作规则取舍，不代表性能保证。", chosen.model.name, chosen.model.isDefault ? L("本机目录的默认候选") : chosen.model.role.title, preference.title))
+        reasons.append(LF("选择 %@：在该模型实际支持的档位中匹配任务需求；复杂任务不默认使用最高档。", chosen.effort))
+        if conservative { reasons.append(L("风险或不确定性较高，效率偏好不会自动降低质量底线。")) }
         let history = summary(records: records, profile: profile, configuration: chosen, scope: quota.scope)
         let discouragedCount = candidates.filter { summary(records: records, profile: profile, configuration: $0, scope: quota.scope).discourages }.count
-        if discouragedCount > 0 { reasons.append("同类本地反馈不佳的配置已降序；比较条件包括模型、effort、任务特征和账户范围。") }
-        if history.evaluated >= 5 { reasons.append("此配置有 \(history.evaluated) 条同类人工反馈，其中完成 \(history.succeeded) 条；不是验证过的成功概率。") }
-        else { warnings.append("同类反馈不足 5 条，不预测成本、成功率或可完成任务数。") }
-        if history.discourages { warnings.append("此配置的同类反馈存在较多失败、重试或返工；建议人工比较替代项。") }
-        if chosen.model.manuallyConfigured { warnings.append("此模型由用户手动配置，可用性及能力未经本机目录核验。") }
+        if discouragedCount > 0 { reasons.append(L("同类本地反馈不佳的配置已降序；比较条件包括模型、effort、任务特征和账户范围。")) }
+        if history.evaluated >= 5 { reasons.append(LF("此配置有 %lld 条同类人工反馈，其中完成 %lld 条；不是验证过的成功概率。", history.evaluated, history.succeeded)) }
+        else { warnings.append(L("同类反馈不足 5 条，不预测成本、成功率或可完成任务数。")) }
+        if history.discourages { warnings.append(L("此配置的同类反馈存在较多失败、重试或返工；建议人工比较替代项。")) }
+        if chosen.model.manuallyConfigured { warnings.append(L("此模型由用户手动配置，可用性及能力未经本机目录核验。")) }
         var alternatives: [PlannerConfiguration] = []
         for target in [minimumRank, 4] {
             for model in available.sorted(by: { ($0.role == (target == 4 ? .quality : .efficient) ? 0 : 1, $0.identifier) < ($1.role == (target == 4 ? .quality : .efficient) ? 0 : 1, $1.identifier) }) {
@@ -370,7 +370,7 @@ public enum PlannerEngine {
             }
         }
         return PlannerAdvice(recommended: chosen, alternatives: alternatives, reasons: reasons, warnings: warnings,
-                             evidence: history.evaluated >= 5 ? "本地反馈校准 · 非成功保证" : "规则建议 · 历史不足",
+                             evidence: history.evaluated >= 5 ? L("本地反馈校准 · 非成功保证") : L("规则建议 · 历史不足"),
                              shouldWait: quota.shouldWait(reserve: reserve, at: date))
     }
 }
@@ -379,9 +379,9 @@ public enum PlannerError: LocalizedError {
     case invalidCatalog, invalidHistory, futureSchema
     public var errorDescription: String? {
         switch self {
-        case .invalidCatalog: "模型目录格式无法识别，请刷新或使用明确标注的手动配置。"
-        case .invalidHistory: "任务记录损坏或不符合边界；原文件已保留，未覆盖。"
-        case .futureSchema: "任务记录来自更新版本；为避免数据丢失，当前版本不会写入。"
+        case .invalidCatalog: L("模型目录格式无法识别，请刷新或使用明确标注的手动配置。")
+        case .invalidHistory: L("任务记录损坏或不符合边界；原文件已保留，未覆盖。")
+        case .futureSchema: L("任务记录来自更新版本；为避免数据丢失，当前版本不会写入。")
         }
     }
 }

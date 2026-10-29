@@ -23,9 +23,9 @@ public enum DesktopPanelMode: String, CaseIterable, Identifiable {
     public var id: Self { self }
     public var title: String {
         switch self {
-        case .small: "小型 · 双圆环"
-        case .medium: "中型 · 双额度"
-        case .large: "大型 · 额度与趋势"
+        case .small: L("小型 · 双圆环")
+        case .medium: L("中型 · 双额度")
+        case .large: L("大型 · 额度与趋势")
         }
     }
 
@@ -81,15 +81,15 @@ private struct QuotaMediumPanelView: View {
                     Text(snapshot.statusLabel(at: .now)).font(.caption2).foregroundStyle(.secondary)
                 }
             }
-            quotaBar("5h额度", window: snapshot.fiveHour)
-            quotaBar("周额度", window: snapshot.weekly)
+            quotaBar(L("5h额度"), window: snapshot.fiveHour)
+            quotaBar(L("周额度"), window: snapshot.weekly)
         }
         .padding(.horizontal, 32)
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .foregroundStyle(isLight ? Color(red: 0.08, green: 0.1, blue: 0.14) : .white)
         .accessibilityElement(children: .contain)
-        .help(snapshot.resolvedService == .claude ? "实验性 · Claude Code 会话记录；不代表后台实时查询" : "Codex 账户额度")
+        .help(snapshot.resolvedService == .claude ? L("实验性 · Claude Code 会话记录；不代表后台实时查询") : L("Codex 账户额度"))
     }
 
     private func quotaBar(_ title: String, window: UsageWindow?) -> some View {
@@ -117,7 +117,7 @@ private struct QuotaMediumPanelView: View {
             .frame(height: 6)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(title)，\(remaining.map { "剩余 \($0)%" } ?? "等待账户数据")")
+        .accessibilityLabel(LF("%@，%@", title, remaining.map { LF("剩余 %lld%%", $0) } ?? L("等待账户数据")))
     }
 }
 
@@ -154,12 +154,12 @@ public struct QuotaWidgetView: View {
                     // Keep the clock independent of account polling and snapshot timestamps.
                     TimelineView(.periodic(from: .now, by: 1)) { _ in
                         HStack(spacing: 6) {
-                            Circle().fill(snapshot.statusLabel(at: .now) == "已同步" ? .green : .orange)
+                            Circle().fill(snapshot.statusLabel(at: .now) == L("已同步") ? .green : .orange)
                                 .frame(width: 6, height: 6)
                             Text(snapshot.statusLabel(at: .now))
                             Text(Date(), format: .dateTime.hour().minute().second())
                                 .monospacedDigit()
-                                .accessibilityLabel("Mac 系统时间")
+                                .accessibilityLabel(L("Mac 系统时间"))
                         }
                     }
                 }
@@ -168,13 +168,13 @@ public struct QuotaWidgetView: View {
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
                 .background(trackColor, in: Capsule())
-                .help(snapshot.hasQuota ? "系统时钟每秒更新；最近接收数据：\(snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard))" : "等待所选服务提供额度数据")
+                .help(snapshot.hasQuota ? LF("系统时钟每秒更新；最近接收数据：%@", snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard)) : L("等待所选服务提供额度数据"))
             }
 
             HStack(alignment: .bottom, spacing: 30) {
                 VStack(alignment: .leading, spacing: 14) {
-                    quotaSection(title: "5h额度", window: snapshot.fiveHour)
-                    quotaSection(title: "周额度", window: snapshot.weekly)
+                    quotaSection(title: L("5h额度"), window: snapshot.fiveHour)
+                    quotaSection(title: L("周额度"), window: snapshot.weekly)
                 }
                 .frame(maxWidth: 244)
 
@@ -184,32 +184,32 @@ public struct QuotaWidgetView: View {
                                        provider: snapshot.resolvedService).equatable()
                     } else if snapshot.resolvedService == .claude {
                         VStack(alignment: .leading, spacing: 10) {
-                            Label("Claude Code · 实验性", systemImage: "flask")
+                            Label(L("Claude Code · 实验性"), systemImage: "flask")
                                 .font(.subheadline.weight(.semibold))
-                            Text("此接入提供会话额度记录，尚无可靠的七日 Token 历史。")
-                            Text("最近接收：\(snapshot.hasQuota ? snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .shortened) : "等待会话数据")")
+                            Text(L("此接入提供会话额度记录，尚无可靠的七日 Token 历史。"))
+                            Text(LF("最近接收：%@", snapshot.hasQuota ? snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .shortened) : L("等待会话数据")))
                         }
                         .font(.caption).foregroundStyle(secondaryText)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                     } else {
                     HStack {
-                        Text("近 7 天趋势").font(.subheadline.weight(.semibold))
+                        Text(L("近 7 天趋势")).font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text("单位 M").font(.caption2).foregroundStyle(secondaryText)
+                        Text(L("Token（百万）")).font(.caption2).foregroundStyle(secondaryText)
                     }
                     Chart(snapshot.dailyUsage) { point in
                         if trend?.style == .line {
-                            LineMark(x: .value("日期", shortDate(point.startDate)),
+                            LineMark(x: .value(L("日期"), shortDate(point.startDate)),
                                      y: .value("Tokens (M)", point.millions))
                                 .interpolationMethod(.linear)
                                 .foregroundStyle(chartColor)
-                            PointMark(x: .value("日期", shortDate(point.startDate)),
+                            PointMark(x: .value(L("日期"), shortDate(point.startDate)),
                                       y: .value("Tokens (M)", point.millions))
                                 .symbolSize(12)
                                 .foregroundStyle(chartColor)
                         } else {
                         BarMark(
-                            x: .value("日期", shortDate(point.startDate)),
+                            x: .value(L("日期"), shortDate(point.startDate)),
                             y: .value("Tokens (M)", point.millions)
                         )
                         .foregroundStyle(chartColor.gradient)
@@ -222,13 +222,16 @@ public struct QuotaWidgetView: View {
                             AxisValueLabel().foregroundStyle(secondaryText)
                         }
                     }
+                    .chartXAxisLabel(position: .bottom, alignment: .trailing) {
+                        Text(L("日期（月/日）")).font(.caption2).foregroundStyle(secondaryText)
+                    }
                     .chartYAxis {
                         AxisMarks(position: .leading) {
                             AxisGridLine().foregroundStyle(gridColor)
                             AxisValueLabel().foregroundStyle(secondaryText)
                         }
                     }
-                    .accessibilityLabel("近七天 Codex Token 用量")
+                    .accessibilityLabel(L("近七天 Codex Token 用量，横轴为日期（月/日），纵轴单位为百万 Token"))
                     }
                 }
             }
@@ -278,10 +281,10 @@ public struct QuotaWidgetView: View {
 
     private func resetText(for window: UsageWindow?) -> String {
         if snapshot.resolvedService == .claude, window != nil, snapshot.displayWindow(window) == nil {
-            return "已到重置时间，等待会话更新"
+            return L("已到重置时间，等待会话更新")
         }
-        guard let date = window?.resetsAt else { return "等待账户数据" }
-        return "\(date.formatted(date: .numeric, time: .shortened)) 重置"
+        guard let date = window?.resetsAt else { return L("等待账户数据") }
+        return LF("%@ 重置", date.formatted(date: .numeric, time: .shortened))
     }
 
     private func shortDate(_ value: String) -> String {
@@ -306,7 +309,7 @@ public struct QuotaRingWidgetView: View {
         VStack(spacing: 8) {
             HStack(spacing: 12) {
                 quotaRing(title: "5h", window: snapshot.fiveHour)
-                quotaRing(title: "周", window: snapshot.weekly)
+                quotaRing(title: L("周"), window: snapshot.weekly)
             }
             if snapshot.resolvedService == .claude {
                 Text("Claude · \(snapshot.statusLabel(at: .now))").font(.caption2).foregroundStyle(.secondary)
@@ -339,8 +342,8 @@ public struct QuotaRingWidgetView: View {
                 .monospacedDigit()
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(snapshot.resolvedService.title) \(title)额度，\(remaining.map { "剩余 \($0)%" } ?? "等待数据")")
-        .help(snapshot.resolvedService == .claude ? "实验性 · 会话记录，不代表后台实时查询" : "Codex 账户额度")
+        .accessibilityLabel(LF("%@ %@额度，%@", snapshot.resolvedService.title, title, remaining.map { LF("剩余 %lld%%", $0) } ?? L("等待数据")))
+        .help(snapshot.resolvedService == .claude ? L("实验性 · 会话记录，不代表后台实时查询") : L("Codex 账户额度"))
     }
 
     private func quotaColor(for remaining: Int) -> Color {

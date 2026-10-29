@@ -6,7 +6,7 @@ enum InsightsRange: Int, CaseIterable, Identifiable {
     case hour = 1, day = 24, week = 168, month = 720
     var id: Self { self }
     var title: String {
-        switch self { case .hour: "近 1 小时"; case .day: "近 24 小时"; case .week: "近 7 天"; case .month: "近 30 天" }
+        switch self { case .hour: L("近 1 小时"); case .day: L("近 24 小时"); case .week: L("近 7 天"); case .month: L("近 30 天") }
     }
 }
 
@@ -150,7 +150,7 @@ final class InsightsStore: ObservableObject {
         guard case .failure(let error) = result else { return }
         let value = error as NSError
         guard value.domain != NSCocoaErrorDomain || value.code != NSUserCancelledError else { return }
-        message = "未能保存导出文件。请检查目标文件夹的权限和可用磁盘空间后重试。"
+        message = L("未能保存导出文件。请检查目标文件夹的权限和可用磁盘空间后重试。")
     }
 
     func setNotifications(_ enabled: Bool) async {
@@ -160,10 +160,10 @@ final class InsightsStore: ObservableObject {
         if enabled {
             do {
                 guard try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) else {
-                    message = "未获得通知许可；可在系统设置的“通知”中允许 Tallygent。"
+                    message = L("未获得通知许可；可在系统设置的“通知”中允许 Tallygent。")
                     return
                 }
-            } catch { message = "无法启用通知，请检查系统通知设置。"; return }
+            } catch { message = L("无法启用通知，请检查系统通知设置。"); return }
         }
         notificationsEnabled = enabled
         defaults.set(enabled, forKey: "insights.notificationsEnabled")

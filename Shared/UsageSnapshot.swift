@@ -10,7 +10,7 @@ public enum WidgetAppearance: String, Codable, CaseIterable, Identifiable, Senda
     case dark, light
 
     public var id: Self { self }
-    public var title: String { self == .dark ? "深色" : "浅色" }
+    public var title: String { self == .dark ? L("深色") : L("浅色") }
 }
 
 public enum GlassRefractionMode: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -174,20 +174,20 @@ public struct UsageSnapshot: Codable, Equatable, Sendable {
     }
 
     public func menuSummary(at now: Date = .now) -> String {
-        guard let value = displayWindow(weekly, at: now)?.remainingPercent else { return "等待额度数据" }
-        return "周额度剩余 \(value)%"
+        guard let value = displayWindow(weekly, at: now)?.remainingPercent else { return L("等待额度数据") }
+        return LF("周额度剩余 %lld%%", value)
     }
 
     public func statusLabel(at now: Date) -> String {
-        guard hasQuota else { return "等待数据" }
+        guard hasQuota else { return L("等待数据") }
         if resolvedService == .claude {
             let windows = [fiveHour, weekly].compactMap { $0 }
             let expired = windows.filter { displayWindow($0, at: now) == nil }.count
-            if expired == windows.count { return "窗口待更新" }
-            if expired > 0 { return "部分窗口待更新" }
-            return now.timeIntervalSince(lastReceivedAt) > 300 ? "较旧会话记录" : "会话记录"
+            if expired == windows.count { return L("窗口待更新") }
+            if expired > 0 { return L("部分窗口待更新") }
+            return now.timeIntervalSince(lastReceivedAt) > 300 ? L("较旧会话记录") : L("会话记录")
         }
-        return now.timeIntervalSince(lastReceivedAt) > 60 ? "数据待刷新" : "已同步"
+        return now.timeIntervalSince(lastReceivedAt) > 60 ? L("数据待刷新") : L("已同步")
     }
 
     /// Time changes presentation only at receipt-age and individual reset boundaries.

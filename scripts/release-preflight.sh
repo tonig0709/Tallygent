@@ -124,6 +124,7 @@ RUBY
 pass "the last mutable artifact is gated before a draft release can be created"
 
 section "Panel source, parser, and visual render checks"
+sh scripts/check-localization.sh "$app"
 sh scripts/check-observation-history.sh
 sh scripts/check-usage-insights.sh
 sh scripts/check-panel-trend.sh
@@ -133,7 +134,7 @@ sh scripts/check-codex-discovery.sh
 sh scripts/check-desktop-panel.sh
 swift run quota-self-check
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
-    Gate/PanelSnapshotProbe.swift Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
+    Gate/PanelSnapshotProbe.swift Shared/Localization.swift Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
     Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/UsageInsights.swift \
     Shared/ObservationHistory.swift Shared/ClaudeStatusline.swift \
     -lsqlite3 -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
@@ -202,7 +203,7 @@ section "Production model catalog and quota request isolation"
 /usr/bin/ditto Gate/fake-catalog-codex.py "$tmp/catalog-codex"
 chmod +x "$tmp/catalog-codex"
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
-    Gate/ModelCatalogProbe.swift App/CodexAppServer.swift Shared/AppServerParser.swift \
+    Gate/ModelCatalogProbe.swift Shared/Localization.swift App/CodexAppServer.swift Shared/AppServerParser.swift \
     Shared/UsageSnapshot.swift Shared/Planner.swift Shared/ClaudeStatusline.swift Shared/ObservationHistory.swift \
     -lsqlite3 -framework AppKit -framework Combine -framework Network -framework CryptoKit -o "$tmp/catalog-probe"
 CODEX_BINARY="$tmp/catalog-codex" "$tmp/catalog-probe"

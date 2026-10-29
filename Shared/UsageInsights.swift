@@ -31,11 +31,11 @@ public struct UsageWindowInsight: Identifiable, Equatable, Sendable {
     public let unavailableReason: String?
     public let history: [UsageHistoryPoint]
 
-    public var title: String { windowID == "fiveHour" ? "5h 额度" : "周额度" }
+    public var title: String { windowID == "fiveHour" ? L("5h 额度") : L("周额度") }
     public var scopeLabel: String {
-        guard let latest else { return "尚无来源记录" }
-        if latest.accountScope != nil { return "按账户隔离" }
-        return latest.sessionScope != nil ? "仅此会话；账户范围未核实" : "身份范围未知"
+        guard let latest else { return L("尚无来源记录") }
+        if latest.accountScope != nil { return L("按账户隔离") }
+        return latest.sessionScope != nil ? L("仅此会话；账户范围未核实") : L("身份范围未知")
     }
 }
 
@@ -47,7 +47,7 @@ public struct UsageResetEvent: Identifiable, Equatable, Sendable {
     public let source: ObservationSource
     public let receivedAt: Date
     public let isFresh: Bool
-    public var title: String { windowID == "fiveHour" ? "5h 额度" : "周额度" }
+    public var title: String { windowID == "fiveHour" ? L("5h 额度") : L("周额度") }
 }
 
 public struct UsageBacktestSummary: Equatable, Sendable {
@@ -91,7 +91,7 @@ public enum UsageInsights {
         }.sorted { $0.resetsAt < $1.resetsAt }
         return UsageInsightsReport(generatedAt: now, windows: windows, resetTimeline: resets,
                                    backtest: backtest(rows: rows),
-                                   pacingExplanation: "来源没有确认固定周期或滚动恢复语义，暂不绘制理想消耗线；5h 与周额度分别约束，不合计成总余额。")
+                                   pacingExplanation: L("来源没有确认固定周期或滚动恢复语义，暂不绘制理想消耗线；5h 与周额度分别约束，不合计成总余额。"))
     }
 
     static func contextKey(_ row: QuotaObservation) -> String {
@@ -142,7 +142,7 @@ public enum UsageInsights {
             return UsageWindowInsight(provider: provider, windowID: windowID, latest: nil,
                 currentRemainingPercent: nil, isFresh: false, sampleCount: 0, segmentSamples: 0,
                 observedSpan: 0, ratePerHour: nil, forecast: nil,
-                unavailableReason: "尚无真实额度观测；历史从启用采集后开始积累。", history: [])
+                unavailableReason: L("尚无真实额度观测；历史从启用采集后开始积累。"), history: [])
         }
         // Never display an old account as a continuation of the currently observed one.
         let context = Array(rows.reversed().prefix { contextKey($0) == contextKey(latest) }.reversed())
@@ -166,19 +166,19 @@ public enum UsageInsights {
         var reason: String?
         var rate: Double?
         var estimate: UsageDepletionEstimate?
-        if !valid { reason = "来源此次未提供这个额度窗口，不沿用旧值作为新数据。" }
-        else if expired { reason = "来源所报重置时间已到；等待新观测确认，不假设额度已恢复。" }
-        else if !fresh { reason = "来源记录已陈旧，暂无法估计；Mac 时钟变化不代表额度刷新。" }
+        if !valid { reason = L("来源此次未提供这个额度窗口，不沿用旧值作为新数据。") }
+        else if expired { reason = L("来源所报重置时间已到；等待新观测确认，不假设额度已恢复。") }
+        else if !fresh { reason = L("来源记录已陈旧，暂无法估计；Mac 时钟变化不代表额度刷新。") }
         else if latest.accountScope == nil && latest.sessionScope == nil {
-            reason = "身份范围未知，无法安全合并多次观测来估计速度。"
+            reason = L("身份范围未知，无法安全合并多次观测来估计速度。")
         } else if latest.durationMinutes == nil || latest.resetsAt == nil {
-            reason = "来源缺少周期长度或重置时间，暂无法确认额度窗口。"
+            reason = L("来源缺少周期长度或重置时间，暂无法确认额度窗口。")
         } else if recent.count < 4 || span < 300 {
-            reason = "同一窗口至少需要 4 次连续观测、跨度 5 分钟；历史仍不足。"
+            reason = L("同一窗口至少需要 4 次连续观测、跨度 5 分钟；历史仍不足。")
         } else {
             let delta = latest.usedPercent! - recent[0].usedPercent!
             if delta < 3 {
-                reason = "近期变化不足 3 个百分点；整数百分比的分辨率不足以可靠外推，不代表额度无限。"
+                reason = L("近期变化不足 3 个百分点；整数百分比的分辨率不足以可靠外推，不代表额度无限。")
             } else {
                 let hours = span / 3_600
                 rate = Double(delta) / hours
@@ -188,18 +188,18 @@ public enum UsageInsights {
                 let earliest = latest.receivedAt.addingTimeInterval(remaining / upper * 3_600)
                 let last = latest.receivedAt.addingTimeInterval(remaining / lower * 3_600)
                 if remaining == 0 {
-                    reason = "最新观测已到 0%；这是来源读数，不是未来耗尽预测。"
+                    reason = L("最新观测已到 0%；这是来源读数，不是未来耗尽预测。")
                 } else if earliest <= now {
-                    reason = "估算的最早耗尽时间已过去，请刷新来源确认当前额度。"
+                    reason = L("估算的最早耗尽时间已过去，请刷新来源确认当前额度。")
                 } else if let reset = latest.resetsAt, last >= reset {
-                    reason = "估算范围跨越下一重置，重置后的容量未知，因此不继续外推。"
+                    reason = L("估算范围跨越下一重置，重置后的容量未知，因此不继续外推。")
                 } else {
                     estimate = UsageDepletionEstimate(earliest: earliest, latest: last,
                         lowerRatePerHour: lower, upperRatePerHour: upper,
                         assumptions: [
-                            "假设近期账户整体消耗速度保持不变；其他设备和任务会改变结果。",
-                            "范围只反映整数百分比的 ±1 点端点误差，不是统计置信区间。",
-                            "不跨重置、身份/来源变化或长时间缺测外推；不是任务成本或 Token 预测。"
+                            L("假设近期账户整体消耗速度保持不变；其他设备和任务会改变结果。"),
+                            L("范围只反映整数百分比的 ±1 点端点误差，不是统计置信区间。"),
+                            L("不跨重置、身份/来源变化或长时间缺测外推；不是任务成本或 Token 预测。")
                         ])
                 }
             }
@@ -250,7 +250,7 @@ public enum UsageInsights {
             meanAbsoluteErrorPercentagePoints: errors.isEmpty ? nil : errors.reduce(0, +) / Double(errors.count),
             baselineMeanAbsoluteErrorPercentagePoints: baseline.isEmpty ? nil : baseline.reduce(0, +) / Double(baseline.count),
             horizonMinutes: 5,
-            explanation: "仅用历史前缀预测约 5 分钟后的账户百分比；与保持当前读数的基线比较。最近每窗口最多 12 个回放点；未满足条件的点计为不可估计。这不是耗尽时间准确率或置信概率。")
+            explanation: L("仅用历史前缀预测约 5 分钟后的账户百分比；与保持当前读数的基线比较。最近每窗口最多 12 个回放点；未满足条件的点计为不可估计。这不是耗尽时间准确率或置信概率。"))
     }
 }
 
@@ -308,10 +308,10 @@ public struct UsageAlertState: Codable, Sendable {
         for (key, reset) in resets where reset.date <= now {
             let eventID = "reset|\(key)|\(reset.date.timeIntervalSince1970)"
             if !first, now.timeIntervalSince(reset.date) <= 300, delivered[eventID] == nil {
-                let windowTitle = reset.windowID == "fiveHour" ? "5h 额度" : "周额度"
+                let windowTitle = reset.windowID == "fiveHour" ? L("5h 额度") : L("周额度")
                 events.append(UsageAlertEvent(id: eventID, kind: .expectedReset, provider: reset.provider,
-                    windowID: reset.windowID, title: "\(reset.provider.title) \(windowTitle)预计重置时间已到",
-                    body: "来源此前预计此时重置；请查看新额度记录确认，不代表额度已经恢复。"))
+                    windowID: reset.windowID, title: LF("%@ %@预计重置时间已到", reset.provider.title, windowTitle),
+                    body: L("来源此前预计此时重置；请查看新额度记录确认，不代表额度已经恢复。")))
                 delivered[eventID] = now
             }
             resets.removeValue(forKey: key)
@@ -334,8 +334,8 @@ public struct UsageAlertState: Codable, Sendable {
                 let eventID = "low|\(UsageInsights.cycleKey(row))|\(row.id)"
                 if delivered[eventID] == nil {
                     events.append(UsageAlertEvent(id: eventID, kind: .lowQuota, provider: row.provider,
-                        windowID: row.windowID, title: "\(row.provider.title) \(window.title)偏低",
-                        body: "最新来源读数剩余 \(remaining)%。5h 和周额度分别计算；不会自动执行或迁移任务。"))
+                        windowID: row.windowID, title: LF("%@ %@偏低", row.provider.title, window.title),
+                        body: LF("最新来源读数剩余 %lld%%。5h 和周额度分别计算；不会自动执行或迁移任务。", remaining)))
                     delivered[eventID] = now
                 }
             }

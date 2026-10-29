@@ -399,6 +399,11 @@ struct DesktopPanelProbe {
         let ideal: CGSize
     }
 
+    /// Hosting-view fittingSize is an unconstrained ideal, not a proposed-viewport measurement.
+    private static func fitsProposedWidth(_ size: CGSize, width: CGFloat) -> Bool {
+        size.width.isFinite && size.height.isFinite && size.width > 0 && size.height > 0 && size.width <= width + 2
+    }
+
     /// Internal labels must fit their natural text, not merely their outer NSHostingView.
     private static func layoutViolations(_ measured: [String: MeasuredControl], width: CGFloat,
                                          prefixes: [String], required: Set<String>) -> [String] {
@@ -547,7 +552,8 @@ struct DesktopPanelProbe {
                         }
                     }
                     .background(Color(nsColor: .windowBackgroundColor))
-                let view = NSHostingView(rootView: expanded)
+                let controller = NSHostingController(rootView: expanded)
+                let view = controller.view
                 view.frame = NSRect(x: 0, y: 0, width: 1_120, height: 760)
                 let window = NSWindow(contentRect: view.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
                 window.isReleasedWhenClosed = false
@@ -558,9 +564,12 @@ struct DesktopPanelProbe {
                     window.setContentSize(NSSize(width: width, height: 760))
                     view.layoutSubtreeIfNeeded()
                     RunLoop.main.run(until: Date().addingTimeInterval(0.2))
-                    var required: Set<String> = ["planner.provider.label", "planner.category.label", "planner.preference.label",
+                    var required: Set<String> = ["planner.content.container", "planner.header.container",
+                        "planner.provider.label", "planner.category.label", "planner.preference.label",
                         "planner.profile.规模.label", "planner.profile.不确定性.label", "planner.profile.风险.label"]
-                    for id in Array(required) { required.insert(String(id.dropLast(".label".count)) + ".container") }
+                    for id in Array(required) where id.hasSuffix(".label") {
+                        required.insert(String(id.dropLast(".label".count)) + ".container")
+                    }
                     let failures = layoutViolations(measured, width: width, prefixes: ["planner"], required: required)
                     if !failures.isEmpty {
                         print("Expanded Planner layout failed \(locale) \(theme) font21 width\(width): \(failures.joined(separator: "; "))")
@@ -569,19 +578,30 @@ struct DesktopPanelProbe {
                     precondition(failures.isEmpty, "expanded Planner profile labels are compressed or clipped")
                     precondition(abs(window.contentRect(forFrameRect: window.frame).width - width) < 2, "expanded Planner native window did not follow the requested width")
                     precondition(abs(view.frame.width - width) < 2, "expanded Planner hosting view did not follow the requested width")
-                    if view.fittingSize.width > width + 2 {
-                        print("Expanded Planner intrinsic overflow: language=\(probeLanguage) locale=\(locale) theme=\(theme) font21 requestedWidth=\(width) fittingSize=\(view.fittingSize) hostingFrame=\(view.frame) contentRect=\(window.contentRect(forFrameRect: window.frame))")
+                    let proposedSize = controller.sizeThatFits(in: CGSize(width: width, height: 760))
+                    if view.fittingSize.width > width + 2 || !fitsProposedWidth(proposedSize, width: width) {
+                        print("Expanded Planner size diagnostic: language=\(probeLanguage) locale=\(locale) theme=\(theme) font21 requestedWidth=\(width) proposedSize=\(proposedSize) unconstrainedIdeal=\(view.fittingSize) hostingFrame=\(view.frame) contentRect=\(window.contentRect(forFrameRect: window.frame))")
                         print("Expanded Planner measurements: \(measured.sorted { $0.key < $1.key }.map { "\($0.key): frame=\($0.value.frame), ideal=\($0.value.ideal)" }.joined(separator: "; "))")
-                        saveLayoutImage(view, name: "planner-expanded-overflow-\(Int(width))")
                         fflush(stdout)
                     }
-                    precondition(view.fittingSize.width <= width + 2, "expanded Planner overflows its window")
+                    if !fitsProposedWidth(proposedSize, width: width) {
+                        saveLayoutImage(view, name: "planner-expanded-overflow-\(Int(width))")
+                    }
+                    precondition(fitsProposedWidth(proposedSize, width: width), "expanded Planner ignores its proposed window width")
                     verified += 1
                     if theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }
                 }
                 window.close()
             }
         }
+
+        // The same native proposed-size measurement must reject genuinely uncompressible content.
+        // Otherwise correcting the ideal-size false positive would silently weaken overflow detection.
+        let tooWide = NSHostingController(rootView: Color.clear.frame(width: 900, height: 60))
+        let rejectedSize = tooWide.sizeThatFits(in: CGSize(width: 760, height: 760))
+        precondition(!fitsProposedWidth(rejectedSize, width: 760),
+                     "proposed-size gate accepted a fixed 900pt view inside a 760pt viewport")
+        print("Native proposed-size negative control rejected: \(rejectedSize)")
 
         // Negative control: render the actual native segmented Picker in a too-small row.
         // The CJK Text must compress or leave its field; the very same validator must reject it.

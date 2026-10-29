@@ -38,6 +38,8 @@ its runtime requires an isolated CI user, not a personal desktop session.
   Solid-black negative controls must fail. Updated quota snapshots must change every layout.
 - **Shared settings:** opacity boundaries, thresholds, settings serialization and visible
   optical parameter changes remain covered. Mode selection has a safe large-mode fallback.
+  Elastic highlights must stay within the rounded rim at every panel size and corner
+  radius, at rest and with pointer movement; the old detached blurred bar must fail.
 - **Large-panel trends:** seven-day Token / 12h / 24h history × bar/line styles must remain
   readable in both themes and opacity bounds. Plot-only comparisons must prove history
   updates independently of the live clock/current quota. Small/medium pixels remain unchanged.
@@ -79,6 +81,9 @@ CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
 - [ ] Edge dispersion at 0%/100% visibly changes only the rim. Frost depth at 0%/100%
       visibly changes haze at minimum opacity, while fully opaque dark glass stays black.
       Labels must distinguish native system blur from the adjustable haze layer; no private backdrop APIs or screen capture are used.
+- [ ] At minimum/maximum elastic highlight and corner radius, check the panel and App
+      preview in all three languages: highlights follow the rounded rim, with no detached
+      white bar inside the surface. Pointer feedback must not move the rim into content.
 - [ ] Generate usage; verify 5h, weekly and large-panel trend refresh within the expected polling cycle.
       Closing a panel must not stop the App's connection.
 - [ ] In panel settings switch the large chart among seven-day Token, 12h and 24h, and

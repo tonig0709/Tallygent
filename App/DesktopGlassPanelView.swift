@@ -291,10 +291,6 @@ private struct DesktopGlassSurface: View {
         )
     }
 
-    private var motionStrength: CGFloat {
-        reduceMotion ? 0 : CGFloat(min(1, max(0, elasticity)))
-    }
-
     private var highlightStart: UnitPoint {
         UnitPoint(x: min(1, max(0, 0.5 - hoverVector.width * 0.5)), y: min(1, max(0, 0.5 - hoverVector.height * 0.5)))
     }
@@ -369,20 +365,9 @@ private struct DesktopGlassSurface: View {
     private var toneOpacity: Double { 0.035 * saturation }
 
     private var elasticHighlight: some View {
-        VStack {
-            HStack {
-                Capsule()
-                    .fill(.white.opacity((isLight ? 0.30 : 0.16) + elasticity * 0.34))
-                    .frame(width: CGFloat(42 + elasticity * 118), height: CGFloat(1 + elasticity * 4.5))
-                    .blur(radius: CGFloat(elasticity * 1.2))
-                    .offset(x: hoverVector.width * motionStrength * 16, y: hoverVector.height * motionStrength * 8)
-                    .padding(.leading, CGFloat(18 + displacement * 10))
-                    .padding(.top, CGFloat(1.2 + displacement * 2.8))
-                Spacer(minLength: 0)
-            }
-            Spacer(minLength: 0)
-        }
-        .allowsHitTesting(false)
+        GlassRimHighlight(isLight: isLight, cornerRadius: cornerRadius,
+                          elasticity: elasticity, displacement: displacement,
+                          hoverVector: reduceMotion ? .zero : hoverVector)
     }
 
     private var borderLayer: some View {

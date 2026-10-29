@@ -163,6 +163,29 @@ func hasReadableContrast(_ bitmap: NSBitmapImageRep, in region: CGRect) -> Bool 
         max(counts.dark, counts.bright) > counts.total / 5
 }
 
+/// An optical highlight may illuminate the continuous rim, never paint an inset interior bar.
+/// Inspect the production highlight alone: wallpaper/compositor blur and content are unrelated.
+@MainActor
+func hasConfinedRimHighlight(_ bitmap: NSBitmapImageRep, size: CGSize, cornerRadius: CGFloat) -> Bool {
+    let bounds = CGRect(origin: .zero, size: size)
+    let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    let interior = shape.inset(by: 4).path(in: bounds)
+    let antialiasedOutline = shape.inset(by: -1).path(in: bounds)
+    var rimPixels = 0
+    for y in 0..<bitmap.pixelsHigh {
+        for x in 0..<bitmap.pixelsWide {
+            guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                  color.alphaComponent > 0.02 else { continue }
+            let point = CGPoint(x: (CGFloat(x) + 0.5) * size.width / CGFloat(bitmap.pixelsWide),
+                                y: (CGFloat(y) + 0.5) * size.height / CGFloat(bitmap.pixelsHigh))
+            // Rounded-rectangle paths are symmetric, so bitmap vertical orientation does not matter.
+            if interior.contains(point) || !antialiasedOutline.contains(point) { return false }
+            rimPixels += 1
+        }
+    }
+    return rimPixels > 8
+}
+
 @MainActor
 @discardableResult
 func checkRender<Content: View, Background: View>(
@@ -498,6 +521,37 @@ await MainActor.run {
         changedPixels(quietElasticity, expressiveElasticity, in: fullFrame) > 100,
         "glass elasticity setting has no visible render effect"
     )
+
+    for mode in DesktopPanelMode.allCases {
+        for radius in [10.0, 30, 64] {
+            for elasticity in [0.0, 1] {
+                for hover in [CGSize.zero, CGSize(width: -1, height: -1), CGSize(width: 1, height: 1)] {
+                    let highlight = render(
+                        GlassRimHighlight(isLight: false, cornerRadius: radius, elasticity: elasticity,
+                                          displacement: 1, hoverVector: hover),
+                        width: mode.size.width, height: mode.size.height
+                    )
+                    precondition(hasConfinedRimHighlight(highlight, size: mode.size, cornerRadius: CGFloat(radius)),
+                                 "\(mode.rawValue) radius\(radius) elasticity\(elasticity) hover\(hover) highlight leaves its continuous rim")
+                }
+            }
+        }
+    }
+    let detachedBarSize = DesktopPanelMode.large.size
+    let detachedBar = render(
+        ZStack(alignment: .topLeading) {
+            Color.clear
+            Capsule().fill(.white.opacity(0.5))
+                .frame(width: 160, height: 5.5)
+                .blur(radius: 1.2)
+                .padding(.leading, 28).padding(.top, 4)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 64, style: .continuous)),
+        width: detachedBarSize.width, height: detachedBarSize.height
+    )
+    precondition(!hasConfinedRimHighlight(detachedBar, size: detachedBarSize, cornerRadius: 64),
+                 "rim-confinement detector accepted the original detached blurred white bar")
+    print("Glass rim confinement passed: three sizes, continuous corners, elasticity/hover extremes, detached-bar negative control.")
 
     let quietDisplacement = render(
         LiquidGlassSurface(isLight: true, opacity: 0.7, accent: .blue, elasticity: 0.5, displacement: 0),

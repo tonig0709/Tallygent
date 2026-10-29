@@ -355,6 +355,44 @@ public struct QuotaRingWidgetView: View {
     }
 }
 
+/// A specular reflection stays on the glass contour; only its light field moves.
+public struct GlassRimHighlight: View {
+    private let isLight: Bool
+    private let cornerRadius: Double
+    private let elasticity: Double
+    private let displacement: Double
+    private let hoverVector: CGSize
+
+    public init(isLight: Bool, cornerRadius: Double, elasticity: Double, displacement: Double,
+                hoverVector: CGSize = .zero) {
+        self.isLight = isLight
+        self.cornerRadius = cornerRadius.isFinite ? min(64, max(0, cornerRadius)) : 30
+        self.elasticity = elasticity.isFinite ? min(1, max(0, elasticity)) : 0
+        self.displacement = displacement.isFinite ? min(1, max(0, displacement)) : 0
+        self.hoverVector = CGSize(
+            width: hoverVector.width.isFinite ? min(1, max(-1, hoverVector.width)) : 0,
+            height: hoverVector.height.isFinite ? min(1, max(-1, hoverVector.height)) : 0
+        )
+    }
+
+    public var body: some View {
+        RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+            .strokeBorder(
+                RadialGradient(
+                    colors: [.white.opacity((isLight ? 0.20 : 0.10) + elasticity * (isLight ? 0.64 : 0.56)), .clear],
+                    center: UnitPoint(
+                        x: min(1, max(0, 0.22 + Double(hoverVector.width) * elasticity * 0.45)),
+                        y: min(1, max(0, 0.06 + Double(hoverVector.height) * elasticity * 0.65))
+                    ),
+                    startRadius: 0,
+                    endRadius: CGFloat(120 + elasticity * 120 + displacement * 40)
+                ),
+                lineWidth: CGFloat(0.8 + elasticity * 1.7 + displacement * 0.2)
+            )
+            .allowsHitTesting(false)
+    }
+}
+
 public struct LiquidGlassSurface: View {
     let isLight: Bool
     let opacity: Double
@@ -492,13 +530,8 @@ public struct LiquidGlassSurface: View {
     }
 
     private var elasticHighlight: some View {
-        Capsule()
-            .fill(.white.opacity((isLight ? 0.30 : 0.16) + elasticity * 0.34))
-            .frame(width: CGFloat(42 + elasticity * 118), height: CGFloat(1 + elasticity * 4.5))
-            .blur(radius: CGFloat(elasticity * 1.2))
-            .padding(.leading, CGFloat(18 + displacement * 10))
-            .padding(.top, CGFloat(1.2 + displacement * 2.8))
-            .allowsHitTesting(false)
+        GlassRimHighlight(isLight: isLight, cornerRadius: cornerRadius,
+                          elasticity: elasticity, displacement: displacement)
     }
 
     @ViewBuilder

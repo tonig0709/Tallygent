@@ -85,6 +85,28 @@ fi
 grep -q 'QuotaPanelContent(mode: mode, snapshot: panelSnapshot' App/DesktopGlassPanelView.swift
 grep -Fq 'DesktopPanelDragRegion(cornerRadius: cornerRadius)' App/DesktopGlassPanelView.swift
 grep -Fq 'GlassOptics(blurAmount: blurAmount, dispersion: dispersion)' App/DesktopGlassPanelView.swift
+for source in Shared/QuotaWidgetView.swift App/DesktopGlassPanelView.swift; do
+    grep -Fq 'GlassRimHighlight(' "$source" || {
+        echo "Glass surface bypasses the checked edge-following highlight: $source" >&2
+        exit 1
+    }
+    if grep -Fq '42 + elasticity * 118' "$source"; then
+        echo "Detached blurred highlight capsule has returned: $source" >&2
+        exit 1
+    fi
+done
+# Check consumption as well as declaration: an unused helper must not satisfy the gate.
+grep -Fq '.overlay(alignment: .topLeading) { elasticHighlight }' Shared/QuotaWidgetView.swift
+awk '
+    /private struct DesktopGlassSurface: View/ { surface = 1 }
+    surface && /var body: some View/ { body = 1 }
+    body && /^[[:space:]]*elasticHighlight[[:space:]]*$/ { found = 1 }
+    body && /private var frostColor/ { body = 0; surface = 0 }
+    END { if (!found) exit 1 }
+' App/DesktopGlassPanelView.swift || {
+    echo 'Desktop glass body no longer renders the checked rim highlight' >&2
+    exit 1
+}
 if grep -Eq 'import WidgetKit|WidgetCenter|WidgetRepairService' App/*.swift; then
     echo 'Panel-only app still invokes WidgetKit' >&2
     exit 1

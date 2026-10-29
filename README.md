@@ -15,9 +15,9 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.8.0/Tallygent-v0.8.0-macOS.dmg"><strong>Download for macOS</strong></a> ·
-  <a href="https://github.com/tonig0709/Tallygent/releases/tag/v0.8.0">Release notes</a> ·
-  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.8.0/Tallygent-v0.8.0-checksums.txt">SHA-256 checksums</a>
+  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.8.1/Tallygent-v0.8.1-macOS.dmg"><strong>Download for macOS</strong></a> ·
+  <a href="https://github.com/tonig0709/Tallygent/releases/tag/v0.8.1">Release notes</a> ·
+  <a href="https://github.com/tonig0709/Tallygent/releases/download/v0.8.1/Tallygent-v0.8.1-checksums.txt">SHA-256 checksums</a>
 </p>
 
 Tallygent is a local-first macOS app for monitoring **Codex** and, experimentally, **Claude Code**. Follow your **12/24-hour quota history**, keep a movable Liquid Glass panel on your desktop, and get explainable model-and-effort suggestions without granting permission to run tasks.
@@ -30,7 +30,7 @@ The gallery uses native demo-data captures from **v0.7.1 / build 52**, before th
 
 ## Available languages
 
-**English · 简体中文 · 繁體中文** — available in v0.8.0. Tallygent automatically follows your Mac’s preferred language, including any per-app language override. Other languages fall back to English. Relaunch after changing language; date, time and number formats follow your system region. [Localization details](docs/LOCALIZATION.md).
+**English · 简体中文 · 繁體中文** — available in v0.8.1. Tallygent automatically follows your Mac’s preferred language, including any per-app language override. Other languages fall back to English. Relaunch after changing language; date, time and number formats follow your system region. [Localization details](docs/LOCALIZATION.md).
 
 README: **English** · [简体中文](README.zh-CN.md) · [繁體中文](README.zh-TW.md). These links switch the document, not the app.
 
@@ -66,9 +66,9 @@ The app preview and the single desktop panel share settings. These are native re
 
 ## Download and get started
 
-**Current stable release: [v0.8.0 (build 54)](https://github.com/tonig0709/Tallygent/releases/tag/v0.8.0).** Requires **macOS 14+**; one universal app supports **Apple Silicon and Intel**. There is no Windows or iOS build.
+**Current stable release: [v0.8.1 (build 55)](https://github.com/tonig0709/Tallygent/releases/tag/v0.8.1).** Requires **macOS 14+**; one universal app supports **Apple Silicon and Intel**. There is no Windows or iOS build.
 
-1. [Download the DMG](https://github.com/tonig0709/Tallygent/releases/download/v0.8.0/Tallygent-v0.8.0-macOS.dmg). Choose the `.dmg` asset, not GitHub's **Source code** archive.
+1. [Download the DMG](https://github.com/tonig0709/Tallygent/releases/download/v0.8.1/Tallygent-v0.8.1-macOS.dmg). Choose the `.dmg` asset, not GitHub's **Source code** archive.
 2. Drag **Tallygent.app** into **Applications**, eject the disk image, then launch the installed app.
 3. For Codex, install and sign in to Codex CLI or a supported Codex/ChatGPT Mac app that includes Codex. Select **Codex** in Tallygent.
 4. Choose a panel size and click **Desktop Glass Panel** (`桌面玻璃面板`). Use **Glass Settings** (`玻璃设置`) to adjust its appearance and chart.

@@ -8,15 +8,15 @@ Tallygent 是本地优先的 macOS 应用，监测 **Codex** 与实验性 **Clau
 
 ## 语言支持
 
-**English、简体中文、繁體中文**，从 v0.8.0 开始提供。应用自动跟随 Mac 的首选语言，也尊重系统为单个 App 指定的语言；未支持的语言回退为 English。更改语言后请重新启动应用。日期、时间与数字格式仍跟随系统地区设置。
+**English、简体中文、繁體中文**，从 v0.8.1 开始提供。应用自动跟随 Mac 的首选语言，也尊重系统为单个 App 指定的语言；未支持的语言回退为 English。更改语言后请重新启动应用。日期、时间与数字格式仍跟随系统地区设置。
 
 这里的 README 语言链接仅切换文档，不改变应用或系统设置。详见[本地化说明](docs/LOCALIZATION.md)。
 
 ## 下载与安装
 
-**v0.8.0（build 54）** · **macOS 14+** · **Apple Silicon / Intel 通用构建**。
+**v0.8.1（build 55）** · **macOS 14+** · **Apple Silicon / Intel 通用构建**。
 
-[下载 DMG](https://github.com/tonig0709/Tallygent/releases/download/v0.8.0/Tallygent-v0.8.0-macOS.dmg) · [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.8.0) · [SHA-256](https://github.com/tonig0709/Tallygent/releases/download/v0.8.0/Tallygent-v0.8.0-checksums.txt)
+[下载 DMG](https://github.com/tonig0709/Tallygent/releases/download/v0.8.1/Tallygent-v0.8.1-macOS.dmg) · [发布说明](https://github.com/tonig0709/Tallygent/releases/tag/v0.8.1) · [SHA-256](https://github.com/tonig0709/Tallygent/releases/download/v0.8.1/Tallygent-v0.8.1-checksums.txt)
 
 1. 下载 `.dmg`，不是 GitHub 的 Source code 压缩包。
 2. 把 **Tallygent.app** 拖到“应用程序”，弹出 DMG，再启动安装好的应用。

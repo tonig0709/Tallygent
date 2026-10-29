@@ -1,6 +1,6 @@
 # Native language support
 
-Tallygent v0.8.0 adds **English (`en`)**, **简体中文 (`zh-Hans`)**, and **繁體中文 (`zh-Hant`)**.
+Tallygent v0.8.1 adds **English (`en`)**, **简体中文 (`zh-Hans`)**, and **繁體中文 (`zh-Hant`)**.
 
 ## Selection
 

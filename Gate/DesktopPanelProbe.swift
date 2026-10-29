@@ -58,6 +58,7 @@ struct DesktopPanelProbe {
     @MainActor
     static func main() {
         _ = NSApplication.shared
+        setbuf(stdout, nil)
         verifyNativeLocalization()
         verifyLocalizedPanelRenders()
         if ProcessInfo.processInfo.environment["TALLYGENT_LAYOUT_ONLY"] == "1" {
@@ -568,6 +569,12 @@ struct DesktopPanelProbe {
                     precondition(failures.isEmpty, "expanded Planner profile labels are compressed or clipped")
                     precondition(abs(window.contentRect(forFrameRect: window.frame).width - width) < 2, "expanded Planner native window did not follow the requested width")
                     precondition(abs(view.frame.width - width) < 2, "expanded Planner hosting view did not follow the requested width")
+                    if view.fittingSize.width > width + 2 {
+                        print("Expanded Planner intrinsic overflow: language=\(probeLanguage) locale=\(locale) theme=\(theme) font21 requestedWidth=\(width) fittingSize=\(view.fittingSize) hostingFrame=\(view.frame) contentRect=\(window.contentRect(forFrameRect: window.frame))")
+                        print("Expanded Planner measurements: \(measured.sorted { $0.key < $1.key }.map { "\($0.key): frame=\($0.value.frame), ideal=\($0.value.ideal)" }.joined(separator: "; "))")
+                        saveLayoutImage(view, name: "planner-expanded-overflow-\(Int(width))")
+                        fflush(stdout)
+                    }
                     precondition(view.fittingSize.width <= width + 2, "expanded Planner overflows its window")
                     verified += 1
                     if theme == "light", width == 760 { saveLayoutImage(view, name: "planner-cn21-expanded-760") }

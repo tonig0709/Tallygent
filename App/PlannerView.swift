@@ -91,7 +91,7 @@ struct PlannerView: View {
     private var header: some View {
         ViewThatFits(in: .horizontal) {
             HStack(alignment: .top, spacing: 16) {
-                heading.fixedSize(horizontal: true, vertical: true)
+                heading.fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 providerPicker.fixedSize(horizontal: true, vertical: true)
             }
@@ -150,10 +150,14 @@ struct PlannerView: View {
                 VStack(alignment: .leading, spacing: 12) {
                     TextField("补充背景（不保存）", text: $context)
                         .onChange(of: context) { _, value in context = String(value.prefix(2_000)); advice = nil }
-                    HStack(spacing: 20) {
-                        levelPicker("规模", value: profileLevel(\.complexity), size: true)
-                        levelPicker("不确定性", value: profileLevel(\.uncertainty))
-                        levelPicker("风险", value: profileLevel(\.risk))
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 20) {
+                            profilePickers
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                        VStack(alignment: .leading, spacing: 12) {
+                            profilePickers
+                        }
                     }
                     Text("安全、认证和关键业务关键词始终保留高风险护栏。高 effort 不等于保证成功。")
                         .font(.caption).foregroundStyle(.secondary)
@@ -176,6 +180,13 @@ struct PlannerView: View {
                 .disabled(taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+    }
+
+    @ViewBuilder
+    private var profilePickers: some View {
+        levelPicker("规模", value: profileLevel(\.complexity), size: true)
+        levelPicker("不确定性", value: profileLevel(\.uncertainty))
+        levelPicker("风险", value: profileLevel(\.risk))
     }
 
     private func levelPicker(_ title: String, value: Binding<PlannerLevel>, size: Bool = false) -> some View {

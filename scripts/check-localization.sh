@@ -64,7 +64,8 @@ cp Gate/LocalizationProbeInfo.plist "$probe_app/Contents/Info.plist"
 for language in en zh-Hans zh-Hant; do
     /usr/bin/ditto "Resources/$language.lproj" "$probe_app/Contents/Resources/$language.lproj"
 done
-xcrun swiftc -parse-as-library Gate/LocalizationProbe.swift Shared/Localization.swift \
+xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
+    -module-cache-path "$probe_dir/module-cache" Gate/LocalizationProbe.swift Shared/Localization.swift \
     -o "$probe_app/Contents/MacOS/localization-probe"
 for language in en zh-Hans zh-Hant zh-CN zh-TW zh-HK fr; do
     expected="$language"

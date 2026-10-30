@@ -13,6 +13,7 @@ struct PlannerView: View {
     @State private var context = ""
     @State private var profile = PlannerProfile()
     @State private var profileIsManual = false
+    @State private var urgencyOverride: Bool?
     @State private var preference = PlannerPreference.balanced
     @AppStorage("plannerSafetyReserve") private var reserve = 10
     @State private var savesTitle = false
@@ -42,7 +43,8 @@ struct PlannerView: View {
         var value = profile
         if PlannerProfile.classify(taskText + " " + context).risk == .high {
             value.risk = .high
-            value.signals = ["检测到安全或关键业务信号，保留高风险护栏"]
+            let signal = L("检测到安全或关键业务信号，保留高风险护栏")
+            if !value.signals.contains(signal) { value.signals.append(signal) }
         }
         return value
     }
@@ -79,6 +81,10 @@ struct PlannerView: View {
         .onChange(of: preference) { _, _ in if advice != nil { recommend() } }
         .onChange(of: reserve) { _, _ in if advice != nil { recommend() } }
         .onChange(of: store.records) { _, _ in if advice != nil { recommend() } }
+        .onReceive(server.insights.$panelReport) { report in
+            // @Published emits before storing: use the incoming value, not the old property.
+            if isActive && advice != nil { recommend(report: report) }
+        }
         .onReceive(Timer.publish(every: 30, on: .main, in: .common).autoconnect()) { _ in
             if isActive && advice != nil { recommend() }
         }
@@ -142,9 +148,12 @@ struct PlannerView: View {
                 Button("本地自动识别") {
                     profileIsManual = false
                     profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
+                    profile.urgent = urgencyOverride ?? profile.urgent
                 }
                 Spacer()
-                Toggle("紧急", isOn: $profile.urgent).toggleStyle(.checkbox)
+                Toggle("紧急", isOn: Binding(get: { urgencyOverride ?? profile.urgent }, set: {
+                    urgencyOverride = $0; profile.urgent = $0
+                })).toggleStyle(.checkbox)
             }
             DisclosureGroup("任务特征与背景（可选，可覆盖自动识别）", isExpanded: $showsFeatures) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -201,10 +210,20 @@ struct PlannerView: View {
 
     private func recommendation(_ advice: PlannerAdvice) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(L(advice.shouldWait ? "建议先等待 / 保留额度" : "配置建议")).font(.headline)
-                Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                Text(advice.decision.title).font(.headline)
                 Text(advice.evidence).font(.caption).foregroundStyle(.secondary)
+                Text(LF("规则置信度：%@（非成功概率）", advice.confidence.title))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            if let usable = advice.quotaAssessment.usablePercent {
+                Text(LF("各窗口扣除保留量后的最小余量：%lld 个百分点；不是本任务可用预算。", Int64(usable)))
+                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+            }
+            if let estimate = advice.tokenEstimate {
+                Text(LF("%lld 条同类用户填报：Token 中位数 %lld，范围 %lld–%lld；未经自动核验，不等于预计订阅额度消耗。",
+                        Int64(estimate.sampleCount), estimate.median, estimate.lower, estimate.upper))
+                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             if let selected = advice.recommended {
                 HStack(alignment: .firstTextBaseline) {
@@ -270,6 +289,9 @@ struct PlannerView: View {
                     Spacer()
                 }
             } else {
+                ForEach(Array(advice.reasons.enumerated()), id: \.offset) { _, reason in
+                    Text(reason).font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
                 ForEach(Array(advice.warnings.enumerated()), id: \.offset) { _, warning in Text(warning).foregroundStyle(.secondary) }
             }
             if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
@@ -398,14 +420,23 @@ struct PlannerView: View {
         }
     }
 
-    private func recommend() {
-        let resolved = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: profileIsManual)
+    private func recommend(report: UsageInsightsReport? = nil) {
+        var resolved = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: profileIsManual)
+        resolved.urgent = urgencyOverride ?? PlannerProfile.classify(taskText + " " + context).urgent
         if profile != resolved { profile = resolved }
-        advice = PlannerEngine.advise(profile: effectiveProfile, preference: preference, models: models,
-                                       quota: server.plannerQuota(), reserve: reserve, records: store.records, override: override)
-        if taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            advice?.warnings.insert(L("尚未填写任务描述；此时只能查看配置，不能评估适配性或保存任务。"), at: 0)
+        let task = taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : taskText + " " + context
+        let pacing = (report ?? server.insights.panelReport).windows.compactMap { window -> PlannerQuotaPace? in
+            guard let latest = window.latest, let rate = window.ratePerHour,
+                  let remaining = window.currentRemainingPercent else { return nil }
+            return PlannerQuotaPace(provider: window.provider,
+                scope: window.provider == .codex ? latest.accountScope : latest.sessionScope,
+                windowID: window.windowID, receivedAt: latest.receivedAt, resetsAt: latest.resetsAt,
+                remainingPercent: remaining, ratePerHour: rate, samples: window.segmentSamples,
+                observedSpan: window.observedSpan)
         }
+        advice = PlannerEngine.advise(task: task, previous: effectiveProfile, manual: profileIsManual, urgent: urgencyOverride,
+                                       preference: preference, models: models, quota: server.plannerQuota(),
+                                       reserve: reserve, records: store.records, override: override, pacing: pacing)
     }
 
     private func save(_ configuration: PlannerConfiguration, start: Bool) {

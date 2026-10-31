@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import AppKit
 
 private struct ServiceMark: View {
     let service: AgentService
@@ -393,6 +394,77 @@ public struct GlassRimHighlight: View {
     }
 }
 
+/// A native popover material, without a fixed light/dark color fill.
+public struct NativeClearMaterial: NSViewRepresentable {
+    public var cornerRadius: Double
+    public var blendingMode: NSVisualEffectView.BlendingMode
+
+    public init(cornerRadius: Double, blendingMode: NSVisualEffectView.BlendingMode = .withinWindow) {
+        self.cornerRadius = cornerRadius
+        self.blendingMode = blendingMode
+    }
+    public func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode)
+        return view
+    }
+    public func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode)
+    }
+    public static func configure(_ view: NSVisualEffectView, cornerRadius: Double,
+                                 blendingMode: NSVisualEffectView.BlendingMode = .behindWindow) {
+        view.material = .popover
+        view.blendingMode = blendingMode
+        view.state = .active
+        view.isEmphasized = false
+        // Vibrant appearance belongs to native material, not the tinted panel theme.
+        view.appearance = NSAppearance(named: .vibrantDark)
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        view.layer?.cornerRadius = CGFloat(min(64, max(10, cornerRadius.isFinite ? cornerRadius : 30)))
+        view.layer?.cornerCurve = .continuous
+        view.layer?.masksToBounds = true
+    }
+}
+
+/// One bounded, event-driven light field shared by all panel sizes and previews.
+/// The cursor lights the surface and nearby contour; quota content stays sharp.
+public struct GlassPointerGlow: View {
+    let cornerRadius: Double
+    let vector: CGSize
+    let active: Bool
+    let elasticity: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    public init(cornerRadius: Double, vector: CGSize, active: Bool, elasticity: Double) {
+        self.cornerRadius = cornerRadius
+        self.vector = CGSize(width: vector.width.isFinite ? min(1, max(-1, vector.width)) : 0,
+                             height: vector.height.isFinite ? min(1, max(-1, vector.height)) : 0)
+        self.active = active
+        self.elasticity = elasticity.isFinite ? min(1, max(0, elasticity)) : 0
+    }
+    public var body: some View {
+        GeometryReader { proxy in
+            let center = UnitPoint(x: reduceMotion ? 0.5 : 0.5 + vector.width * 0.5,
+                                   y: reduceMotion ? 0.5 : 0.5 + vector.height * 0.5)
+            let shape = RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+            let radius = max(48, min(proxy.size.width, proxy.size.height) * 0.85)
+            ZStack {
+                shape.fill(RadialGradient(colors: [.white.opacity(0.11 + elasticity * 0.07), .white.opacity(0.035), .clear],
+                                          center: center, startRadius: 0, endRadius: radius))
+                shape.strokeBorder(RadialGradient(colors: [.white.opacity(0.65), .white.opacity(0.12), .clear],
+                                                   center: center, startRadius: 0, endRadius: radius * 1.2),
+                                   lineWidth: 1.2 + elasticity * 1.2)
+            }
+        }
+        .blendMode(.screen)
+        .opacity(active ? 1 : 0)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: active)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 public struct LiquidGlassSurface: View {
     let isLight: Bool
     let opacity: Double
@@ -406,6 +478,9 @@ public struct LiquidGlassSurface: View {
     let blurAmount: Double
     let saturation: Double
     let refractionMode: GlassRefractionMode
+    let surfaceStyle: GlassSurfaceStyle
+    let hoverVector: CGSize
+    let isHovering: Bool
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -426,7 +501,10 @@ public struct LiquidGlassSurface: View {
         displacement: Double = 0.35,
         blurAmount: Double = 0.20,
         saturation: Double = 1.40,
-        refractionMode: GlassRefractionMode = .standard
+        refractionMode: GlassRefractionMode = .standard,
+        surfaceStyle: GlassSurfaceStyle = .tinted,
+        hoverVector: CGSize = .zero,
+        isHovering: Bool = false
     ) {
         self.isLight = isLight
         self.opacity = opacity
@@ -440,6 +518,9 @@ public struct LiquidGlassSurface: View {
         self.blurAmount = min(1, max(0, blurAmount))
         self.saturation = min(2.2, max(1, saturation))
         self.refractionMode = refractionMode
+        self.surfaceStyle = surfaceStyle
+        self.hoverVector = hoverVector
+        self.isHovering = isHovering
     }
 
     public var body: some View {
@@ -465,11 +546,18 @@ public struct LiquidGlassSurface: View {
             .overlay { chromaticEdge(shape: shape) }
             .overlay { refractionHighlight(shape: shape) }
             .overlay(alignment: .topLeading) { elasticHighlight }
+            .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity) }
     }
 
     @ViewBuilder
     private var surfaceLayer: some View {
-        if isLight {
+        if surfaceStyle == .nativeClear {
+            NativeClearMaterial(cornerRadius: cornerRadius)
+                .overlay {
+                    RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+                        .fill(.black.opacity(darkFilmOpacity))
+                }
+        } else if isLight {
             RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
                 .fill(Color(red: 0.93, green: 0.96, blue: 1).opacity(resolvedOpacity))
         } else {
@@ -526,8 +614,8 @@ public struct LiquidGlassSurface: View {
 
     private var frostColor: Color {
         // Haze density, not a private or simulated backdrop blur radius.
-        (isLight ? Color.white : Color(white: 0.28))
-            .opacity(optics.frostOpacity * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
+        (isLight || surfaceStyle == .nativeClear ? Color.white : Color(white: 0.28))
+            .opacity(optics.frostOpacity * (surfaceStyle == .nativeClear ? 0.25 : 1) * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
     }
 
     private var toneOpacity: Double {

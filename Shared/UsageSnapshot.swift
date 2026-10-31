@@ -19,6 +19,12 @@ public enum GlassRefractionMode: String, Codable, CaseIterable, Identifiable, Se
     public var id: Self { self }
 }
 
+public enum GlassSurfaceStyle: String, Codable, CaseIterable, Identifiable, Sendable {
+    case tinted, nativeClear
+    public var id: Self { self }
+    public var title: String { self == .nativeClear ? L("原生清透") : L("染色玻璃") }
+}
+
 /// Shared visual response for the App preview and the native desktop surface.
 /// Frost is a haze overlay; macOS owns the actual backdrop blur radius.
 public struct GlassOptics: Sendable {
@@ -40,6 +46,9 @@ public struct GlassOptics: Sendable {
 /// A target-neutral description of the glass surface. The app persists this
 /// alongside the quota snapshot; every panel uses the same persisted values.
 public struct GlassRenderSettings: Codable, Equatable, Sendable {
+    // Optional on disk so existing build 57 snapshots remain decodable.
+    public var surfaceStyle: GlassSurfaceStyle?
+    public var resolvedSurfaceStyle: GlassSurfaceStyle { surfaceStyle ?? .tinted }
     public var appearance: WidgetAppearance
     public var opacity: Double
     public var edgeStrength: Double
@@ -63,7 +72,8 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
         dispersion: Double = 0.08,
         cornerRadius: Double = 30,
         tone: String = "neutral",
-        refractionMode: GlassRefractionMode = .standard
+        refractionMode: GlassRefractionMode = .standard,
+        surfaceStyle: GlassSurfaceStyle = .tinted
     ) {
         self.appearance = appearance
         self.opacity = opacity
@@ -76,6 +86,7 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
         self.cornerRadius = cornerRadius
         self.tone = tone
         self.refractionMode = refractionMode
+        self.surfaceStyle = surfaceStyle
     }
 
     public var sanitized: Self {
@@ -90,7 +101,8 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
             dispersion: min(0.30, max(0, dispersion)),
             cornerRadius: min(64, max(10, cornerRadius)),
             tone: ["cool", "neutral", "warm"].contains(tone) ? tone : "neutral",
-            refractionMode: refractionMode
+            refractionMode: refractionMode,
+            surfaceStyle: resolvedSurfaceStyle
         )
     }
 

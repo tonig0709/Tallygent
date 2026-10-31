@@ -83,7 +83,9 @@ if grep -Fq 'Text(snapshot.updatedAt, style: .time)' Shared/QuotaWidgetView.swif
     exit 1
 fi
 grep -q 'QuotaPanelContent(mode: mode, snapshot: panelSnapshot' App/DesktopGlassPanelView.swift
-grep -Fq 'DesktopPanelDragRegion(cornerRadius: cornerRadius)' App/DesktopGlassPanelView.swift
+grep -Fq 'DesktopPanelDragRegion(cornerRadius: cornerRadius, onPointer: updateHover)' App/DesktopGlassPanelView.swift
+grep -Fq '.activeAlways' App/DesktopGlassPanelView.swift
+grep -Fq 'DesktopGlassBackdropHost(content:' App/DesktopGlassPanelView.swift
 grep -Fq 'GlassOptics(blurAmount: blurAmount, dispersion: dispersion)' App/DesktopGlassPanelView.swift
 for source in Shared/QuotaWidgetView.swift App/DesktopGlassPanelView.swift; do
     grep -Fq 'GlassRimHighlight(' "$source" || {

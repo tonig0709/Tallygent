@@ -66,6 +66,11 @@ struct DesktopPanelProbe {
             precondition(material.appearance?.name == (light ? NSAppearance.Name.aqua : .darkAqua),
                          "Backdrop material did not follow the panel theme")
         }
+        NativeClearMaterial.configure(material, cornerRadius: 51)
+        precondition(material.material == .popover && material.blendingMode == .behindWindow && material.state == .active,
+                     "clear renderer stopped using the native popover backdrop")
+        precondition(material.appearance?.name == NSAppearance.Name.vibrantDark && material.layer?.cornerRadius == 51,
+                     "clear renderer inherited a tinted theme or lost continuous clipping")
         setbuf(stdout, nil)
         verifyNativeLocalization()
         verifyLocalizedPanelRenders()
@@ -139,6 +144,29 @@ struct DesktopPanelProbe {
         }
         let productionDrag = first.contentView.flatMap { dragViews(in: $0).first }
         precondition(productionDrag?.bounds.size == DesktopPanelMode.stored().size, "production drag region is still limited to the header")
+        precondition(first.contentView is DesktopGlassBackdropHost, "native clear material was moved back inside SwiftUI compositing")
+        let nativeRoot = first.contentView as! DesktopGlassBackdropHost
+        for mode in DesktopPanelMode.allCases {
+            DesktopPanelWindowConfigurator(size: mode.size, clearMaterial: true, cornerRadius: 51).configure(first)
+            precondition(!nativeRoot.material.isHidden && nativeRoot.material.blendingMode == .behindWindow && !first.isOpaque,
+                         "clear material has an opaque window or missing native root")
+        }
+        DesktopPanelWindowConfigurator(size: DesktopPanelMode.stored().size, clearMaterial: false).configure(first)
+        precondition(nativeRoot.material.isHidden, "tinted mode stacks two native backdrops")
+        if let productionDrag {
+            var received: CGPoint?
+            productionDrag.onPointer = { received = $0 }
+            productionDrag.updateTrackingAreas()
+            precondition(productionDrag.trackingAreas.contains { $0.options.contains(.activeAlways) && $0.options.contains(.mouseMoved) },
+                         "pointer lighting only tracks an active window or misses mouse movement")
+            let local = CGPoint(x: productionDrag.bounds.midX, y: productionDrag.bounds.midY)
+            let event = NSEvent.mouseEvent(with: .mouseMoved, location: productionDrag.convert(local, to: nil), modifierFlags: [], timestamp: 0,
+                                           windowNumber: first.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+            productionDrag.mouseMoved(with: event)
+            precondition(received == local, "full-surface mouse position was not delivered to the light field")
+            productionDrag.mouseExited(with: event)
+            precondition(received == nil, "pointer lighting remains active after exit")
+        }
         controller.show(server: server)
         precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1, "show created a second desktop panel")
         precondition(controller.isVisible, "desktop panel did not open")
@@ -147,6 +175,7 @@ struct DesktopPanelProbe {
         controller.show(server: server)
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
+        verifyNativeClearRuntime(server: server)
         verifyLiveTrendPanel(server: server)
         for width in [760.0, 1_030, 1_120, 1_400] {
             var frames: [DesktopPanelMode: CGRect] = [:]
@@ -385,6 +414,63 @@ struct DesktopPanelProbe {
         print("Placed-panel trend preferences and observed history refresh: PASS")
     }
 
+    @MainActor
+    private static func verifyNativeClearRuntime(server: QuotaMonitor) {
+        let defaults = UserDefaults.standard
+        let keys = [GlassSettingKeys.surfaceStyle, GlassSettingKeys.opacity, GlassSettingKeys.blurAmount,
+                    GlassSettingKeys.tone, GlassSettingKeys.appearance, DesktopPanelMode.defaultsKey]
+        let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+        let controller = DesktopPanelController.shared
+        let backdrop = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 300), styleMask: [.borderless], backing: .buffered, defer: false)
+        backdrop.isReleasedWhenClosed = false
+        backdrop.level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 2)
+        backdrop.contentView = NSHostingView(rootView: LinearGradient(colors: [Color(red: 0.25, green: 0.45, blue: 0.68), Color(red: 0.52, green: 0.33, blue: 0.24)], startPoint: .topLeading, endPoint: .bottomTrailing))
+        defer {
+            controller.close()
+            backdrop.close()
+            for (key, value) in saved { if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        }
+        defaults.set(GlassSurfaceStyle.nativeClear.rawValue, forKey: GlassSettingKeys.surfaceStyle)
+        defaults.set(0.35, forKey: GlassSettingKeys.opacity)
+        defaults.set(0, forKey: GlassSettingKeys.blurAmount)
+        defaults.set("neutral", forKey: GlassSettingKeys.tone)
+        defaults.set(GlassAppearanceMode.light.rawValue, forKey: GlassSettingKeys.appearance)
+        func drag(in view: NSView) -> DesktopPanelDragRegion.DragView? {
+            if let value = view as? DesktopPanelDragRegion.DragView { return value }
+            return view.subviews.compactMap { drag(in: $0) }.first
+        }
+        for mode in DesktopPanelMode.allCases {
+            controller.close()
+            defaults.set(mode.rawValue, forKey: DesktopPanelMode.defaultsKey)
+            controller.show(server: server)
+            let window = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+            backdrop.setFrame(window.frame, display: true)
+            backdrop.orderFront(nil)
+            window.contentView!.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            let root = window.contentView as! DesktopGlassBackdropHost
+            precondition(!root.material.isHidden && root.material.appearance?.name == NSAppearance.Name.vibrantDark,
+                         "Native Clear did not survive stored Light appearance and mode restoration")
+            saveLayoutImage(root, name: "native-clear-desktop-\(mode.rawValue)")
+            if mode == .medium, let tracking = drag(in: root) {
+                func frame(at fraction: CGFloat) -> NSBitmapImageRep {
+                    let point = CGPoint(x: tracking.bounds.width * fraction, y: tracking.bounds.midY)
+                    let event = NSEvent.mouseEvent(with: .mouseMoved, location: tracking.convert(point, to: nil), modifierFlags: [], timestamp: 0,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+                    tracking.mouseMoved(with: event)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                    let image = root.bitmapImageRepForCachingDisplay(in: root.bounds)!
+                    root.cacheDisplay(in: root.bounds, to: image)
+                    saveLayoutImage(root, name: "native-clear-pointer-\(fraction < 0.5 ? "left" : "right")")
+                    return image
+                }
+                precondition(changedPlotPixels(frame(at: 0.2), frame(at: 0.8)) > 100,
+                             "Native panel pointer routing does not illuminate the interior")
+            }
+        }
+        print("Native Clear root/material, independent theme, three sizes and full-surface pointer light: PASS")
+    }
+
     /// The symmetric central band excludes both clock and footer in either bitmap orientation.
     @MainActor
     private static func changedPlotPixels(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep) -> Int {
@@ -479,7 +565,7 @@ struct DesktopPanelProbe {
                                 required.formUnion(["monitor.service.label", "monitor.service.container", "monitor.content.container", "monitor.actions.container"])
                                 if DashboardLayout.hasInlineInspector(width: width) {
                                     prefixes += ["glass", "panel"]
-                                    required.formUnion(["glass.preset.label", "glass.appearance.label", "glass.refraction.label", "glass.tone.label",
+                                    required.formUnion(["glass.material.label", "glass.preset.label", "glass.appearance.label", "glass.refraction.label", "glass.tone.label",
                                                         "panel.chart.source.label", "panel.chart.style.label"])
                                 }
                             case .planner:

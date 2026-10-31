@@ -22,6 +22,7 @@ struct DashboardView: View {
     @ObservedObject private var insights: InsightsStore
     @Environment(\.colorScheme) private var colorScheme
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
+    @AppStorage(GlassSettingKeys.surfaceStyle) private var surfaceStyleRaw = GlassSurfaceStyle.tinted.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
     @AppStorage(GlassSettingKeys.elasticity) private var elasticity = 0.15
@@ -164,20 +165,10 @@ struct DashboardView: View {
                                 .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
                                 .frame(width: page.size.width, height: page.size.height)
                                 .background {
-                                LiquidGlassSurface(
-                                    isLight: isLight,
-                                    opacity: glassOpacity,
-                                    accent: .blue,
-                                    cornerRadius: cornerRadius,
-                                    edgeStrength: edgeStrength,
-                                    tone: glassTone.color,
-                                    dispersion: dispersion,
-                                    elasticity: elasticity,
-                                    displacement: displacement,
-                                    blurAmount: blurAmount,
-                                    saturation: saturation,
-                                    refractionMode: refractionMode
-                                )
+                                GlassPreviewSurface(settings: GlassRenderSettings(appearance: isLight ? .light : .dark, opacity: glassOpacity,
+                                    edgeStrength: edgeStrength, elasticity: elasticity, displacement: displacement, blurAmount: blurAmount,
+                                    saturation: saturation, dispersion: dispersion, cornerRadius: cornerRadius, tone: toneRaw,
+                                    refractionMode: refractionMode, surfaceStyle: surfaceStyle), tone: glassTone.color)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
                                 .scaleEffect(DashboardLayout.previewScale(width: geometry.size.width))
@@ -317,8 +308,10 @@ struct DashboardView: View {
     }
 
     private var isLight: Bool {
-        appearanceMode.isLight(in: colorScheme)
+        surfaceStyle != .nativeClear && appearanceMode.isLight(in: colorScheme)
     }
+
+    private var surfaceStyle: GlassSurfaceStyle { GlassSurfaceStyle(rawValue: surfaceStyleRaw) ?? .tinted }
 
     private var previewSnapshot: UsageSnapshot {
         var value = server.snapshot

@@ -325,6 +325,22 @@ await MainActor.run {
         )
     }
 
+    for mode in DesktopPanelMode.allCases {
+        let image = checkRender(
+            QuotaPanelContent(mode: mode, snapshot: boundary, glassOpacity: 0.35),
+            // ImageRenderer cannot draw an AppKit backdrop. Test content here;
+            // the isolated native-window probe owns real material/hover capture.
+            on: Color.clear,
+            width: mode.size.width, height: mode.size.height,
+            label: "native clear \(mode.rawValue) content",
+            regions: mode == .small ? smallRegions : mode == .large ? largeRegions : [
+                ("5h quota", CGRect(x: 0.06, y: 0.30, width: 0.88, height: 0.28)),
+                ("weekly quota", CGRect(x: 0.06, y: 0.59, width: 0.88, height: 0.28))
+            ]
+        )
+        saveTrendPreview(image, name: "native-clear-\(mode.rawValue)-content")
+    }
+
     let trendNow = Date()
     let trendReport = panelTrendFixture(at: trendNow)
     let changedTrendReport = panelTrendFixture(at: trendNow, changedHistory: true)
@@ -491,6 +507,17 @@ await MainActor.run {
         "glass dispersion is imperceptible or clipped outside the glass"
     )
     let interior = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+    let leftGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
+    let rightGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
+    precondition(changedPixels(leftGlow, rightGlow, in: interior) > 1_000, "pointer lighting does not follow across the panel interior")
+    let leftPeak = leftGlow.colorAt(x: 48, y: 60)!.usingColorSpace(.deviceRGB)!.redComponent
+    let rightAway = rightGlow.colorAt(x: 48, y: 60)!.usingColorSpace(.deviceRGB)!.redComponent
+    precondition(leftPeak > rightAway + 0.05, "pointer light is not localized near the cursor")
+    saveTrendPreview(leftGlow, name: "pointer-light-left")
+    saveTrendPreview(rightGlow, name: "pointer-light-right")
+    let idleA = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: false, elasticity: 0.15).background(Color.black), width: 240, height: 120)
+    let idleB = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: false, elasticity: 0.15).background(Color.black), width: 240, height: 120)
+    precondition(changedPixels(idleA, idleB, in: fullFrame) == 0, "pointer light persists after leaving the panel")
     precondition(changedPixels(plainEdge, dispersedEdge, in: interior) == 0, "edge color separation tints panel content")
     for isLight in [false, true] {
         let clear = render(LiquidGlassSurface(isLight: isLight, opacity: 0.35, accent: .blue, blurAmount: 0), width: 240, height: 120)
@@ -638,6 +665,11 @@ let settingsSnapshot = UsageSnapshot(glassSettings: settings)
 let settingsData = try JSONEncoder().encode(settingsSnapshot)
 let decodedSettings = try JSONDecoder().decode(UsageSnapshot.self, from: settingsData)
 precondition(decodedSettings.glassSettings == settings, "glass settings did not survive the app-to-widget snapshot round trip")
+let legacyGlass = try JSONDecoder().decode(GlassRenderSettings.self, from: Data(#"{"appearance":"dark","opacity":0.35,"edgeStrength":0.42,"elasticity":0.15,"displacement":0.18,"blurAmount":0,"saturation":1.15,"dispersion":0.03,"cornerRadius":24,"tone":"neutral","refractionMode":"standard"}"#.utf8))
+precondition(legacyGlass.resolvedSurfaceStyle == .tinted, "existing snapshots silently switched renderer")
+let clearGlass = GlassRenderSettings(opacity: 0.35, blurAmount: 0, surfaceStyle: .nativeClear)
+let decodedClearGlass = try JSONDecoder().decode(GlassRenderSettings.self, from: JSONEncoder().encode(clearGlass))
+precondition(decodedClearGlass.resolvedSurfaceStyle == .nativeClear, "clear material selection did not persist")
 
 let invalidSettings = GlassRenderSettings(opacity: -1, elasticity: 3, displacement: -2, blurAmount: 9, saturation: 0, cornerRadius: 200, tone: "invalid").sanitized
 precondition(invalidSettings.opacity == WidgetGlassOpacity.minimum, "glass opacity was not clamped")

@@ -9,6 +9,7 @@ struct DesktopGlassPanelView: View {
     @ObservedObject private var insights: InsightsStore
     @AppStorage(DesktopPanelMode.defaultsKey) private var modeRaw = DesktopPanelMode.large.rawValue
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(GlassSettingKeys.surfaceStyle) private var surfaceStyleRaw = GlassSurfaceStyle.tinted.rawValue
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
@@ -60,7 +61,8 @@ struct DesktopGlassPanelView: View {
                     blurAmount: blurAmount,
                     saturation: saturation,
                     refractionMode: refractionMode,
-                    hoverVector: hoverVector,
+                    surfaceStyle: surfaceStyle,
+                    hoverVector: reduceMotion ? .zero : hoverVector,
                     isHovering: isHovering
                 )
             }
@@ -74,7 +76,7 @@ struct DesktopGlassPanelView: View {
             .overlay {
                 // The content is read-only; native window dragging can cover it all.
                 // Controls below remain above this layer and keep their own clicks.
-                DesktopPanelDragRegion(cornerRadius: cornerRadius)
+                DesktopPanelDragRegion(cornerRadius: cornerRadius, onPointer: updateHover)
             }
             .overlay(alignment: .topLeading) {
                 Button(action: closePanel) {
@@ -110,10 +112,9 @@ struct DesktopGlassPanelView: View {
                     controls
                 }
             }
-            .onContinuousHover(perform: updateHover)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsChrome)
             .onDisappear { showsChrome = false }
-            .background(DesktopPanelWindowConfigurator(size: mode.size))
+            .background(DesktopPanelWindowConfigurator(size: mode.size, clearMaterial: surfaceStyle == .nativeClear, cornerRadius: cornerRadius))
             .ignoresSafeArea()
     }
 
@@ -165,19 +166,20 @@ struct DesktopGlassPanelView: View {
     }
 
     private var isLight: Bool {
-        appearanceMode.isLight(in: colorScheme)
+        surfaceStyle != .nativeClear && appearanceMode.isLight(in: colorScheme)
     }
 
-    private func updateHover(_ phase: HoverPhase) {
-        switch phase {
-        case .active(let location):
+    private var surfaceStyle: GlassSurfaceStyle { GlassSurfaceStyle(rawValue: surfaceStyleRaw) ?? .tinted }
+
+    private func updateHover(_ location: CGPoint?) {
+        if let location {
             showsChrome = Self.isNearEdge(location, size: mode.size)
             isHovering = true
             hoverVector = CGSize(
                 width: min(1, max(-1, location.x / mode.size.width * 2 - 1)),
                 height: min(1, max(-1, location.y / mode.size.height * 2 - 1))
             )
-        case .ended:
+        } else {
             showsChrome = false
             isHovering = false
             if reduceMotion {
@@ -200,18 +202,42 @@ struct DesktopGlassPanelView: View {
 // Use AppKit's native window drag loop; SwiftUI content is not a window background.
 struct DesktopPanelDragRegion: NSViewRepresentable {
     var cornerRadius: Double = 30
+    var onPointer: ((CGPoint?) -> Void)? = nil
 
     func makeNSView(context: Context) -> DragView {
         let view = DragView()
         view.cornerRadius = cornerRadius
+        view.onPointer = onPointer
         return view
     }
     func updateNSView(_ view: DragView, context: Context) {
         view.cornerRadius = cornerRadius
+        view.onPointer = onPointer
     }
 
     final class DragView: NSView {
         var cornerRadius: Double = 30
+        var onPointer: ((CGPoint?) -> Void)?
+        private var pointerArea: NSTrackingArea?
+        override var isFlipped: Bool { true }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            window?.acceptsMouseMovedEvents = true
+        }
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            if let pointerArea { removeTrackingArea(pointerArea) }
+            let area = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self, userInfo: nil)
+            addTrackingArea(area)
+            pointerArea = area
+        }
+        override func mouseMoved(with event: NSEvent) {
+            let point = convert(event.locationInWindow, from: nil)
+            let outline = RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous).path(in: bounds)
+            onPointer?(outline.contains(point) ? point : nil)
+        }
+        override func mouseEntered(with event: NSEvent) { mouseMoved(with: event) }
+        override func mouseExited(with event: NSEvent) { onPointer?(nil) }
         override func hitTest(_ point: NSPoint) -> NSView? {
             let local = convert(point, from: superview)
             let radius = min(CGFloat(cornerRadius), min(bounds.width, bounds.height) / 2)
@@ -241,6 +267,7 @@ private struct DesktopGlassSurface: View {
     let blurAmount: Double
     let saturation: Double
     let refractionMode: GlassRefractionMode
+    let surfaceStyle: GlassSurfaceStyle
     let hoverVector: CGSize
     let isHovering: Bool
 
@@ -252,7 +279,7 @@ private struct DesktopGlassSurface: View {
     }
 
     private var filmOpacity: Double {
-        if isLight {
+        if isLight && surfaceStyle != .nativeClear {
             return 0.12 + WidgetGlassOpacity.normalized(resolvedOpacity) * 0.68
         }
         return WidgetGlassOpacity.darkFilmOpacity(resolvedOpacity)
@@ -340,7 +367,7 @@ private struct DesktopGlassSurface: View {
 
     var body: some View {
         ZStack {
-            DesktopVisualEffectView(isLight: isLight)
+            if surfaceStyle != .nativeClear { DesktopVisualEffectView(isLight: isLight) }
             shape.fill(filmColor)
             shape.fill(frostColor)
             shape.fill(tone.opacity(toneOpacity))
@@ -350,14 +377,16 @@ private struct DesktopGlassSurface: View {
             restingRefraction
             chromaticEdge
             elasticHighlight
+            GlassPointerGlow(cornerRadius: cornerRadius, vector: reduceMotion ? .zero : hoverVector,
+                             active: isHovering, elasticity: elasticity)
         }
     }
 
     private var frostColor: Color {
         // Public macOS materials own backdrop blur. This controls visible frosting,
         // not a fictitious blur radius, and leaves fully opaque dark glass black.
-        (isLight ? Color.white : Color(white: 0.28))
-            .opacity(optics.frostOpacity * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
+        (isLight || surfaceStyle == .nativeClear ? Color.white : Color(white: 0.28))
+            .opacity(optics.frostOpacity * (surfaceStyle == .nativeClear ? 0.25 : 1) * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
     }
 
     private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
@@ -435,6 +464,8 @@ struct DesktopVisualEffectView: NSViewRepresentable {
 
 struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     var size = DesktopPanelMode.large.size
+    var clearMaterial = false
+    var cornerRadius: Double = 30
     func makeNSView(context: Context) -> NSView {
         let view = NSView()
         DispatchQueue.main.async { configure(view.window) }
@@ -451,6 +482,8 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         window.backgroundColor = .clear
         window.hasShadow = true
         window.ignoresMouseEvents = false
+        window.acceptsMouseMovedEvents = true
+        (window.contentView as? DesktopGlassBackdropHost)?.configure(clear: clearMaterial, cornerRadius: cornerRadius)
         window.isMovable = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
@@ -477,6 +510,29 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     }
 }
 
+/// THESIS: Native popover optics, not an opaque light/dark rectangle.
+/// OWN-WORLD: The OS owns backdrop blur; one bounded specular field follows input.
+/// STORY: Read quota on the real desktop and move the same panel normally.
+/// FIRST VIEWPORT: Existing three sizes, content and controls stay unchanged.
+/// FORM: A native material root below the hosting view, outside SwiftUI flattening.
+final class DesktopGlassBackdropHost: NSView {
+    let material = NSVisualEffectView()
+    init(content: NSView) {
+        super.init(frame: content.frame)
+        for child in [material, content] {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(child)
+            NSLayoutConstraint.activate([child.leadingAnchor.constraint(equalTo: leadingAnchor), child.trailingAnchor.constraint(equalTo: trailingAnchor),
+                                         child.topAnchor.constraint(equalTo: topAnchor), child.bottomAnchor.constraint(equalTo: bottomAnchor)])
+        }
+    }
+    required init?(coder: NSCoder) { return nil }
+    func configure(clear: Bool, cornerRadius: Double) {
+        material.isHidden = !clear
+        NativeClearMaterial.configure(material, cornerRadius: cornerRadius)
+    }
+}
+
 @MainActor
 final class DesktopPanelController {
     static let shared = DesktopPanelController()
@@ -494,9 +550,10 @@ final class DesktopPanelController {
             window.identifier = NSUserInterfaceItemIdentifier(DesktopGlassPanelView.windowID)
             window.isReleasedWhenClosed = false
             window.hidesOnDeactivate = false
-            window.contentView = NSHostingView(rootView: DesktopGlassPanelView(server: server))
+            window.contentView = DesktopGlassBackdropHost(content: NSHostingView(rootView: DesktopGlassPanelView(server: server)))
             if !window.setFrameUsingName(DesktopGlassPanelView.windowID) { window.center() }
-            DesktopPanelWindowConfigurator(size: size).configure(window)
+            let settings = GlassSettingsSnapshot.load()
+            DesktopPanelWindowConfigurator(size: size, clearMaterial: settings.resolvedSurfaceStyle == .nativeClear, cornerRadius: settings.cornerRadius).configure(window)
             window.setFrameAutosaveName(DesktopGlassPanelView.windowID)
             panel = window
         }

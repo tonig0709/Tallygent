@@ -435,3 +435,7 @@
 "检测到长上下文需求，但目录未确认上下文上限；请先验证容量，不能保证兼容。" = "Long context is required, but the catalog does not confirm a context limit. Verify capacity first; compatibility is not guaranteed.";
 "任务可能分阶段，但尚无协调开销与收益证据；暂不增加多模型阶段。" = "The task may support stages, but coordination costs and benefits are not established. No multi-model stages are added yet.";
 "同类反馈不足 %lld 条，不预测成本、成功率或可完成任务数。" = "Fewer than %lld comparable reports are available; cost, success rate and task capacity remain unknown.";
+"原生清透" = "Native Clear";
+"染色玻璃" = "Tinted Glass";
+"玻璃材质" = "Glass Material";
+"原生清透独立于深浅色；最低档使用原生磨砂，不额外染黑。鼠标经过面板内部会点亮玻璃。" = "Native Clear is independent of Light and Dark. Its minimum setting uses native frosting without added dark tint. Moving the pointer inside the panel lights the glass.";

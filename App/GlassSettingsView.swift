@@ -1,6 +1,7 @@
 import SwiftUI
 
 enum GlassSettingKeys {
+    static let surfaceStyle = "glassSurfaceStyle"
     static let appearance = "glassAppearanceMode"
     static let opacity = "desktopPanelGlassOpacity"
     static let edgeStrength = "glassEdgeStrength"
@@ -70,7 +71,8 @@ enum GlassSettingsSnapshot {
         let appearanceMode = GlassAppearanceMode(
             rawValue: defaults.string(forKey: GlassSettingKeys.appearance) ?? GlassAppearanceMode.dark.rawValue
         ) ?? .dark
-        let appearance: WidgetAppearance = appearanceMode == .light ? .light : .dark
+        let style = GlassSurfaceStyle(rawValue: defaults.string(forKey: GlassSettingKeys.surfaceStyle) ?? "") ?? .tinted
+        let appearance: WidgetAppearance = style != .nativeClear && appearanceMode == .light ? .light : .dark
         let double = { (key: String, fallback: Double) in
             defaults.object(forKey: key) == nil ? fallback : defaults.double(forKey: key)
         }
@@ -87,7 +89,8 @@ enum GlassSettingsSnapshot {
             tone: defaults.string(forKey: GlassSettingKeys.tone) ?? GlassTone.neutral.rawValue,
             refractionMode: GlassRefractionMode(
                 rawValue: defaults.string(forKey: GlassSettingKeys.refractionMode) ?? GlassRefractionMode.standard.rawValue
-            ) ?? .standard
+            ) ?? .standard,
+            surfaceStyle: style
         ).sanitized
     }
 }
@@ -111,6 +114,7 @@ struct GlassSettingsView: View {
     var onSettingsChange: (GlassRenderSettings) -> Void = { _ in }
 
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(GlassSettingKeys.surfaceStyle) private var surfaceStyleRaw = GlassSurfaceStyle.tinted.rawValue
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var opacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
@@ -149,6 +153,15 @@ struct GlassSettingsView: View {
 
             GlassOpticsPreview(settings: currentSettings, tone: tone.wrappedValue.color)
 
+            AdaptivePicker("玻璃材质", id: "glass.material", selection: surfaceStyle) {
+                ForEach(GlassSurfaceStyle.allCases) { style in Text(style.title).tag(style) }
+            }
+            if surfaceStyle.wrappedValue == .nativeClear {
+                Text("原生清透独立于深浅色；最低档使用原生磨砂，不额外染黑。鼠标经过面板内部会点亮玻璃。")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             AdaptivePicker("预设", id: "glass.preset", selection: preset) {
                 ForEach(GlassPreset.allCases) { preset in
                     Text(preset.title).tag(preset)
@@ -161,6 +174,7 @@ struct GlassSettingsView: View {
                     Text(mode.title).tag(mode)
                 }
             }
+            .disabled(surfaceStyle.wrappedValue == .nativeClear)
 
             controlSection("基础") {
                 slider("不透明度", value: $opacity, range: WidgetGlassOpacity.minimum...WidgetGlassOpacity.maximum, format: .percent)
@@ -256,11 +270,17 @@ struct GlassSettingsView: View {
             dispersion: dispersion,
             cornerRadius: cornerRadius,
             tone: toneRaw,
-            refractionMode: refractionMode.wrappedValue
+            refractionMode: refractionMode.wrappedValue,
+            surfaceStyle: surfaceStyle.wrappedValue
         ).sanitized
     }
 
-    private var isLight: Bool { appearance.wrappedValue.isLight(in: colorScheme) }
+    private var isLight: Bool { surfaceStyle.wrappedValue != .nativeClear && appearance.wrappedValue.isLight(in: colorScheme) }
+
+    private var surfaceStyle: Binding<GlassSurfaceStyle> {
+        Binding(get: { GlassSurfaceStyle(rawValue: surfaceStyleRaw) ?? .tinted },
+                set: { if $0 == .nativeClear { apply(.clear) } else { surfaceStyleRaw = $0.rawValue } })
+    }
 
     private var appearance: Binding<GlassAppearanceMode> {
         Binding(
@@ -304,7 +324,7 @@ struct GlassSettingsView: View {
     private var preset: Binding<GlassPreset> {
         Binding(
             get: {
-                if matches(opacity: 0.35, edge: 0.42, elasticity: 0.08, displacement: 0.18, blur: 0.08, saturation: 1.15, dispersion: 0.03, radius: 24, tone: .neutral, mode: .standard) { return .clear }
+                if surfaceStyle.wrappedValue == .nativeClear { return .clear }
                 if matches(opacity: 0.86, edge: 0.55, elasticity: 0.15, displacement: 0.35, blur: 0.20, saturation: 1.40, dispersion: 0.08, radius: 30, tone: .neutral, mode: .standard) { return .standard }
                 if matches(opacity: 0.72, edge: 0.90, elasticity: 0.55, displacement: 0.72, blur: 0.32, saturation: 1.75, dispersion: 0.18, radius: 42, tone: .cool, mode: .prominent) { return .vivid }
                 return .custom
@@ -329,7 +349,7 @@ struct GlassSettingsView: View {
         let settings: GlassRenderSettings
         switch preset {
         case .clear:
-            settings = GlassRenderSettings(opacity: 0.35, edgeStrength: 0.42, elasticity: 0.08, displacement: 0.18, blurAmount: 0.08, saturation: 1.15, dispersion: 0.03, cornerRadius: 24)
+            settings = GlassRenderSettings(opacity: 0.35, edgeStrength: 0.42, elasticity: 0.15, displacement: 0.18, blurAmount: 0, saturation: 1.15, dispersion: 0.03, cornerRadius: 24, surfaceStyle: .nativeClear)
         case .standard:
             settings = .standard
         case .vivid:
@@ -338,6 +358,7 @@ struct GlassSettingsView: View {
             return
         }
         opacity = settings.opacity
+        surfaceStyleRaw = settings.resolvedSurfaceStyle.rawValue
         edgeStrength = settings.edgeStrength
         elasticity = settings.elasticity
         displacement = settings.displacement
@@ -350,7 +371,7 @@ struct GlassSettingsView: View {
     }
 }
 
-private struct GlassOpticsPreview: View {
+struct GlassPreviewSurface: View {
     let settings: GlassRenderSettings
     let tone: Color
 
@@ -361,7 +382,6 @@ private struct GlassOpticsPreview: View {
     var body: some View {
         GeometryReader { proxy in
             let shape = RoundedRectangle(cornerRadius: CGFloat(settings.cornerRadius), style: .continuous)
-            ZStack {
                 LiquidGlassSurface(
                     isLight: settings.appearance == .light,
                     opacity: settings.opacity,
@@ -374,37 +394,15 @@ private struct GlassOpticsPreview: View {
                     displacement: settings.displacement,
                     blurAmount: settings.blurAmount,
                     saturation: settings.saturation,
-                    refractionMode: settings.refractionMode
+                    refractionMode: settings.refractionMode,
+                    surfaceStyle: settings.resolvedSurfaceStyle,
+                    hoverVector: reduceMotion ? .zero : pointer,
+                    isHovering: hovering
                 )
-                shape
-                    .strokeBorder(
-                        RadialGradient(
-                            colors: [.white.opacity(hovering ? 0.82 : 0), .clear],
-                            center: highlightCenter,
-                            startRadius: 0,
-                            endRadius: 96
-                        ),
-                        lineWidth: 2.2 + settings.displacement * 4 + settings.elasticity * 3
-                    )
-                    .offset(x: pointer.width * settings.elasticity * 8, y: pointer.height * settings.elasticity * 6)
-
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                    Text("LIQUID GLASS")
-                        .font(.caption2.weight(.semibold))
-                        .tracking(1.2)
-                }
-                .foregroundStyle(settings.appearance == .light ? .black.opacity(0.72) : .white.opacity(0.84))
-            }
             .clipShape(shape)
             .contentShape(shape)
             .onContinuousHover { phase in update(phase, size: proxy.size) }
         }
-        .frame(height: 88)
-    }
-
-    private var highlightCenter: UnitPoint {
-        UnitPoint(x: 0.5 + pointer.width * 0.5, y: 0.5 + pointer.height * 0.5)
     }
 
     private func update(_ phase: HoverPhase, size: CGSize) {
@@ -422,5 +420,22 @@ private struct GlassOpticsPreview: View {
                 withAnimation(.spring(response: 0.35, dampingFraction: 1)) { pointer = .zero }
             }
         }
+    }
+}
+
+private struct GlassOpticsPreview: View {
+    let settings: GlassRenderSettings
+    let tone: Color
+    var body: some View {
+        GlassPreviewSurface(settings: settings, tone: tone)
+            .overlay {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                    Text("LIQUID GLASS").font(.caption2.weight(.semibold)).tracking(1.2)
+                }
+                .foregroundStyle(settings.appearance == .light ? .black.opacity(0.72) : .white.opacity(0.84))
+                .allowsHitTesting(false)
+            }
+            .frame(height: 88)
     }
 }

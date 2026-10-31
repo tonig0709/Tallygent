@@ -1,0 +1,57 @@
+# Native Clear — local build 58
+
+Operate surface: a readable floating quota panel, with the existing three sizes,
+charts, drag/close/settings behavior and continuous native sliders. This is a
+material extension, not a replacement product identity.
+
+## Material boundary
+
+The old Clear preset only changed numbers in the tinted renderer. Native Clear
+is now an explicit persisted `glassSurfaceStyle` choice. Selecting **Native
+Clear** or the **Clear** preset resets to 0.35 opacity, zero added haze and neutral
+tone. Light/Dark is retained for Tinted Glass, but does not recolor Native Clear.
+
+The desktop window has an AppKit `NSVisualEffectView` root below the transparent
+SwiftUI content host. It uses public `.popover`, `.behindWindow`, `.active` and
+the native vibrant appearance. There is no wallpaper screenshot, screen recording
+permission, private blur API, global desktop preference, React runtime or new
+dependency. At the clear preset's minimum, film, haze and neutral tone add zero
+interior color; the operating system provides backdrop sampling and frosting.
+Higher opacity and explicit custom haze/tone still work. Reduce Transparency is
+respected. Exact pixels vary with the wallpaper, OS and accessibility settings;
+offscreen content renders do not prove actual wallpaper transmission.
+
+## Pointer light
+
+A shared `GlassPointerGlow` paints a bounded white specular field on the interior
+and a directional contour reflection, below quota text/charts. It follows local
+coordinates continuously, does not translate panel geometry, and fades out on
+exit. AppKit `.activeAlways` tracking covers the whole drag region even when the
+desktop window is not key. Close/settings remain above that drag region. No
+global event monitor, idle animation loop or account request is added. Reduce
+Motion fixes the light's position instead of following the cursor.
+
+## Reference and provenance
+
+GitHub repository search `liquid-glass in:name`, sorted by stars, checked
+2026-10-31: [rdev/liquid-glass-react](https://github.com/rdev/liquid-glass-react)
+led the returned set with 6,565 stars (not a claim about every possible spelling).
+Source inspected at `ac48eab18d1f7f444ae30002d240cae29c863a21`, MIT license.
+Its container-local mouse coordinates and directional light motivated this native
+implementation. No upstream TypeScript or shader code is bundled or copied.
+Apple's public AppKit header documents `.popover` as the NSPopover background
+material and `.behindWindow` as sampling the desktop/windows behind the window.
+
+## Regression evidence required before handoff
+
+- Existing snapshot JSON without the new optional field decodes as Tinted Glass;
+  Native Clear round-trips without changing account/history or Planner data.
+- Both local and three-OS CI retain existing contrast, black-screen negative
+  controls, rim clipping, slider, three-size/layout and snapshot refresh tests.
+- New tests cover native clear root placement/material/corner clipping, full-area
+  inactive-window tracking, point delivery and exit, interior light location and
+  idle invisibility, clear content in three sizes, and all three translations.
+- The exact signed universal DMG payload must pass the existing release gate;
+  downloaded ZIP digest, CRC, DMG checksum, build metadata and resources are
+  checked again locally. No Release is created. Personal desktop optical matching
+  remains a real-install acceptance check, not an offscreen claim.

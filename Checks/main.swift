@@ -65,7 +65,13 @@ precondition(WidgetGlassOpacity.clamped(2) == WidgetGlassOpacity.maximum)
 precondition(WidgetGlassOpacity.clamped(0.7) == 0.7)
 precondition(WidgetGlassOpacity.normalized(WidgetGlassOpacity.minimum) == 0)
 precondition(WidgetGlassOpacity.normalized(WidgetGlassOpacity.maximum) == 1)
-precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.minimum) == 0.08)
+precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.minimum) == 0)
+precondition(WidgetGlassOpacity.darkGlassTintOpacity(WidgetGlassOpacity.minimum) == 0)
+for step in 1...100 {
+    let a = WidgetGlassOpacity.minimum + Double(step - 1) / 100 * (1 - WidgetGlassOpacity.minimum)
+    let b = WidgetGlassOpacity.minimum + Double(step) / 100 * (1 - WidgetGlassOpacity.minimum)
+    precondition(WidgetGlassOpacity.darkFilmOpacity(a) < WidgetGlassOpacity.darkFilmOpacity(b))
+}
 precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.maximum) == 0.94)
 precondition(WidgetGlassOpacity.darkFilmOpacity(0.5) < WidgetGlassOpacity.darkFilmOpacity(0.86))
 precondition(UsageSnapshot.placeholder.resolvedAppearance == .dark)
@@ -224,6 +230,7 @@ func checkRender<Content: View, Background: View>(
     for (name, region) in regions {
         let regionPixels = Int(CGFloat(pixelCount) * region.width * region.height)
         precondition(changedPixels(rendered, baseline, in: region) > regionPixels / 500, "\(label) lacks visible \(name) content")
+        if !hasReadableContrast(rendered, in: region) { fputs("Render contrast failure: \(label), \(name), \(contrastPixelCounts(rendered, in: region))\n", stderr) }
         precondition(hasReadableContrast(rendered, in: region), "\(label) lacks readable \(name) contrast")
     }
     return rendered

@@ -239,12 +239,13 @@ public enum WidgetGlassOpacity {
     /// dark appearance is to solid black without hiding the wallpaper at the
     /// minimum setting.
     public static func darkFilmOpacity(_ value: Double) -> Double {
-        0.08 + pow(normalized(value), 1.15) * 0.86
+        pow(normalized(value), 1.15) * 0.94
     }
 
     public static func darkGlassTintOpacity(_ value: Double) -> Double {
-        0.28 + normalized(value) * 0.22
+        normalized(value) * 0.50
     }
+
 }
 
 public enum SnapshotHTTPClient {

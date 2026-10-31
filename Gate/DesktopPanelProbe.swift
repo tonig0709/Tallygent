@@ -58,6 +58,14 @@ struct DesktopPanelProbe {
     @MainActor
     static func main() {
         _ = NSApplication.shared
+        let material = NSVisualEffectView()
+        for light in [true, false] {
+            DesktopVisualEffectView.configure(material, isLight: light)
+            precondition(material.material == .popover && material.blendingMode == .behindWindow && material.state == .active,
+                         "Minimum-opacity desktop must sample the backdrop with native popover material")
+            precondition(material.appearance?.name == (light ? NSAppearance.Name.aqua : .darkAqua),
+                         "Backdrop material did not follow the panel theme")
+        }
         setbuf(stdout, nil)
         verifyNativeLocalization()
         verifyLocalizedPanelRenders()

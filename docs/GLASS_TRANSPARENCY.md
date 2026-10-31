@@ -1,0 +1,13 @@
+# Native translucent panel adjustment — 2026-10-31
+
+The desktop surface previously used `underWindowBackground`, plus a minimum 8% black film. The macOS 26 App preview also retained a minimum 28% black glass tint. Lowering the control therefore did not remove the added darkening.
+
+The desktop now uses public `NSVisualEffectView.Material.popover` with active behind-window sampling, matching the category of native material shown in the reference settings popover. No private blur API, wallpaper capture, global appearance preference, account setting or Planner code is changed.
+
+At the existing 0.35 minimum, the extra dark film and dark glass tint are zero. These are overlay opacities, not claims about the system material's optical transmittance. The original 0.35–1.00 slider range and preference keys remain unchanged. Dark film still reaches 94% at maximum; curves are continuous and monotonic. The dark App preview fallback uses native thin material rather than a flat 35% opaque fill. The light appearance retains its existing film and preview curves for readable dark text; removing those also removed light-theme contrast in the render check. Frost, borders, content and interaction layers are retained.
+
+Checks cover the overlay endpoints and 100 monotonic slider steps. The isolated desktop probe also asserts popover material, behind-window blending, active state and both appearances. Existing readability, rim confinement and black-screen checks remain. The native desktop probe must not be run in the personal user session.
+
+An offscreen image cannot prove actual wallpaper transmission: system compositing, accessibility Reduce Transparency, wallpaper and lighting affect the final result. Real-desktop comparison against the user's reference remains necessary after building and installing a new candidate. No installed App or previously generated build 56 DMG is modified by this source change.
+
+Local validation: `swift run -c release --scratch-path .panel-build/clear-glass-check --disable-sandbox quota-self-check` passed after retaining the light-theme curves. This includes the original contrast, frosting, dispersion, corner, refraction and rim-confinement assertions. Confirmation output is in `.panel-build/clear-glass-confirmation.log`. `scripts/check-localization.sh` passed all 436 keys and seven native language/fallback cases; Swift parsing and `git diff --check` passed. Full App type-checking is not validated locally: the Command Line Tools SDK could not load `SwiftUIMacros.StateMacro`. The native runtime material assertion remains pending in isolated full-Xcode CI, not the personal desktop session.

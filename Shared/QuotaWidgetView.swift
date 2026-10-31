@@ -501,7 +501,11 @@ public struct LiquidGlassSurface: View {
 
     private var fallbackDarkSurface: some View {
         RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
-            .fill(.black.opacity(resolvedOpacity))
+            .fill(.ultraThinMaterial)
+            .overlay {
+                RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+                    .fill(.black.opacity(darkFilmOpacity))
+            }
     }
 
     private var outerBorder: Color {

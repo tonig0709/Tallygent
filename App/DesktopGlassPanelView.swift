@@ -411,19 +411,25 @@ private struct DesktopGlassSurface: View {
     }
 }
 
-private struct DesktopVisualEffectView: NSViewRepresentable {
+struct DesktopVisualEffectView: NSViewRepresentable {
     let isLight: Bool
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        view.material = .underWindowBackground
-        view.blendingMode = .behindWindow
-        view.state = .active
+        Self.configure(view, isLight: isLight)
         return view
     }
 
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+    static func configure(_ view: NSVisualEffectView, isLight: Bool) {
+        // Match the native settings popover, not an opaque window-body material.
+        view.material = .popover
+        view.blendingMode = .behindWindow
+        view.state = .active
         view.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        Self.configure(view, isLight: isLight)
     }
 }
 

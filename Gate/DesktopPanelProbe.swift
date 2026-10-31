@@ -526,8 +526,12 @@ struct DesktopPanelProbe {
                     defaults.set(appearance.rawValue, forKey: GlassSettingKeys.appearance)
                     func frame(opacity: Double) -> NSBitmapImageRep {
                         defaults.set(opacity, forKey: GlassSettingKeys.opacity)
+                        root.layoutSubtreeIfNeeded()
                         RunLoop.main.run(until: Date().addingTimeInterval(0.16))
                         root.layoutSubtreeIfNeeded()
+                        // Layout may attach the large chart's background configurator;
+                        // drain that native attachment callback before asserting state.
+                        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
                         precondition(root.material.isHidden == (style != .nativeClear),
                                      "live \(mode.rawValue)/\(style.rawValue)/\(appearance.rawValue)/\(opacity) stacks or removes the Native Clear backdrop")
                         precondition(window.frame.size == mode.size && !window.isOpaque,

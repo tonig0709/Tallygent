@@ -107,6 +107,16 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
     }
 
     public static let standard = Self()
+    public static let nativeClear = Self(opacity: 0.35, edgeStrength: 0.42, elasticity: 0.15,
+        displacement: 0.18, blurAmount: 0, saturation: 1.15, dispersion: 0.03, cornerRadius: 24, surfaceStyle: .nativeClear)
+
+    public var isNativeClearPreset: Bool {
+        let target = Self.nativeClear
+        return resolvedSurfaceStyle == .nativeClear && tone == target.tone && refractionMode == target.refractionMode &&
+            zip([opacity, edgeStrength, elasticity, displacement, blurAmount, saturation, dispersion, cornerRadius],
+                [target.opacity, target.edgeStrength, target.elasticity, target.displacement, target.blurAmount, target.saturation, target.dispersion, target.cornerRadius])
+                .allSatisfy { abs($0 - $1) < 0.005 }
+    }
 }
 
 public struct UsageWindow: Codable, Equatable, Sendable {

@@ -324,7 +324,8 @@ struct GlassSettingsView: View {
     private var preset: Binding<GlassPreset> {
         Binding(
             get: {
-                if surfaceStyle.wrappedValue == .nativeClear { return .clear }
+                if currentSettings.isNativeClearPreset { return .clear }
+                if surfaceStyle.wrappedValue == .nativeClear { return .custom }
                 if matches(opacity: 0.86, edge: 0.55, elasticity: 0.15, displacement: 0.35, blur: 0.20, saturation: 1.40, dispersion: 0.08, radius: 30, tone: .neutral, mode: .standard) { return .standard }
                 if matches(opacity: 0.72, edge: 0.90, elasticity: 0.55, displacement: 0.72, blur: 0.32, saturation: 1.75, dispersion: 0.18, radius: 42, tone: .cool, mode: .prominent) { return .vivid }
                 return .custom
@@ -349,7 +350,7 @@ struct GlassSettingsView: View {
         let settings: GlassRenderSettings
         switch preset {
         case .clear:
-            settings = GlassRenderSettings(opacity: 0.35, edgeStrength: 0.42, elasticity: 0.15, displacement: 0.18, blurAmount: 0, saturation: 1.15, dispersion: 0.03, cornerRadius: 24, surfaceStyle: .nativeClear)
+            settings = .nativeClear
         case .standard:
             settings = .standard
         case .vivid:

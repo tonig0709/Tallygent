@@ -464,8 +464,14 @@ struct DesktopPanelProbe {
                     saveLayoutImage(root, name: "native-clear-pointer-\(fraction < 0.5 ? "left" : "right")")
                     return image
                 }
-                precondition(changedPlotPixels(frame(at: 0.2), frame(at: 0.8)) > 100,
-                             "Native panel pointer routing does not illuminate the interior")
+                let changed = changedPlotPixels(frame(at: 0.2), frame(at: 0.8))
+                let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+                print("Native pointer pixels: \(changed), system Reduce Motion: \(reduced)")
+                if reduced {
+                    precondition(changed == 0, "native panel ignores Reduce Motion")
+                } else {
+                    precondition(changed > 100, "Native panel pointer routing does not illuminate the interior")
+                }
             }
         }
         print("Native Clear root/material, independent theme, three sizes and full-surface pointer light: PASS")

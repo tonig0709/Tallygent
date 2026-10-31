@@ -378,7 +378,7 @@ private struct DesktopGlassSurface: View {
             chromaticEdge
             elasticHighlight
             GlassPointerGlow(cornerRadius: cornerRadius, vector: reduceMotion ? .zero : hoverVector,
-                             active: isHovering, elasticity: elasticity)
+                             active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion)
         }
     }
 

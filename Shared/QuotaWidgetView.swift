@@ -434,14 +434,15 @@ public struct GlassPointerGlow: View {
     let vector: CGSize
     let active: Bool
     let elasticity: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let reduceMotion: Bool
 
-    public init(cornerRadius: Double, vector: CGSize, active: Bool, elasticity: Double) {
+    public init(cornerRadius: Double, vector: CGSize, active: Bool, elasticity: Double, reduceMotion: Bool = false) {
         self.cornerRadius = cornerRadius
         self.vector = CGSize(width: vector.width.isFinite ? min(1, max(-1, vector.width)) : 0,
                              height: vector.height.isFinite ? min(1, max(-1, vector.height)) : 0)
         self.active = active
         self.elasticity = elasticity.isFinite ? min(1, max(0, elasticity)) : 0
+        self.reduceMotion = reduceMotion
     }
     public var body: some View {
         GeometryReader { proxy in
@@ -483,6 +484,7 @@ public struct LiquidGlassSurface: View {
     let isHovering: Bool
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var resolvedOpacity: Double { reduceTransparency ? 1 : WidgetGlassOpacity.clamped(opacity) }
     private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
@@ -546,7 +548,7 @@ public struct LiquidGlassSurface: View {
             .overlay { chromaticEdge(shape: shape) }
             .overlay { refractionHighlight(shape: shape) }
             .overlay(alignment: .topLeading) { elasticHighlight }
-            .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity) }
+            .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion) }
     }
 
     @ViewBuilder

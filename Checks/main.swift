@@ -518,6 +518,10 @@ await MainActor.run {
     let idleA = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: false, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     let idleB = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: false, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     precondition(changedPixels(idleA, idleB, in: fullFrame) == 0, "pointer light persists after leaving the panel")
+    let reducedA = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: true, elasticity: 0.15, reduceMotion: true).background(Color.black), width: 240, height: 120)
+    let reducedB = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: true, elasticity: 0.15, reduceMotion: true).background(Color.black), width: 240, height: 120)
+    precondition(changedPixels(reducedA, reducedB, in: fullFrame) == 0, "Reduce Motion still moves the glass light")
+    precondition(changedPixels(reducedA, idleA, in: fullFrame) > 100, "Reduce Motion removed hover feedback instead of stabilizing it")
     precondition(changedPixels(plainEdge, dispersedEdge, in: interior) == 0, "edge color separation tints panel content")
     for isLight in [false, true] {
         let clear = render(LiquidGlassSurface(isLight: isLight, opacity: 0.35, accent: .blue, blurAmount: 0), width: 240, height: 120)
@@ -670,6 +674,10 @@ precondition(legacyGlass.resolvedSurfaceStyle == .tinted, "existing snapshots si
 let clearGlass = GlassRenderSettings(opacity: 0.35, blurAmount: 0, surfaceStyle: .nativeClear)
 let decodedClearGlass = try JSONDecoder().decode(GlassRenderSettings.self, from: JSONEncoder().encode(clearGlass))
 precondition(decodedClearGlass.resolvedSurfaceStyle == .nativeClear, "clear material selection did not persist")
+precondition(GlassRenderSettings.nativeClear.isNativeClearPreset)
+var customizedClear = GlassRenderSettings.nativeClear
+customizedClear.opacity = 0.7
+precondition(!customizedClear.isNativeClearPreset, "custom Clear settings still report the pristine preset")
 
 let invalidSettings = GlassRenderSettings(opacity: -1, elasticity: 3, displacement: -2, blurAmount: 9, saturation: 0, cornerRadius: 200, tone: "invalid").sanitized
 precondition(invalidSettings.opacity == WidgetGlassOpacity.minimum, "glass opacity was not clamped")

@@ -260,14 +260,33 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     var size = DesktopPanelMode.large.size
     var clearMaterial = false
     var cornerRadius: Double = 30
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { configure(view.window) }
+    func makeNSView(context: Context) -> WindowView {
+        let view = WindowView()
+        view.configuration = self
         return view
     }
 
-    func updateNSView(_ view: NSView, context: Context) {
-        DispatchQueue.main.async { configure(view.window) }
+    func updateNSView(_ view: WindowView, context: Context) {
+        view.configuration = self
+        view.scheduleConfiguration()
+    }
+
+    final class WindowView: NSView {
+        var configuration: DesktopPanelWindowConfigurator?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            scheduleConfiguration()
+        }
+
+        func scheduleConfiguration() {
+            // A chart can mount this view after updateNSView. Apply on attachment
+            // too, and read the latest settings rather than a queued stale copy.
+            DispatchQueue.main.async { [weak self] in
+                guard let self, let window = self.window else { return }
+                self.configuration?.configure(window)
+            }
+        }
     }
 
     func configure(_ window: NSWindow?) {

@@ -21,6 +21,12 @@ Tinted Glass, avoiding double frosting. Preview and desktop still sample their
 respective backgrounds, so different wallpapers/windows cannot yield identical
 pixels. No preferences are reset or migrated to conceal a renderer mismatch.
 
+The window configurator also reapplies its latest value when its native view
+attaches to a window. Large charts can defer that attachment beyond a settings
+update; a one-shot queued call with a nil window previously dropped the change.
+Queued work now reads the view's latest configuration rather than an older
+captured value. A dedicated late-attachment/latest-value probe guards this race.
+
 The pure `scripts/check-glass-renderer-parity.sh` guards all three entry paths
 and backdrop exclusivity. The isolated desktop probe also switches both
 materials, dark/light/automatic, opacity endpoints and all sizes on the actual

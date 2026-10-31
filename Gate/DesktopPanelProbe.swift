@@ -126,6 +126,7 @@ struct DesktopPanelProbe {
             }
         }
         window.close()
+        verifyConfiguratorAttachment()
         let controller = DesktopPanelController.shared
         let server = QuotaMonitor()
         controller.show(server: server)
@@ -473,6 +474,31 @@ struct DesktopPanelProbe {
         print("Native Clear root/material, independent theme, three sizes and full-surface pointer light: PASS")
     }
 
+    @MainActor
+    private static func verifyConfiguratorAttachment() {
+        let window = DesktopGlassWindow(contentRect: NSRect(origin: .zero, size: DesktopPanelMode.large.size),
+                                        styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        let root = DesktopGlassBackdropHost(content: NSView(frame: window.contentLayoutRect))
+        let configuration = DesktopPanelWindowConfigurator.WindowView()
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true)
+        configuration.scheduleConfiguration()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.05)) // no window attached yet
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false)
+        root.addSubview(configuration)
+        window.contentView = root
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        precondition(root.material.isHidden, "late-mounted configuration lost the latest material selection")
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false)
+        configuration.scheduleConfiguration()
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true)
+        configuration.scheduleConfiguration()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        precondition(!root.material.isHidden, "queued configuration overwrote a newer material selection")
+        print("Native glass configuration: late attachment and latest queued settings: PASS")
+    }
+
     /// Exercise the actual placed view, not a second preview-only renderer.
     /// Cached images verify settings/readability, not WindowServer wallpaper optics.
     @MainActor
@@ -503,7 +529,7 @@ struct DesktopPanelProbe {
                         RunLoop.main.run(until: Date().addingTimeInterval(0.16))
                         root.layoutSubtreeIfNeeded()
                         precondition(root.material.isHidden == (style != .nativeClear),
-                                     "live style switch stacks or removes the Native Clear backdrop")
+                                     "live \(mode.rawValue)/\(style.rawValue)/\(appearance.rawValue)/\(opacity) stacks or removes the Native Clear backdrop")
                         precondition(window.frame.size == mode.size && !window.isOpaque,
                                      "glass settings changed the panel's native geometry or transparency")
                         let image = root.bitmapImageRepForCachingDisplay(in: root.bounds)!

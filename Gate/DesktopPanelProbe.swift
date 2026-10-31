@@ -520,6 +520,9 @@ struct DesktopPanelProbe {
             controller.show(server: server)
             let window = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
             let root = window.contentView as! DesktopGlassBackdropHost
+            func bridges(in view: NSView) -> [DesktopPanelWindowConfigurator.WindowView] {
+                (view as? DesktopPanelWindowConfigurator.WindowView).map { [$0] } ?? view.subviews.flatMap { bridges(in: $0) }
+            }
             for style in [GlassSurfaceStyle.tinted, .nativeClear] {
                 for appearance in [GlassAppearanceMode.dark, .light, .automatic] {
                     defaults.set(style.rawValue, forKey: GlassSettingKeys.surfaceStyle)
@@ -529,11 +532,23 @@ struct DesktopPanelProbe {
                         root.layoutSubtreeIfNeeded()
                         RunLoop.main.run(until: Date().addingTimeInterval(0.16))
                         root.layoutSubtreeIfNeeded()
-                        // Layout may attach the large chart's background configurator;
-                        // drain that native attachment callback before asserting state.
-                        RunLoop.main.run(until: Date().addingTimeInterval(0.01))
-                        precondition(root.material.isHidden == (style != .nativeClear),
-                                     "live \(mode.rawValue)/\(style.rawValue)/\(appearance.rawValue)/\(opacity) stacks or removes the Native Clear backdrop")
+                        // Wait for actual SwiftUI -> native delivery, not a guessed
+                        // chart mounting duration. This remains a bounded live-update gate.
+                        func delivered() -> Bool {
+                            root.material.isHidden == (style != .nativeClear) && bridges(in: root).contains {
+                                $0.window === window && $0.configuration?.clearMaterial == (style == .nativeClear) && $0.configuration?.size == mode.size
+                            }
+                        }
+                        let deadline = Date().addingTimeInterval(1)
+                        while !delivered() && Date() < deadline {
+                            root.layoutSubtreeIfNeeded()
+                            RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                        }
+                        let routing = bridges(in: root).map {
+                            "clear=\(String(describing: $0.configuration?.clearMaterial)),size=\(String(describing: $0.configuration?.size)),window=\($0.window === window)"
+                        }
+                        precondition(delivered(),
+                                     "live \(mode.rawValue)/\(style.rawValue)/\(appearance.rawValue)/\(opacity) not delivered: bridges=\(routing),rootHidden=\(root.material.isHidden),sameRoot=\(window.contentView === root),stored=\(defaults.string(forKey: GlassSettingKeys.surfaceStyle) ?? "nil")")
                         precondition(window.frame.size == mode.size && !window.isOpaque,
                                      "glass settings changed the panel's native geometry or transparency")
                         let image = root.bitmapImageRepForCachingDisplay(in: root.bounds)!

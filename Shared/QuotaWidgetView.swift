@@ -474,6 +474,7 @@ public struct LiquidGlassSurface: View {
                 .fill(Color(red: 0.93, green: 0.96, blue: 1).opacity(resolvedOpacity))
         } else {
             darkSurface
+                .environment(\.colorScheme, .dark)
         }
     }
 

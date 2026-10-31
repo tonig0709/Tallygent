@@ -309,6 +309,22 @@ await MainActor.run {
         }
     }
 
+    // An explicit dark glass selection must not inherit a light system material.
+    for systemScheme in [ColorScheme.light, .dark] {
+        checkRender(
+            QuotaPanelContent(mode: .medium, snapshot: boundary, glassOpacity: 0.35),
+            on: LiquidGlassSurface(isLight: false, opacity: 0.35, accent: .blue)
+                .environment(\.colorScheme, systemScheme),
+            width: DesktopPanelMode.medium.size.width,
+            height: DesktopPanelMode.medium.size.height,
+            label: "dark panel with \(systemScheme) system appearance",
+            regions: [
+                ("5h quota", CGRect(x: 0.06, y: 0.30, width: 0.88, height: 0.28)),
+                ("weekly quota", CGRect(x: 0.06, y: 0.59, width: 0.88, height: 0.28))
+            ]
+        )
+    }
+
     let trendNow = Date()
     let trendReport = panelTrendFixture(at: trendNow)
     let changedTrendReport = panelTrendFixture(at: trendNow, changedHistory: true)

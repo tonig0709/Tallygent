@@ -8,6 +8,8 @@ At the existing 0.35 minimum, the extra dark film and dark glass tint are zero. 
 
 Checks cover the overlay endpoints and 100 monotonic slider steps. The isolated desktop probe also asserts popover material, behind-window blending, active state and both appearances. Existing readability, rim confinement and black-screen checks remain. The native desktop probe must not be run in the personal user session.
 
+The dark App preview explicitly scopes its material to the dark color scheme, independent of the system theme; otherwise older macOS thin materials could turn light while quota text stays white. A mismatched-system-theme readability case covers both system schemes.
+
 An offscreen image cannot prove actual wallpaper transmission: system compositing, accessibility Reduce Transparency, wallpaper and lighting affect the final result. Real-desktop comparison against the user's reference remains necessary after building and installing a new candidate. No installed App or previously generated build 56 DMG is modified by this source change.
 
 Local validation: `swift run -c release --scratch-path .panel-build/clear-glass-check --disable-sandbox quota-self-check` passed after retaining the light-theme curves. This includes the original contrast, frosting, dispersion, corner, refraction and rim-confinement assertions. Confirmation output is in `.panel-build/clear-glass-confirmation.log`. `scripts/check-localization.sh` passed all 436 keys and seven native language/fallback cases; Swift parsing and `git diff --check` passed. Full App type-checking is not validated locally: the Command Line Tools SDK could not load `SwiftUIMacros.StateMacro`. The native runtime material assertion remains pending in isolated full-Xcode CI, not the personal desktop session.

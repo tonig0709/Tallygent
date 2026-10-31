@@ -59,13 +59,6 @@ struct DesktopPanelProbe {
     static func main() {
         _ = NSApplication.shared
         let material = NSVisualEffectView()
-        for light in [true, false] {
-            DesktopVisualEffectView.configure(material, isLight: light)
-            precondition(material.material == .popover && material.blendingMode == .behindWindow && material.state == .active,
-                         "Minimum-opacity desktop must sample the backdrop with native popover material")
-            precondition(material.appearance?.name == (light ? NSAppearance.Name.aqua : .darkAqua),
-                         "Backdrop material did not follow the panel theme")
-        }
         NativeClearMaterial.configure(material, cornerRadius: 51)
         precondition(material.material == .popover && material.blendingMode == .behindWindow && material.state == .active,
                      "clear renderer stopped using the native popover backdrop")
@@ -178,6 +171,7 @@ struct DesktopPanelProbe {
         precondition(controller.isVisible, "desktop panel failed to reopen")
         controller.close()
         verifyNativeClearRuntime(server: server)
+        verifyLiveGlassAppearance(server: server)
         verifyLiveTrendPanel(server: server)
         for width in [760.0, 1_030, 1_120, 1_400] {
             var frames: [DesktopPanelMode: CGRect] = [:]
@@ -477,6 +471,59 @@ struct DesktopPanelProbe {
             }
         }
         print("Native Clear root/material, independent theme, three sizes and full-surface pointer light: PASS")
+    }
+
+    /// Exercise the actual placed view, not a second preview-only renderer.
+    /// Cached images verify settings/readability, not WindowServer wallpaper optics.
+    @MainActor
+    private static func verifyLiveGlassAppearance(server: QuotaMonitor) {
+        let defaults = UserDefaults.standard
+        let keys = [GlassSettingKeys.surfaceStyle, GlassSettingKeys.appearance, GlassSettingKeys.opacity,
+                    GlassSettingKeys.blurAmount, GlassSettingKeys.tone, DesktopPanelMode.defaultsKey]
+        let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+        let controller = DesktopPanelController.shared
+        defer {
+            controller.close()
+            for (key, value) in saved { if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        }
+        defaults.set(0, forKey: GlassSettingKeys.blurAmount)
+        defaults.set("neutral", forKey: GlassSettingKeys.tone)
+        for mode in DesktopPanelMode.allCases {
+            controller.close()
+            defaults.set(mode.rawValue, forKey: DesktopPanelMode.defaultsKey)
+            controller.show(server: server)
+            let window = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+            let root = window.contentView as! DesktopGlassBackdropHost
+            for style in [GlassSurfaceStyle.tinted, .nativeClear] {
+                for appearance in [GlassAppearanceMode.dark, .light, .automatic] {
+                    defaults.set(style.rawValue, forKey: GlassSettingKeys.surfaceStyle)
+                    defaults.set(appearance.rawValue, forKey: GlassSettingKeys.appearance)
+                    func frame(opacity: Double) -> NSBitmapImageRep {
+                        defaults.set(opacity, forKey: GlassSettingKeys.opacity)
+                        RunLoop.main.run(until: Date().addingTimeInterval(0.16))
+                        root.layoutSubtreeIfNeeded()
+                        precondition(root.material.isHidden == (style != .nativeClear),
+                                     "live style switch stacks or removes the Native Clear backdrop")
+                        precondition(window.frame.size == mode.size && !window.isOpaque,
+                                     "glass settings changed the panel's native geometry or transparency")
+                        let image = root.bitmapImageRepForCachingDisplay(in: root.bounds)!
+                        root.cacheDisplay(in: root.bounds, to: image)
+                        saveLayoutImage(root, name: "shared-glass-\(mode.rawValue)-\(style.rawValue)-\(appearance.rawValue)-\(opacity)")
+                        return image
+                    }
+                    let clear = frame(opacity: 0.35)
+                    let solid = frame(opacity: 1)
+                    // Accessibility intentionally keeps both settings opaque.
+                    if !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency {
+                        precondition(changedPlotPixels(clear, solid) > 50,
+                                     "placed \(mode.rawValue)/\(style.rawValue)/\(appearance.rawValue) ignores live opacity")
+                    }
+                    precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1,
+                                 "glass changes created a second desktop panel")
+                }
+            }
+        }
+        print("Shared glass live settings: two materials, dark/light/auto, opacity endpoints and three sizes: PASS")
     }
 
     /// The symmetric central band excludes both clock and footer in either bitmap orientation.

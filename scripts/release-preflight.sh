@@ -139,7 +139,7 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     Shared/ObservationHistory.swift Shared/ClaudeStatusline.swift \
     -lsqlite3 -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
 require_text 'NSVisualEffectView' App/DesktopGlassPanelView.swift "native desktop material is missing"
-require_text 'view.blendingMode = .behindWindow' App/DesktopGlassPanelView.swift "wallpaper sampling is missing"
+require_text 'blendingMode: NSVisualEffectView.BlendingMode = .behindWindow' Shared/QuotaWidgetView.swift "wallpaper sampling is missing"
 require_text 'Slider(value: value' App/GlassSettingsView.swift "native live sliders are missing"
 require_text 'DesktopPanelDragRegion(cornerRadius: cornerRadius, onPointer: updateHover)' App/DesktopGlassPanelView.swift "pointer callback is not wired to the full native drag region"
 require_text 'override func mouseMoved(with event: NSEvent)' App/DesktopGlassPanelView.swift "native mouse movement is not delivered"

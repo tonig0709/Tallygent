@@ -482,6 +482,9 @@ public struct LiquidGlassSurface: View {
     let surfaceStyle: GlassSurfaceStyle
     let hoverVector: CGSize
     let isHovering: Bool
+    // Only the desktop's Native Clear root supplies this same material outside
+    // SwiftUI. Tinted glass must keep the exact preview backend, with no extra blur.
+    let nativeClearBackdropProvided: Bool
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -506,7 +509,8 @@ public struct LiquidGlassSurface: View {
         refractionMode: GlassRefractionMode = .standard,
         surfaceStyle: GlassSurfaceStyle = .tinted,
         hoverVector: CGSize = .zero,
-        isHovering: Bool = false
+        isHovering: Bool = false,
+        nativeClearBackdropProvided: Bool = false
     ) {
         self.isLight = isLight
         self.opacity = opacity
@@ -523,6 +527,7 @@ public struct LiquidGlassSurface: View {
         self.surfaceStyle = surfaceStyle
         self.hoverVector = hoverVector
         self.isHovering = isHovering
+        self.nativeClearBackdropProvided = nativeClearBackdropProvided
     }
 
     public var body: some View {
@@ -553,8 +558,16 @@ public struct LiquidGlassSurface: View {
 
     @ViewBuilder
     private var surfaceLayer: some View {
-        if surfaceStyle == .nativeClear {
-            NativeClearMaterial(cornerRadius: cornerRadius)
+        if reduceTransparency {
+            RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+                .fill(isLight && surfaceStyle != .nativeClear ? Color.white : Color.black)
+        } else if surfaceStyle == .nativeClear {
+            ZStack {
+                Color.clear
+                if !nativeClearBackdropProvided {
+                    NativeClearMaterial(cornerRadius: cornerRadius)
+                }
+            }
                 .overlay {
                     RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
                         .fill(.black.opacity(darkFilmOpacity))
@@ -626,7 +639,8 @@ public struct LiquidGlassSurface: View {
 
     private var elasticHighlight: some View {
         GlassRimHighlight(isLight: isLight, cornerRadius: cornerRadius,
-                          elasticity: elasticity, displacement: displacement)
+                          elasticity: elasticity, displacement: displacement,
+                          hoverVector: reduceMotion ? .zero : hoverVector)
     }
 
     @ViewBuilder

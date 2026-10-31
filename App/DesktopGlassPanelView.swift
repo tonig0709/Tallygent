@@ -48,7 +48,7 @@ struct DesktopGlassPanelView: View {
             .id(server.service == .claude ? server.snapshot.claudePresentationKey() : "codex")
             .frame(width: mode.size.width, height: mode.size.height)
             .background {
-                DesktopGlassSurface(
+                LiquidGlassSurface(
                     isLight: isLight,
                     opacity: glassOpacity,
                     accent: .blue,
@@ -63,7 +63,8 @@ struct DesktopGlassPanelView: View {
                     refractionMode: refractionMode,
                     surfaceStyle: surfaceStyle,
                     hoverVector: reduceMotion ? .zero : hoverVector,
-                    isHovering: isHovering
+                    isHovering: isHovering,
+                    nativeClearBackdropProvided: true
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
@@ -254,213 +255,6 @@ struct DesktopPanelDragRegion: NSViewRepresentable {
     }
 }
 
-private struct DesktopGlassSurface: View {
-    let isLight: Bool
-    let opacity: Double
-    let accent: Color
-    let cornerRadius: Double
-    let edgeStrength: Double
-    let tone: Color
-    let dispersion: Double
-    let elasticity: Double
-    let displacement: Double
-    let blurAmount: Double
-    let saturation: Double
-    let refractionMode: GlassRefractionMode
-    let surfaceStyle: GlassSurfaceStyle
-    let hoverVector: CGSize
-    let isHovering: Bool
-
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    private var resolvedOpacity: Double {
-        reduceTransparency ? 1 : WidgetGlassOpacity.clamped(opacity)
-    }
-
-    private var filmOpacity: Double {
-        if isLight && surfaceStyle != .nativeClear {
-            return 0.12 + WidgetGlassOpacity.normalized(resolvedOpacity) * 0.68
-        }
-        return WidgetGlassOpacity.darkFilmOpacity(resolvedOpacity)
-    }
-
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
-    }
-
-    private var filmColor: Color {
-        (isLight ? Color.white : Color.black).opacity(filmOpacity)
-    }
-
-    private var outerBorder: Color {
-        isLight
-            ? .white.opacity(0.48 + edgeStrength * 0.42)
-            : .white.opacity(0.12 + edgeStrength * 0.22)
-    }
-
-    private var innerBorder: Color {
-        isLight ? accent.opacity(0.18) : .white.opacity(0.09)
-    }
-
-    private var borderWidth: CGFloat {
-        CGFloat(0.65 + edgeStrength * 0.75 + displacement * 1.25)
-    }
-
-    private var highlightOpacity: Double {
-        (isLight ? 0.46 : 0.1) + edgeStrength * 0.24
-    }
-
-    private var highlightCenter: UnitPoint {
-        UnitPoint(
-            x: min(1, max(0, 0.5 + hoverVector.width * 0.5)),
-            y: min(1, max(0, 0.5 + hoverVector.height * 0.5))
-        )
-    }
-
-    private var highlightStart: UnitPoint {
-        UnitPoint(x: min(1, max(0, 0.5 - hoverVector.width * 0.5)), y: min(1, max(0, 0.5 - hoverVector.height * 0.5)))
-    }
-
-    private var highlightEnd: UnitPoint {
-        UnitPoint(x: min(1, max(0, 0.5 + hoverVector.width * 0.5)), y: min(1, max(0, 0.5 + hoverVector.height * 0.5)))
-    }
-
-    private var directionalHighlight: some View {
-        ZStack {
-            shape.strokeBorder(
-                LinearGradient(
-                    colors: [.clear, .white.opacity(isLight ? 0.96 : 0.68), .clear],
-                    startPoint: highlightStart,
-                    endPoint: highlightEnd
-                ),
-                lineWidth: CGFloat(1.4 + edgeStrength * 1.8 + displacement * 2)
-            )
-            .blendMode(.screen)
-            shape.strokeBorder(
-                RadialGradient(
-                    colors: [.white.opacity(isLight ? 0.82 : 0.48), .clear],
-                    center: highlightCenter,
-                    startRadius: 0,
-                    endRadius: 180
-                ),
-                lineWidth: CGFloat(1 + displacement * 3)
-            )
-            .blendMode(.overlay)
-        }
-        .opacity(isHovering ? 1 : 0)
-        .animation(.easeOut(duration: 0.14), value: isHovering)
-    }
-
-    private var chromaticEdge: some View {
-        let offset = CGFloat(optics.edgeOffset)
-        return ZStack {
-            shape.inset(by: offset + CGFloat(optics.edgeWidth) / 2)
-                .strokeBorder(.red.opacity(optics.edgeOpacity), lineWidth: CGFloat(optics.edgeWidth))
-                .offset(x: -offset, y: offset * 0.4)
-            shape.inset(by: offset + CGFloat(optics.edgeWidth) / 2)
-                .strokeBorder(.cyan.opacity(optics.edgeOpacity), lineWidth: CGFloat(optics.edgeWidth))
-                .offset(x: offset, y: -offset * 0.4)
-        }
-        .allowsHitTesting(false)
-    }
-
-    var body: some View {
-        ZStack {
-            if surfaceStyle != .nativeClear { DesktopVisualEffectView(isLight: isLight) }
-            shape.fill(filmColor)
-            shape.fill(frostColor)
-            shape.fill(tone.opacity(toneOpacity))
-            borderLayer
-            topHighlight
-            directionalHighlight
-            restingRefraction
-            chromaticEdge
-            elasticHighlight
-            GlassPointerGlow(cornerRadius: cornerRadius, vector: reduceMotion ? .zero : hoverVector,
-                             active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion)
-        }
-    }
-
-    private var frostColor: Color {
-        // Public macOS materials own backdrop blur. This controls visible frosting,
-        // not a fictitious blur radius, and leaves fully opaque dark glass black.
-        (isLight || surfaceStyle == .nativeClear ? Color.white : Color(white: 0.28))
-            .opacity(optics.frostOpacity * (surfaceStyle == .nativeClear ? 0.25 : 1) * (1 - WidgetGlassOpacity.normalized(resolvedOpacity)))
-    }
-
-    private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
-
-    private var toneOpacity: Double { 0.035 * saturation }
-
-    private var elasticHighlight: some View {
-        GlassRimHighlight(isLight: isLight, cornerRadius: cornerRadius,
-                          elasticity: elasticity, displacement: displacement,
-                          hoverVector: reduceMotion ? .zero : hoverVector)
-    }
-
-    private var borderLayer: some View {
-        ZStack {
-            shape.strokeBorder(outerBorder, lineWidth: 0.65 + CGFloat(edgeStrength) * 1.35)
-            shape.inset(by: 1.2 + displacement * 5.2)
-                .strokeBorder(innerBorder.opacity(0.65 + displacement * 0.35), lineWidth: 0.5 + displacement * 2.5)
-        }
-    }
-
-    private var topHighlight: some View {
-        VStack(spacing: 0) {
-            Capsule()
-                .fill(.white.opacity(highlightOpacity))
-                .frame(height: 0.75)
-                .padding(.horizontal, 36)
-                .padding(.top, 1)
-            Spacer(minLength: 0)
-        }
-    }
-
-    @ViewBuilder
-    private var restingRefraction: some View {
-        switch refractionMode {
-        case .standard:
-            shape.inset(by: CGFloat(1 + displacement * 4)).strokeBorder(
-                LinearGradient(colors: [.white.opacity(0.16 + displacement * 0.48), .clear], startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: CGFloat(1 + displacement * 3.2)
-            )
-        case .polar:
-            shape.inset(by: CGFloat(1 + displacement * 4)).strokeBorder(
-                AngularGradient(colors: [.white.opacity(0.20 + displacement * 0.52), .clear, accent.opacity(0.16 * saturation), .clear], center: .center),
-                lineWidth: CGFloat(1.2 + displacement * 4)
-            )
-        case .prominent:
-            shape.inset(by: CGFloat(1 + displacement * 4)).strokeBorder(
-                LinearGradient(colors: [.white.opacity(0.30 + displacement * 0.58), accent.opacity(0.20 * saturation), .clear, .black.opacity(0.10 + displacement * 0.12)], startPoint: .topLeading, endPoint: .bottomTrailing),
-                lineWidth: CGFloat(1.8 + displacement * 5)
-            )
-        }
-    }
-}
-
-struct DesktopVisualEffectView: NSViewRepresentable {
-    let isLight: Bool
-
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        Self.configure(view, isLight: isLight)
-        return view
-    }
-
-    static func configure(_ view: NSVisualEffectView, isLight: Bool) {
-        // Match the native settings popover, not an opaque window-body material.
-        view.material = .popover
-        view.blendingMode = .behindWindow
-        view.state = .active
-        view.appearance = NSAppearance(named: isLight ? .aqua : .darkAqua)
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        Self.configure(view, isLight: isLight)
-    }
-}
 
 struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     var size = DesktopPanelMode.large.size

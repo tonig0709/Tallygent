@@ -1,8 +1,31 @@
-# Native Clear — local build 58
+# Native Clear — local build 59
 
 Operate surface: a readable floating quota panel, with the existing three sizes,
 charts, drag/close/settings behavior and continuous native sliders. This is a
 material extension, not a replacement product identity.
+
+## Preview / placed-panel parity (build 59)
+
+Settings, gallery and the placed desktop now route through `LiquidGlassSurface`.
+The old `DesktopGlassSurface` / forced dark popover path is removed. Tinted glass
+keeps the approved preview backend (SwiftUI clear Liquid Glass on macOS 26;
+ultra-thin material fallback on older systems), with identical film, haze, tint,
+rim, refraction and pointer layers. Light mode also uses the preview's exact fill
+curve instead of a separate desktop formula. Reduce Transparency shares an
+explicit opaque fallback.
+
+Only Native Clear moves its one popover backdrop outside SwiftUI, into the
+desktop root. `nativeClearBackdropProvided` skips the embedded backdrop only in
+that branch; it never skips coatings or Tinted Glass. The root stays hidden for
+Tinted Glass, avoiding double frosting. Preview and desktop still sample their
+respective backgrounds, so different wallpapers/windows cannot yield identical
+pixels. No preferences are reset or migrated to conceal a renderer mismatch.
+
+The pure `scripts/check-glass-renderer-parity.sh` guards all three entry paths
+and backdrop exclusivity. The isolated desktop probe also switches both
+materials, dark/light/automatic, opacity endpoints and all sizes on the actual
+placed view. Its cached frames test settings propagation, not live wallpaper
+transmission; that last optical check remains a real-desktop acceptance step.
 
 ## Material boundary
 

@@ -517,6 +517,7 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
 /// FORM: A native material root below the hosting view, outside SwiftUI flattening.
 final class DesktopGlassBackdropHost: NSView {
     let material = NSVisualEffectView()
+    private var opticalRadius: Double = 30
     init(content: NSView) {
         super.init(frame: content.frame)
         for child in [material, content] {
@@ -527,7 +528,13 @@ final class DesktopGlassBackdropHost: NSView {
         }
     }
     required init?(coder: NSCoder) { return nil }
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        let outline = RoundedRectangle(cornerRadius: CGFloat(opticalRadius), style: .continuous).path(in: bounds)
+        return outline.contains(local) ? super.hitTest(point) : nil
+    }
     func configure(clear: Bool, cornerRadius: Double) {
+        opticalRadius = min(64, max(10, cornerRadius))
         material.isHidden = !clear
         NativeClearMaterial.configure(material, cornerRadius: cornerRadius)
     }

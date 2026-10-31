@@ -150,6 +150,8 @@ struct DesktopPanelProbe {
             DesktopPanelWindowConfigurator(size: mode.size, clearMaterial: true, cornerRadius: 51).configure(first)
             precondition(!nativeRoot.material.isHidden && nativeRoot.material.blendingMode == .behindWindow && !first.isOpaque,
                          "clear material has an opaque window or missing native root")
+            let outside = nativeRoot.convert(CGPoint(x: 1, y: 1), to: nativeRoot.superview)
+            precondition(nativeRoot.hitTest(outside) == nil, "native backdrop intercepts clicks in the transparent corners")
         }
         DesktopPanelWindowConfigurator(size: DesktopPanelMode.stored().size, clearMaterial: false).configure(first)
         precondition(nativeRoot.material.isHidden, "tinted mode stacks two native backdrops")

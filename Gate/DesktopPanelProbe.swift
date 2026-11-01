@@ -173,6 +173,7 @@ struct DesktopPanelProbe {
         controller.close()
         verifyNativeClearRuntime(server: server)
         verifyLiveGlassAppearance(server: server)
+        verifyPointerHighlightSetting(server: server)
         verifyLiveTrendPanel(server: server)
         for width in [760.0, 1_030, 1_120, 1_400] {
             var frames: [DesktopPanelMode: CGRect] = [:]
@@ -415,7 +416,7 @@ struct DesktopPanelProbe {
     private static func verifyNativeClearRuntime(server: QuotaMonitor) {
         let defaults = UserDefaults.standard
         let keys = [GlassSettingKeys.surfaceStyle, GlassSettingKeys.opacity, GlassSettingKeys.blurAmount,
-                    GlassSettingKeys.tone, GlassSettingKeys.appearance, DesktopPanelMode.defaultsKey]
+                    GlassSettingKeys.tone, GlassSettingKeys.appearance, GlassSettingKeys.pointerHighlightIntensity, DesktopPanelMode.defaultsKey]
         let saved = keys.map { ($0, defaults.object(forKey: $0)) }
         let controller = DesktopPanelController.shared
         let backdrop = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 680, height: 300), styleMask: [.borderless], backing: .buffered, defer: false)
@@ -430,6 +431,7 @@ struct DesktopPanelProbe {
         defaults.set(GlassSurfaceStyle.nativeClear.rawValue, forKey: GlassSettingKeys.surfaceStyle)
         defaults.set(0.35, forKey: GlassSettingKeys.opacity)
         defaults.set(0, forKey: GlassSettingKeys.blurAmount)
+        defaults.set(1, forKey: GlassSettingKeys.pointerHighlightIntensity)
         defaults.set("neutral", forKey: GlassSettingKeys.tone)
         defaults.set(GlassAppearanceMode.light.rawValue, forKey: GlassSettingKeys.appearance)
         func drag(in view: NSView) -> DesktopPanelDragRegion.DragView? {
@@ -569,6 +571,73 @@ struct DesktopPanelProbe {
             }
         }
         print("Shared glass live settings: two materials, dark/light/auto, opacity endpoints and three sizes: PASS")
+    }
+
+    @MainActor
+    private static func verifyPointerHighlightSetting(server: QuotaMonitor) {
+        let defaults = UserDefaults.standard
+        let keys = [GlassSettingKeys.surfaceStyle, GlassSettingKeys.appearance, GlassSettingKeys.opacity,
+                    GlassSettingKeys.pointerHighlightIntensity, DesktopPanelMode.defaultsKey]
+        let saved = keys.map { ($0, defaults.object(forKey: $0)) }
+        let controller = DesktopPanelController.shared
+        defer {
+            controller.close()
+            for (key, value) in saved { if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) } }
+        }
+        defaults.set(GlassAppearanceMode.dark.rawValue, forKey: GlassSettingKeys.appearance)
+        defaults.set(0.35, forKey: GlassSettingKeys.opacity)
+        func tracking(in view: NSView) -> DesktopPanelDragRegion.DragView? {
+            (view as? DesktopPanelDragRegion.DragView) ?? view.subviews.compactMap { tracking(in: $0) }.first
+        }
+        func brightness(_ image: NSBitmapImageRep) -> Double {
+            var total = 0.0
+            var count = 0.0
+            for y in Int(Double(image.pixelsHigh) * 0.40)..<Int(Double(image.pixelsHigh) * 0.60) {
+                for x in Int(Double(image.pixelsWide) * 0.52)..<Int(Double(image.pixelsWide) * 0.94) {
+                    if let color = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) {
+                        // Native backdrop caching can be transparent. Compare light
+                        // composited on black, not unpremultiplied white RGB alone.
+                        total += Double((color.redComponent + color.greenComponent + color.blueComponent) * color.alphaComponent / 3)
+                        count += 1
+                    }
+                }
+            }
+            return total / max(1, count)
+        }
+        for style in [GlassSurfaceStyle.tinted, .nativeClear] {
+            defaults.set(style.rawValue, forKey: GlassSettingKeys.surfaceStyle)
+            for mode in DesktopPanelMode.allCases {
+                controller.close()
+                defaults.set(mode.rawValue, forKey: DesktopPanelMode.defaultsKey)
+                controller.show(server: server)
+                let window = NSApp.windows.first { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }!
+                let root = window.contentView!
+                root.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                let drag = tracking(in: root)!
+                func frame(intensity: Double, x: CGFloat) -> NSBitmapImageRep {
+                    defaults.set(intensity, forKey: GlassSettingKeys.pointerHighlightIntensity)
+                    let point = CGPoint(x: drag.bounds.width * x, y: drag.bounds.midY)
+                    let event = NSEvent.mouseEvent(with: .mouseMoved, location: drag.convert(point, to: nil), modifierFlags: [], timestamp: 0,
+                                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 0, pressure: 0)!
+                    drag.mouseMoved(with: event)
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.3))
+                    root.layoutSubtreeIfNeeded()
+                    let image = root.bitmapImageRepForCachingDisplay(in: root.bounds)!
+                    root.cacheDisplay(in: root.bounds, to: image)
+                    return image
+                }
+                let offLeft = frame(intensity: 0, x: 0.2)
+                let offRight = frame(intensity: 0, x: 0.8)
+                precondition(changedPlotPixels(offLeft, offRight) == 0, "zero-intensity placed panel still follows the pointer")
+                let dim = frame(intensity: 0.35, x: 0.8)
+                let bright = frame(intensity: 1, x: 0.8)
+                precondition(brightness(bright) > brightness(offRight) + 0.003, "placed panel ignores live highlight enable/disable")
+                precondition(brightness(bright) > brightness(dim) + 0.003, "placed panel ignores intermediate highlight strength")
+                saveLayoutImage(root, name: "pointer-intensity-\(style.rawValue)-\(mode.rawValue)")
+            }
+        }
+        print("Live mouse-highlight intensity: zero disables, intermediate strength, both materials and three sizes: PASS")
     }
 
     /// The symmetric central band excludes both clock and footer in either bitmap orientation.

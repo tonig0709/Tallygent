@@ -118,7 +118,7 @@ func render<V: View>(_ view: V, width: CGFloat, height: CGFloat) -> NSBitmapImag
 }
 
 @MainActor
-func changedPixels(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep, in region: CGRect) -> Int {
+func changedPixels(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep, in region: CGRect, tolerance: CGFloat = 0.12) -> Int {
     let xRange = max(0, Int(CGFloat(lhs.pixelsWide) * region.minX))..<min(lhs.pixelsWide, Int(CGFloat(lhs.pixelsWide) * region.maxX))
     let yRange = max(0, Int(CGFloat(lhs.pixelsHigh) * region.minY))..<min(lhs.pixelsHigh, Int(CGFloat(lhs.pixelsHigh) * region.maxY))
     var count = 0
@@ -131,7 +131,7 @@ func changedPixels(_ lhs: NSBitmapImageRep, _ rhs: NSBitmapImageRep, in region: 
                 abs(left.greenComponent - right.greenComponent) +
                 abs(left.blueComponent - right.blueComponent) +
                 abs(left.alphaComponent - right.alphaComponent)
-            if difference > 0.12 { count += 1 }
+            if difference > tolerance { count += 1 }
         }
     }
     return count
@@ -522,6 +522,61 @@ await MainActor.run {
     let reducedB = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: true, elasticity: 0.15, reduceMotion: true).background(Color.black), width: 240, height: 120)
     precondition(changedPixels(reducedA, reducedB, in: fullFrame) == 0, "Reduce Motion still moves the glass light")
     precondition(changedPixels(reducedA, idleA, in: fullFrame) > 100, "Reduce Motion removed hover feedback instead of stabilizing it")
+    @MainActor func intensityGlow(_ intensity: Double) -> NSBitmapImageRep {
+        render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: true,
+                                elasticity: 0.15, intensity: intensity)
+            .background(Color.black), width: 240, height: 120)
+    }
+    let noGlow = intensityGlow(0)
+    let softGlow = intensityGlow(0.4)
+    let fullGlow = intensityGlow(1)
+    precondition(changedPixels(noGlow, idleA, in: fullFrame, tolerance: 0) == 0,
+                 "zero pointer intensity is not exactly inactive")
+    precondition(changedPixels(fullGlow, leftGlow, in: fullFrame, tolerance: 0) == 0,
+                 "full pointer intensity changed the existing default light")
+    let idlePeak = idleA.colorAt(x: 48, y: 60)!.usingColorSpace(.deviceRGB)!.redComponent
+    let softPeak = softGlow.colorAt(x: 48, y: 60)!.usingColorSpace(.deviceRGB)!.redComponent
+    let fullPeak = fullGlow.colorAt(x: 48, y: 60)!.usingColorSpace(.deviceRGB)!.redComponent
+    precondition(softPeak > idlePeak + 0.005 && fullPeak > softPeak + 0.005,
+                 "pointer intensity does not monotonically control the cursor light peak")
+    let systemReduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+    let systemReduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+    for mode in DesktopPanelMode.allCases {
+        @MainActor func pointerSurface(_ intensity: Double, vector: CGSize, hovering: Bool) -> NSBitmapImageRep {
+            // Use the solid dark accessibility fallback or Tinted Light on black; neither needs a native compositor view.
+            render(LiquidGlassSurface(isLight: !systemReduceTransparency,
+                                       opacity: systemReduceTransparency ? 1 : 0.35, accent: .blue, elasticity: 0.8,
+                                       displacement: 0.8, hoverVector: vector, isHovering: hovering,
+                                       pointerHighlightIntensity: intensity)
+                .environment(\.colorScheme, systemReduceTransparency ? .dark : .light)
+                .background(Color.black),
+                width: mode.size.width, height: mode.size.height)
+        }
+        let idle = pointerSurface(0, vector: .zero, hovering: false)
+        let defaultIdle = pointerSurface(1, vector: .zero, hovering: false)
+        let left = CGSize(width: -0.6, height: 0)
+        let right = CGSize(width: 0.6, height: 0)
+        for vector in [left, right] {
+            let disabled = pointerSurface(0, vector: vector, hovering: true)
+            precondition(changedPixels(disabled, idle, in: fullFrame, tolerance: 0) == 0,
+                         "\(mode.rawValue) zero intensity still changes the surface on hover")
+        }
+        precondition(changedPixels(defaultIdle, idle, in: fullFrame, tolerance: 0) == 0,
+                     "\(mode.rawValue) pointer intensity alters the static glass rim")
+        let activeLeft = pointerSurface(1, vector: left, hovering: true)
+        let activeRight = pointerSurface(1, vector: right, hovering: true)
+        let visibleFloor = max(8, activeLeft.pixelsWide * activeLeft.pixelsHigh / 1_000)
+        precondition(changedPixels(activeLeft, idle, in: fullFrame) > visibleFloor,
+                     "\(mode.rawValue) positive pointer intensity removed active feedback")
+        if systemReduceMotion {
+            precondition(changedPixels(activeLeft, activeRight, in: fullFrame, tolerance: 0) == 0,
+                         "\(mode.rawValue) Reduce Motion still moves the pointer field")
+        } else {
+            precondition(changedPixels(activeLeft, activeRight, in: fullFrame) > visibleFloor,
+                         "\(mode.rawValue) positive pointer intensity has no visible surface movement")
+        }
+    }
+    print("Pointer highlight intensity passed: exact zero/off, monotonic peak, full-strength compatibility and three-size accessibility-aware feedback.")
     precondition(changedPixels(plainEdge, dispersedEdge, in: interior) == 0, "edge color separation tints panel content")
     for isLight in [false, true] {
         let clear = render(LiquidGlassSurface(isLight: isLight, opacity: 0.35, accent: .blue, blurAmount: 0), width: 240, height: 120)
@@ -663,7 +718,8 @@ let settings = GlassRenderSettings(
     dispersion: 0.16,
     cornerRadius: 51,
     tone: "cool",
-    refractionMode: .polar
+    refractionMode: .polar,
+    pointerHighlightIntensity: 0.4
 )
 let settingsSnapshot = UsageSnapshot(glassSettings: settings)
 let settingsData = try JSONEncoder().encode(settingsSnapshot)
@@ -671,6 +727,20 @@ let decodedSettings = try JSONDecoder().decode(UsageSnapshot.self, from: setting
 precondition(decodedSettings.glassSettings == settings, "glass settings did not survive the app-to-widget snapshot round trip")
 let legacyGlass = try JSONDecoder().decode(GlassRenderSettings.self, from: Data(#"{"appearance":"dark","opacity":0.35,"edgeStrength":0.42,"elasticity":0.15,"displacement":0.18,"blurAmount":0,"saturation":1.15,"dispersion":0.03,"cornerRadius":24,"tone":"neutral","refractionMode":"standard"}"#.utf8))
 precondition(legacyGlass.resolvedSurfaceStyle == .tinted, "existing snapshots silently switched renderer")
+precondition(legacyGlass.pointerHighlightIntensity == nil && legacyGlass.resolvedPointerHighlightIntensity == 1,
+             "old glass JSON must keep full pointer intensity when the field is absent")
+let noPointerSnapshot = UsageSnapshot(glassSettings: GlassRenderSettings(pointerHighlightIntensity: 0))
+let decodedNoPointer = try JSONDecoder().decode(UsageSnapshot.self, from: JSONEncoder().encode(noPointerSnapshot))
+precondition(decodedNoPointer.glassSettings?.pointerHighlightIntensity == 0 &&
+             decodedNoPointer.glassSettings?.resolvedPointerHighlightIntensity == 0,
+             "saved zero pointer intensity did not survive the snapshot round trip")
+for (raw, expected) in [(Double(-1), Double(0)), (0, 0), (0.4, 0.4), (1, 1), (2, 1),
+                        (.nan, 1), (.infinity, 1), (-.infinity, 1)] {
+    let pointerSettings = GlassRenderSettings(pointerHighlightIntensity: raw)
+    precondition(pointerSettings.resolvedPointerHighlightIntensity == expected &&
+                 pointerSettings.sanitized.pointerHighlightIntensity == expected,
+                 "pointer intensity must clamp finite inputs and safely default nonfinite inputs")
+}
 let clearGlass = GlassRenderSettings(opacity: 0.35, blurAmount: 0, surfaceStyle: .nativeClear)
 let decodedClearGlass = try JSONDecoder().decode(GlassRenderSettings.self, from: JSONEncoder().encode(clearGlass))
 precondition(decodedClearGlass.resolvedSurfaceStyle == .nativeClear, "clear material selection did not persist")
@@ -678,6 +748,11 @@ precondition(GlassRenderSettings.nativeClear.isNativeClearPreset)
 var customizedClear = GlassRenderSettings.nativeClear
 customizedClear.opacity = 0.7
 precondition(!customizedClear.isNativeClearPreset, "custom Clear settings still report the pristine preset")
+var customizedPointer = GlassRenderSettings.nativeClear
+customizedPointer.pointerHighlightIntensity = 0
+precondition(!customizedPointer.isNativeClearPreset, "custom pointer intensity still reports the pristine Clear preset")
+customizedPointer.pointerHighlightIntensity = nil
+precondition(customizedPointer.isNativeClearPreset, "legacy Clear settings lost preset identity when intensity is absent")
 
 let invalidSettings = GlassRenderSettings(opacity: -1, elasticity: 3, displacement: -2, blurAmount: 9, saturation: 0, cornerRadius: 200, tone: "invalid").sanitized
 precondition(invalidSettings.opacity == WidgetGlassOpacity.minimum, "glass opacity was not clamped")

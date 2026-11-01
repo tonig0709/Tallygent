@@ -25,6 +25,7 @@ struct DashboardView: View {
     @AppStorage(GlassSettingKeys.surfaceStyle) private var surfaceStyleRaw = GlassSurfaceStyle.tinted.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
+    @AppStorage(GlassSettingKeys.pointerHighlightIntensity) private var pointerHighlightIntensity = 1.0
     @AppStorage(GlassSettingKeys.elasticity) private var elasticity = 0.15
     @AppStorage(GlassSettingKeys.displacement) private var displacement = 0.35
     @AppStorage(GlassSettingKeys.blurAmount) private var blurAmount = 0.20
@@ -168,7 +169,8 @@ struct DashboardView: View {
                                 GlassPreviewSurface(settings: GlassRenderSettings(appearance: isLight ? .light : .dark, opacity: glassOpacity,
                                     edgeStrength: edgeStrength, elasticity: elasticity, displacement: displacement, blurAmount: blurAmount,
                                     saturation: saturation, dispersion: dispersion, cornerRadius: cornerRadius, tone: toneRaw,
-                                    refractionMode: refractionMode, surfaceStyle: surfaceStyle), tone: glassTone.color)
+                                    refractionMode: refractionMode, surfaceStyle: surfaceStyle,
+                                    pointerHighlightIntensity: pointerHighlightIntensity), tone: glassTone.color)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))
                                 .scaleEffect(DashboardLayout.previewScale(width: geometry.size.width))

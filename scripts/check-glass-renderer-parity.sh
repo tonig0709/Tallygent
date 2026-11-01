@@ -72,6 +72,15 @@ require(not contains(desktop_call, r"surfaceStyle\s*:\s*\.nativeClear\b"),
         "desktop must pass the selected style, not force clear")
 require(contains(desktop_call, r"surfaceStyle\s*:\s*surfaceStyle\b"),
         "desktop must pass the selected style to the shared renderer")
+require(contains(desktop_call, r"pointerHighlightIntensity\s*:\s*pointerHighlightIntensity\b") and
+        contains(preview_call, r"pointerHighlightIntensity\s*:\s*settings\.resolvedPointerHighlightIntensity\b") and
+        contains(gallery, r"pointerHighlightIntensity\s*:\s*pointerHighlightIntensity\b"),
+        "mouse-highlight strength must reach desktop, settings preview and gallery")
+for text in [desktop, settings, gallery]:
+    require(contains(text, r"@AppStorage\(GlassSettingKeys\.pointerHighlightIntensity\)"),
+            "mouse-highlight strength is not shared through the same persisted setting")
+require(contains(settings, r'slider\("鼠标高光强度",\s*value:\s*\$pointerHighlightIntensity,\s*range:\s*0\.\.\.1'),
+        "native mouse-highlight slider is missing its zero-to-one range")
 
 host = region(desktop, r"final\s+class\s+DesktopGlassBackdropHost\b")
 require(contains(host, r"material\.isHidden\s*=\s*!clear\b") and

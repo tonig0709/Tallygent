@@ -48,6 +48,12 @@ public struct GlassOptics: Sendable {
 public struct GlassRenderSettings: Codable, Equatable, Sendable {
     // Optional on disk so existing build 57 snapshots remain decodable.
     public var surfaceStyle: GlassSurfaceStyle?
+    // Optional for snapshots saved before the mouse-highlight control existed.
+    public var pointerHighlightIntensity: Double?
+    public var resolvedPointerHighlightIntensity: Double {
+        let value = pointerHighlightIntensity ?? 1
+        return value.isFinite ? min(1, max(0, value)) : 1
+    }
     public var resolvedSurfaceStyle: GlassSurfaceStyle { surfaceStyle ?? .tinted }
     public var appearance: WidgetAppearance
     public var opacity: Double
@@ -73,7 +79,8 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
         cornerRadius: Double = 30,
         tone: String = "neutral",
         refractionMode: GlassRefractionMode = .standard,
-        surfaceStyle: GlassSurfaceStyle = .tinted
+        surfaceStyle: GlassSurfaceStyle = .tinted,
+        pointerHighlightIntensity: Double = 1
     ) {
         self.appearance = appearance
         self.opacity = opacity
@@ -87,6 +94,7 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
         self.tone = tone
         self.refractionMode = refractionMode
         self.surfaceStyle = surfaceStyle
+        self.pointerHighlightIntensity = pointerHighlightIntensity
     }
 
     public var sanitized: Self {
@@ -102,7 +110,8 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
             cornerRadius: min(64, max(10, cornerRadius)),
             tone: ["cool", "neutral", "warm"].contains(tone) ? tone : "neutral",
             refractionMode: refractionMode,
-            surfaceStyle: resolvedSurfaceStyle
+            surfaceStyle: resolvedSurfaceStyle,
+            pointerHighlightIntensity: resolvedPointerHighlightIntensity
         )
     }
 
@@ -113,6 +122,7 @@ public struct GlassRenderSettings: Codable, Equatable, Sendable {
     public var isNativeClearPreset: Bool {
         let target = Self.nativeClear
         return resolvedSurfaceStyle == .nativeClear && tone == target.tone && refractionMode == target.refractionMode &&
+            abs(resolvedPointerHighlightIntensity - target.resolvedPointerHighlightIntensity) < 0.005 &&
             zip([opacity, edgeStrength, elasticity, displacement, blurAmount, saturation, dispersion, cornerRadius],
                 [target.opacity, target.edgeStrength, target.elasticity, target.displacement, target.blurAmount, target.saturation, target.dispersion, target.cornerRadius])
                 .allSatisfy { abs($0 - $1) < 0.005 }

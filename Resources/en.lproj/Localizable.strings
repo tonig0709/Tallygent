@@ -439,3 +439,5 @@
 "染色玻璃" = "Tinted Glass";
 "玻璃材质" = "Glass Material";
 "原生清透独立于深浅色；最低档使用原生磨砂，不额外染黑。鼠标经过面板内部会点亮玻璃。" = "Native Clear is independent of Light and Dark. Its minimum setting uses native frosting without added dark tint. Moving the pointer inside the panel lights the glass.";
+"鼠标高光强度" = "Pointer Highlight";
+"调整面内光晕和边缘追光；0% 关闭鼠标高光，保留固定玻璃反光。" = "Adjust the interior glow and cursor-following rim light. At 0%, pointer highlights are off; static glass reflections remain.";

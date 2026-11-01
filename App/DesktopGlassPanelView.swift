@@ -13,6 +13,7 @@ struct DesktopGlassPanelView: View {
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
+    @AppStorage(GlassSettingKeys.pointerHighlightIntensity) private var pointerHighlightIntensity = 1.0
     @AppStorage(GlassSettingKeys.elasticity) private var elasticity = 0.15
     @AppStorage(GlassSettingKeys.displacement) private var displacement = 0.35
     @AppStorage(GlassSettingKeys.blurAmount) private var blurAmount = 0.20
@@ -64,7 +65,8 @@ struct DesktopGlassPanelView: View {
                     surfaceStyle: surfaceStyle,
                     hoverVector: reduceMotion ? .zero : hoverVector,
                     isHovering: isHovering,
-                    nativeClearBackdropProvided: true
+                    nativeClearBackdropProvided: true,
+                    pointerHighlightIntensity: pointerHighlightIntensity
                 )
             }
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous))

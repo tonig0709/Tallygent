@@ -1,4 +1,4 @@
-# Native Clear — local build 59
+# Native Clear — local build 60
 
 Operate surface: a readable floating quota panel, with the existing three sizes,
 charts, drag/close/settings behavior and continuous native sliders. This is a
@@ -51,6 +51,20 @@ respected. Exact pixels vary with the wallpaper, OS and accessibility settings;
 offscreen content renders do not prove actual wallpaper transmission.
 
 ## Pointer light
+
+Build 60 adds a shared **Pointer Highlight** slider (0–100%) to both settings
+entry points. It controls the cursor-triggered interior glow and rim tracking;
+zero removes pointer feedback while preserving fixed glass reflections. The
+default is 100%, matching build 59. App preview, gallery and desktop use the same
+persisted `glassPointerHighlightIntensity` value. Old snapshots without the
+optional field resolve to 100%; zero round-trips without being replaced by a
+default. Presets/Restore Defaults restore the standard intensity. Reduce Motion
+still uses stationary feedback, and zero disables that feedback too.
+
+Tests cover exact zero/off pixels, monotonic intensity, default compatibility,
+three-size surface movement, old JSON/clamping, shared preference routing and
+live strength changes on the placed panel for both materials. No account request
+or wallpaper sampling changes are involved.
 
 A shared `GlassPointerGlow` paints a bounded white specular field on the interior
 and a directional contour reflection, below quota text/charts. It follows local

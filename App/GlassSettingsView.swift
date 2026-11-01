@@ -5,6 +5,7 @@ enum GlassSettingKeys {
     static let appearance = "glassAppearanceMode"
     static let opacity = "desktopPanelGlassOpacity"
     static let edgeStrength = "glassEdgeStrength"
+    static let pointerHighlightIntensity = "glassPointerHighlightIntensity"
     static let elasticity = "glassElasticity"
     static let displacement = "glassDisplacement"
     static let blurAmount = "glassBlurAmount"
@@ -90,7 +91,8 @@ enum GlassSettingsSnapshot {
             refractionMode: GlassRefractionMode(
                 rawValue: defaults.string(forKey: GlassSettingKeys.refractionMode) ?? GlassRefractionMode.standard.rawValue
             ) ?? .standard,
-            surfaceStyle: style
+            surfaceStyle: style,
+            pointerHighlightIntensity: double(GlassSettingKeys.pointerHighlightIntensity, 1)
         ).sanitized
     }
 }
@@ -118,6 +120,7 @@ struct GlassSettingsView: View {
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var opacity = WidgetGlassOpacity.defaultValue
     @AppStorage(GlassSettingKeys.edgeStrength) private var edgeStrength = 0.55
+    @AppStorage(GlassSettingKeys.pointerHighlightIntensity) private var pointerHighlightIntensity = 1.0
     @AppStorage(GlassSettingKeys.elasticity) private var elasticity = 0.15
     @AppStorage(GlassSettingKeys.displacement) private var displacement = 0.35
     @AppStorage(GlassSettingKeys.blurAmount) private var blurAmount = 0.20
@@ -179,6 +182,8 @@ struct GlassSettingsView: View {
             controlSection("基础") {
                 slider("不透明度", value: $opacity, range: WidgetGlassOpacity.minimum...WidgetGlassOpacity.maximum, format: .percent)
                 slider("边缘强度", value: $edgeStrength, range: 0...1, format: .percent)
+                slider("鼠标高光强度", value: $pointerHighlightIntensity, range: 0...1, format: .percent)
+                    .help("调整面内光晕和边缘追光；0% 关闭鼠标高光，保留固定玻璃反光。")
                 slider("弹性高光", value: $elasticity, range: 0...1, format: .percent)
                 slider("光学圆角", value: $cornerRadius, range: 10...64, format: .number)
             }
@@ -271,7 +276,8 @@ struct GlassSettingsView: View {
             cornerRadius: cornerRadius,
             tone: toneRaw,
             refractionMode: refractionMode.wrappedValue,
-            surfaceStyle: surfaceStyle.wrappedValue
+            surfaceStyle: surfaceStyle.wrappedValue,
+            pointerHighlightIntensity: pointerHighlightIntensity
         ).sanitized
     }
 
@@ -336,6 +342,7 @@ struct GlassSettingsView: View {
 
     private func matches(opacity expectedOpacity: Double, edge: Double, elasticity expectedElasticity: Double, displacement expectedDisplacement: Double, blur: Double, saturation expectedSaturation: Double, dispersion expectedDispersion: Double, radius: Double, tone: GlassTone, mode: GlassRefractionMode) -> Bool {
         abs(opacity - expectedOpacity) < 0.005 &&
+            abs(pointerHighlightIntensity - 1) < 0.005 &&
             abs(edgeStrength - edge) < 0.005 &&
             abs(elasticity - expectedElasticity) < 0.005 &&
             abs(displacement - expectedDisplacement) < 0.005 &&
@@ -361,6 +368,7 @@ struct GlassSettingsView: View {
         opacity = settings.opacity
         surfaceStyleRaw = settings.resolvedSurfaceStyle.rawValue
         edgeStrength = settings.edgeStrength
+        pointerHighlightIntensity = settings.resolvedPointerHighlightIntensity
         elasticity = settings.elasticity
         displacement = settings.displacement
         blurAmount = settings.blurAmount
@@ -398,7 +406,8 @@ struct GlassPreviewSurface: View {
                     refractionMode: settings.refractionMode,
                     surfaceStyle: settings.resolvedSurfaceStyle,
                     hoverVector: reduceMotion ? .zero : pointer,
-                    isHovering: hovering
+                    isHovering: hovering,
+                    pointerHighlightIntensity: settings.resolvedPointerHighlightIntensity
                 )
             .clipShape(shape)
             .contentShape(shape)

@@ -435,14 +435,16 @@ public struct GlassPointerGlow: View {
     let active: Bool
     let elasticity: Double
     let reduceMotion: Bool
+    let intensity: Double
 
-    public init(cornerRadius: Double, vector: CGSize, active: Bool, elasticity: Double, reduceMotion: Bool = false) {
+    public init(cornerRadius: Double, vector: CGSize, active: Bool, elasticity: Double, reduceMotion: Bool = false, intensity: Double = 1) {
         self.cornerRadius = cornerRadius
         self.vector = CGSize(width: vector.width.isFinite ? min(1, max(-1, vector.width)) : 0,
                              height: vector.height.isFinite ? min(1, max(-1, vector.height)) : 0)
         self.active = active
         self.elasticity = elasticity.isFinite ? min(1, max(0, elasticity)) : 0
         self.reduceMotion = reduceMotion
+        self.intensity = intensity.isFinite ? min(1, max(0, intensity)) : 1
     }
     public var body: some View {
         GeometryReader { proxy in
@@ -459,7 +461,7 @@ public struct GlassPointerGlow: View {
             }
         }
         .blendMode(.screen)
-        .opacity(active ? 1 : 0)
+        .opacity(active ? intensity : 0)
         .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: active)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -485,6 +487,7 @@ public struct LiquidGlassSurface: View {
     // Only the desktop's Native Clear root supplies this same material outside
     // SwiftUI. Tinted glass must keep the exact preview backend, with no extra blur.
     let nativeClearBackdropProvided: Bool
+    let pointerHighlightIntensity: Double
 
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -510,7 +513,8 @@ public struct LiquidGlassSurface: View {
         surfaceStyle: GlassSurfaceStyle = .tinted,
         hoverVector: CGSize = .zero,
         isHovering: Bool = false,
-        nativeClearBackdropProvided: Bool = false
+        nativeClearBackdropProvided: Bool = false,
+        pointerHighlightIntensity: Double = 1
     ) {
         self.isLight = isLight
         self.opacity = opacity
@@ -528,6 +532,7 @@ public struct LiquidGlassSurface: View {
         self.hoverVector = hoverVector
         self.isHovering = isHovering
         self.nativeClearBackdropProvided = nativeClearBackdropProvided
+        self.pointerHighlightIntensity = pointerHighlightIntensity.isFinite ? min(1, max(0, pointerHighlightIntensity)) : 1
     }
 
     public var body: some View {
@@ -553,7 +558,7 @@ public struct LiquidGlassSurface: View {
             .overlay { chromaticEdge(shape: shape) }
             .overlay { refractionHighlight(shape: shape) }
             .overlay(alignment: .topLeading) { elasticHighlight }
-            .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion) }
+            .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion, intensity: pointerHighlightIntensity) }
     }
 
     @ViewBuilder
@@ -640,7 +645,8 @@ public struct LiquidGlassSurface: View {
     private var elasticHighlight: some View {
         GlassRimHighlight(isLight: isLight, cornerRadius: cornerRadius,
                           elasticity: elasticity, displacement: displacement,
-                          hoverVector: reduceMotion ? .zero : hoverVector)
+                          hoverVector: reduceMotion ? .zero : CGSize(width: hoverVector.width * pointerHighlightIntensity,
+                                                                     height: hoverVector.height * pointerHighlightIntensity))
     }
 
     @ViewBuilder

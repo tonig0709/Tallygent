@@ -373,7 +373,7 @@ struct PlannerView: View {
                     HStack {
                         Spacer()
                         Button("清空", role: .destructive) { confirmsClear = true }
-                            .disabled(store.isSaving || store.records.isEmpty)
+                            .disabled(store.isSaving)
                     }
                     if let chosen = advice?.recommended {
                         let summary = PlannerEngine.summary(records: store.records, profile: effectiveProfile, configuration: chosen, scope: server.plannerQuota().scope)

@@ -12,4 +12,9 @@ xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
 # Published emits in willSet; recomputing from its old stored value lags one receipt.
 grep -Fq 'recommend(report: report)' App/PlannerView.swift
 grep -Fq '(report ?? server.insights.panelReport).windows' App/PlannerView.swift
+# Empty records can mean a failed load; keep the confirmed reset/recovery action available.
+if grep -Fq '.disabled(store.isSaving || store.records.isEmpty)' App/PlannerView.swift; then
+    echo 'Planner recovery must remain available after an empty failed load' >&2
+    exit 1
+fi
 sh scripts/check-planner-benchmark.sh Shared/Planner.swift "$probe_dir/policy-comparison.json"

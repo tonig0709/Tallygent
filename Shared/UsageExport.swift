@@ -46,9 +46,9 @@ public enum UsageExport {
         var data = Data([0xEF, 0xBB, 0xBF]) // UTF-8 BOM lets spreadsheet apps recognize translated text.
         try append("schemaVersion,id,eventID,provider,accountScope,sessionScope,windowID,durationMinutes,usedPercent,remainingPercent,resetsAtUTC,source,receivedAtUTC,providerUpdatedAtUTC,validity,reason,quotaPool\r\n", to: &data)
         for row in rows {
-            let values = [String(row.schemaVersion), row.id, row.eventID, row.provider.rawValue,
+            let values: [String] = [String(row.schemaVersion), row.id, row.eventID, row.provider.rawValue,
                 row.accountScope ?? "", row.sessionScope ?? "", row.windowID,
-                row.durationMinutes.map(String.init) ?? "", row.usedPercent.map(String.init) ?? "",
+                row.durationMinutes.map { String($0) } ?? "", row.usedPercent.map { String($0) } ?? "",
                 row.usedPercent.map { String(100 - $0) } ?? "", stamp(row.resetsAt), row.source.rawValue,
                 stamp(row.receivedAt), stamp(row.providerUpdatedAt), row.validity.rawValue, row.reason ?? "", row.quotaPool ?? ""]
             try append(values.map(csvCell).joined(separator: ",") + "\r\n", to: &data)

@@ -471,6 +471,64 @@ public struct GlassPointerGlow: View {
     }
 }
 
+/// Spectral reflection confined to the glass bevel, not wallpaper RGB sampling.
+/// Separate wavelengths share the same contour; light pools fade along the rim.
+public struct GlassChromaticRim: View {
+    let cornerRadius: Double
+    let strength: Double
+    let vector: CGSize
+    let active: Bool
+    let pointerIntensity: Double
+    let reduceMotion: Bool
+
+    public init(cornerRadius: Double, dispersion: Double, vector: CGSize = .zero,
+                active: Bool = false, pointerIntensity: Double = 1, reduceMotion: Bool = false) {
+        self.cornerRadius = cornerRadius.isFinite ? min(64, max(10, cornerRadius)) : 30
+        strength = GlassOptics(blurAmount: 0, dispersion: dispersion).dispersionStrength
+        self.vector = CGSize(width: vector.width.isFinite ? min(1, max(-1, vector.width)) : 0,
+                             height: vector.height.isFinite ? min(1, max(-1, vector.height)) : 0)
+        self.active = active
+        self.pointerIntensity = pointerIntensity.isFinite ? min(1, max(0, pointerIntensity)) : 1
+        self.reduceMotion = reduceMotion
+    }
+
+    public var body: some View {
+        GeometryReader { proxy in
+            let shape = RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
+            let colors = [Color(red: 1, green: 0.50, blue: 0.43), Color(red: 1, green: 0.78, blue: 0.48),
+                          Color(red: 0.65, green: 0.88, blue: 0.72), Color(red: 0.43, green: 0.80, blue: 0.96),
+                          Color(red: 0.66, green: 0.61, blue: 1)]
+            ZStack {
+                ForEach(0..<colors.count, id: \.self) { index in
+                    shape.inset(by: CGFloat(0.45 + Double(index) * (0.12 + strength * 0.55)))
+                        .strokeBorder(colors[index], lineWidth: CGFloat(0.45 + strength * 0.45))
+                }
+            }
+            .mask {
+                ZStack {
+                    AngularGradient(stops: [.init(color: .white.opacity(0.12), location: 0),
+                                            .init(color: .white.opacity(0.85), location: 0.12),
+                                            .init(color: .white.opacity(0.06), location: 0.32),
+                                            .init(color: .white.opacity(0.10), location: 0.5),
+                                            .init(color: .white.opacity(0.70), location: 0.64),
+                                            .init(color: .white.opacity(0.05), location: 0.84),
+                                            .init(color: .white.opacity(0.12), location: 1)],
+                                    center: .center, angle: .degrees(-135))
+                    RadialGradient(colors: [.white, .clear],
+                                   center: UnitPoint(x: reduceMotion ? 0.5 : 0.5 + vector.width * 0.5,
+                                                     y: reduceMotion ? 0.5 : 0.5 + vector.height * 0.5),
+                                   startRadius: 0, endRadius: max(48, min(proxy.size.width, proxy.size.height) * 0.8))
+                        .opacity(active ? pointerIntensity : 0)
+                }
+            }
+            .opacity(0.55 * pow(strength, 1.25))
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: active)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 public struct LiquidGlassSurface: View {
     let isLight: Bool
     let opacity: Double
@@ -560,7 +618,10 @@ public struct LiquidGlassSurface: View {
                     .padding(.horizontal, 36)
                     .padding(.top, 1)
             }
-            .overlay { chromaticEdge(shape: shape) }
+            .overlay {
+                GlassChromaticRim(cornerRadius: cornerRadius, dispersion: dispersion, vector: hoverVector,
+                                  active: isHovering, pointerIntensity: pointerHighlightIntensity, reduceMotion: reduceMotion)
+            }
             .overlay { refractionHighlight(shape: shape) }
             .overlay(alignment: .topLeading) { elasticHighlight }
             .overlay { GlassPointerGlow(cornerRadius: cornerRadius, vector: hoverVector, active: isHovering, elasticity: elasticity, reduceMotion: reduceMotion, intensity: pointerHighlightIntensity) }
@@ -686,17 +747,4 @@ public struct LiquidGlassSurface: View {
         }
     }
 
-    private func chromaticEdge(shape: RoundedRectangle) -> some View {
-        let offset = CGFloat(optics.edgeOffset)
-        let width = CGFloat(optics.edgeWidth)
-        let rim = shape.inset(by: offset + width / 2)
-        return ZStack {
-            rim
-                .strokeBorder(.red.opacity(optics.edgeOpacity), lineWidth: width)
-                .offset(x: -offset, y: offset * 0.4)
-            rim
-                .strokeBorder(.cyan.opacity(optics.edgeOpacity), lineWidth: width)
-                .offset(x: offset, y: -offset * 0.4)
-        }
-    }
 }

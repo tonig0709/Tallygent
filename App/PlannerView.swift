@@ -27,6 +27,7 @@ struct PlannerView: View {
     @State private var confirmsClear = false
     @State private var notice: String?
     @State private var showsFeatures = false
+    @State private var showsHistory = false
 
     init(server: QuotaMonitor, store: PlannerStore, isActive: Bool = true, initialDetailsExpanded: Bool = false) {
         self.server = server
@@ -55,8 +56,8 @@ struct PlannerView: View {
                 header
                 composer
                 if let advice { recommendation(advice) }
-                catalog
                 history
+                catalog
                 Text("仅提供建议与本地记录：不发送任务内容、不修改项目或 Codex 设置、不启动付费任务。")
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -108,11 +109,7 @@ struct PlannerView: View {
     }
 
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("下一项任务，用什么配置？").font(.title2.weight(.semibold))
-            Text("先解释选择，再积累你自己的反馈。不会替你执行任务。")
-                .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-        }
+        Text("下一项任务，用什么配置？").font(.title2.weight(.semibold))
     }
 
     private var providerPicker: some View {
@@ -139,24 +136,16 @@ struct PlannerView: View {
                 .onChange(of: taskText) { _, value in
                     taskText = String(value.prefix(8_000)); advice = nil; override = nil
                 }
-            AdaptivePicker("任务类别", id: "planner.category",
-                           selection: Binding(get: { profile.category }, set: { profile.category = $0; profileIsManual = true }), prefersSegments: false) {
-                ForEach(PlannerCategory.allCases.filter { $0 != .automatic }) { Text($0.title).tag($0) }
+            AdaptivePicker("优化偏好", id: "planner.preference", selection: $preference) {
+                ForEach(PlannerPreference.allCases) { Text($0.title).tag($0) }
             }
-            .frame(maxWidth: 440, alignment: .leading)
-            HStack {
-                Button("本地自动识别") {
-                    profileIsManual = false
-                    profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
-                    profile.urgent = urgencyOverride ?? profile.urgent
-                }
-                Spacer()
-                Toggle("紧急", isOn: Binding(get: { urgencyOverride ?? profile.urgent }, set: {
-                    urgencyOverride = $0; profile.urgent = $0
-                })).toggleStyle(.checkbox)
-            }
-            DisclosureGroup("任务特征与背景（可选，可覆盖自动识别）", isExpanded: $showsFeatures) {
+            DisclosureGroup(isExpanded: $showsFeatures) {
                 VStack(alignment: .leading, spacing: 12) {
+                    AdaptivePicker("任务类别", id: "planner.category",
+                                   selection: Binding(get: { profile.category }, set: { profile.category = $0; profileIsManual = true }), prefersSegments: false) {
+                        ForEach(PlannerCategory.allCases.filter { $0 != .automatic }) { Text($0.title).tag($0) }
+                    }
+                    .frame(maxWidth: 440, alignment: .leading)
                     TextField("补充背景（不保存）", text: $context)
                         .onChange(of: context) { _, value in context = String(value.prefix(2_000)); advice = nil }
                     ViewThatFits(in: .horizontal) {
@@ -172,14 +161,25 @@ struct PlannerView: View {
                         .font(.caption).foregroundStyle(.secondary)
                     Text(L(profileIsManual ? "当前使用手动任务特征；点“本地自动识别”恢复自动。" : "每次生成建议都会按当前任务重新自动识别。"))
                         .font(.caption).foregroundStyle(.secondary)
+                    Button("本地自动识别") {
+                        profileIsManual = false
+                        profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
+                        profile.urgent = urgencyOverride ?? profile.urgent
+                    }
+                    Stepper(LF("每个窗口保留 %lld%%", Int64(reserve)), value: $reserve, in: 0...50, step: 5)
                 }.padding(.top, 10)
-            }
-            AdaptivePicker("优化偏好", id: "planner.preference", selection: $preference) {
-                ForEach(PlannerPreference.allCases) { Text($0.title).tag($0) }
+            } label: {
+                HStack(spacing: 8) {
+                    Text("任务选项")
+                    if profileIsManual || !context.isEmpty || reserve != 10 {
+                        Text("自定").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
             HStack {
-                Stepper(LF("每个窗口保留 %lld%%", Int64(reserve)), value: $reserve, in: 0...50, step: 5)
-                    .fixedSize()
+                Toggle("紧急", isOn: Binding(get: { urgencyOverride ?? profile.urgent }, set: {
+                    urgencyOverride = $0; profile.urgent = $0
+                })).toggleStyle(.checkbox)
                 Spacer()
                 Button("生成建议") {
                     override = nil; recommend()
@@ -212,29 +212,57 @@ struct PlannerView: View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(alignment: .leading, spacing: 6) {
                 Text(advice.decision.title).font(.headline)
-                Text(advice.evidence).font(.caption).foregroundStyle(.secondary)
                 Text(LF("规则置信度：%@（非成功概率）", advice.confidence.title))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            if let usable = advice.quotaAssessment.usablePercent {
-                Text(LF("各窗口扣除保留量后的最小余量：%lld 个百分点；不是本任务可用预算。", Int64(usable)))
-                    .font(.callout).fixedSize(horizontal: false, vertical: true)
-            }
-            if let estimate = advice.tokenEstimate {
-                Text(LF("%lld 条同类用户填报：Token 中位数 %lld，范围 %lld–%lld；未经自动核验，不等于预计订阅额度消耗。",
-                        Int64(estimate.sampleCount), estimate.median, estimate.lower, estimate.upper))
-                    .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
             if let selected = advice.recommended {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(selected.model.name).font(.title2.weight(.semibold)).textSelection(.enabled)
-                    Text(selected.effort).font(.title3).foregroundStyle(.secondary)
+                Text("\(selected.model.name) · \(selected.effort)")
+                    .font(.title2.weight(.semibold)).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                if let reason = advice.reasons.first {
+                    Text(reason).font(.callout).fixedSize(horizontal: false, vertical: true)
+                }
+                if !advice.warnings.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(advice.warnings.enumerated()), id: \.offset) { _, warning in
+                            Label(warning, systemImage: "info.circle").font(.caption)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }.foregroundStyle(.secondary)
+                }
+                Toggle("保存任务短标题到本机（默认不保存描述或背景）", isOn: $savesTitle)
+                    .font(.caption)
+                HStack {
+                    Button("复制配置") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(selected.copyText, forType: .string)
+                        notice = LF("已复制模型与 effort；请自行在 %@ 中应用。", selected.model.provider.title)
+                    }
+                    Button("保存为计划") { save(selected, start: false) }
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("标记开始") { save(selected, start: true) }
+                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     Spacer()
                 }
-                Text("\(L(selected.model.source)) · \(selected.model.discoveredAt.formatted(date: .abbreviated, time: .standard))")
-                    .font(.caption).foregroundStyle(.secondary)
-                ForEach(Array(advice.reasons.enumerated()), id: \.offset) { _, reason in
-                    Text(reason).font(.callout).fixedSize(horizontal: false, vertical: true)
+                DisclosureGroup("推荐依据与额度") {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(advice.evidence).font(.caption).foregroundStyle(.secondary)
+                        Text("\(L(selected.model.source)) · \(selected.model.discoveredAt.formatted(date: .abbreviated, time: .standard))")
+                            .font(.caption).foregroundStyle(.secondary)
+                        ForEach(Array(advice.reasons.dropFirst().enumerated()), id: \.offset) { _, reason in
+                            Text(reason).font(.callout).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let usable = advice.quotaAssessment.usablePercent {
+                            Text(LF("各窗口扣除保留量后的最小余量：%lld 个百分点；不是本任务可用预算。", Int64(usable)))
+                                .font(.callout).fixedSize(horizontal: false, vertical: true)
+                        }
+                        if let estimate = advice.tokenEstimate {
+                            Text(LF("%lld 条同类用户填报：Token 中位数 %lld，范围 %lld–%lld；未经自动核验，不等于预计订阅额度消耗。",
+                                    Int64(estimate.sampleCount), estimate.median, estimate.lower, estimate.upper))
+                                .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                        }
+                        quotaReadout
+                    }.padding(.top, 10)
                 }
                 DisclosureGroup("比较替代项 / 手动覆盖") {
                     VStack(alignment: .leading, spacing: 12) {
@@ -264,31 +292,8 @@ struct PlannerView: View {
                         Button("恢复规则建议") { override = nil; recommend() }
                     }.padding(.top, 10)
                 }
-                quotaReadout
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("边界与缺失信息").font(.subheadline.weight(.medium))
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(Array(advice.warnings.enumerated()), id: \.offset) { _, warning in
-                            Label(warning, systemImage: "info.circle").font(.caption)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                    }.foregroundStyle(.secondary).padding(.top, 8)
-                }
-                Toggle("保存任务短标题到本机（默认不保存描述或背景）", isOn: $savesTitle)
-                    .font(.caption)
-                HStack {
-                    Button("复制配置") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(selected.copyText, forType: .string)
-                        notice = LF("已复制模型与 effort；请自行在 %@ 中应用。", selected.model.provider.title)
-                    }
-                    Button("保存为计划") { save(selected, start: false) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Button("标记开始") { save(selected, start: true) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Spacer()
-                }
             } else {
+                Text(advice.evidence).font(.caption).foregroundStyle(.secondary)
                 ForEach(Array(advice.reasons.enumerated()), id: \.offset) { _, reason in
                     Text(reason).font(.callout).fixedSize(horizontal: false, vertical: true)
                 }
@@ -362,59 +367,67 @@ struct PlannerView: View {
 
     private var history: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("计划与反馈").font(.headline)
-                Spacer()
-                Text(LF("%lld / 500 条 · 仅本机", Int64(store.records.count))).font(.caption).foregroundStyle(.secondary)
-                Button("清空", role: .destructive) { confirmsClear = true }
-                    .disabled(store.isSaving)
-            }
             if let error = store.error { Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red).textSelection(.enabled) }
-            if let chosen = advice?.recommended {
-                let summary = PlannerEngine.summary(records: store.records, profile: effectiveProfile, configuration: chosen, scope: server.plannerQuota().scope)
-                if summary.evaluated >= 5 {
-                    Text(LF("同类配置：%lld 条已评估，完成 %lld 条，存在失败/返工/较多重试 %lld 条。", Int64(summary.evaluated), Int64(summary.succeeded), Int64(summary.adverse)))
-                        .font(.callout).foregroundStyle(.secondary)
-                    if let tokens = summary.medianReportedTokens {
-                        Text(LF("用户填报 Token 中位数 %lld；不等同于额度消耗，也不用于未来预算保证。", tokens))
-                            .font(.caption).foregroundStyle(.secondary)
+            DisclosureGroup(isExpanded: $showsHistory) {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack {
+                        Spacer()
+                        Button("清空", role: .destructive) { confirmsClear = true }
+                            .disabled(store.isSaving || store.records.isEmpty)
                     }
-                }
-            }
-            if store.records.isEmpty {
-                Text("还没有任务记录。先保存计划或标记开始；至少 5 条同类人工反馈后才参与规则校准。期间账户变化不等于该任务消耗。")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            LazyVStack(alignment: .leading, spacing: 12) {
-                ForEach(store.records) { record in
-                    DisclosureGroup {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("\(record.configuration.model.identifier) · \(record.configuration.effort) · \(record.profile.category.title)")
-                            Text("用户记录的配置，未自动核验实际执行模型。切换工作区不丢草稿；关闭窗口不保存原始输入。")
-                                .foregroundStyle(.secondary)
-                            Text(L(record.attribution)).foregroundStyle(.secondary)
-                            Text(LF("重试 %lld · %@%@", Int64(record.retries), record.verification.title, record.manualRework ? L(" · 有手工返工") : ""))
-                            if let tokens = record.tokens { Text(LF("填报 Token：输入 %lld，输出 %lld；%@", tokens.input, tokens.output, L(tokens.source))) }
-                            HStack {
-                                if record.outcome == .planned {
-                                    Button("标记开始") { Task { await store.start(record.id, quota: server.plannerQuota()) } }
-                                        .disabled(record.configuration.model.provider != server.service)
-                                }
-                                if [.running, .interrupted].contains(record.outcome) {
-                                    Button("记录结果") { feedback = record }
-                                }
-                                Spacer()
-                                Button("删除记录", role: .destructive) { Task { await store.delete(record.id) } }
-                            }.disabled(store.isSaving)
-                        }.font(.caption).padding(.top, 8)
-                    } label: {
-                        HStack {
-                            Text(record.title ?? "\(record.profile.category.title) · \(record.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                            Spacer()
-                            Text(record.outcome.title).foregroundStyle(.secondary)
+                    if let chosen = advice?.recommended {
+                        let summary = PlannerEngine.summary(records: store.records, profile: effectiveProfile, configuration: chosen, scope: server.plannerQuota().scope)
+                        if summary.evaluated >= 5 {
+                            Text(LF("同类配置：%lld 条已评估，完成 %lld 条，存在失败/返工/较多重试 %lld 条。", Int64(summary.evaluated), Int64(summary.succeeded), Int64(summary.adverse)))
+                                .font(.callout).foregroundStyle(.secondary)
+                            if let tokens = summary.medianReportedTokens {
+                                Text(LF("用户填报 Token 中位数 %lld；不等同于额度消耗，也不用于未来预算保证。", tokens))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    Divider()
+                    if store.records.isEmpty {
+                        Text("还没有任务记录。先保存计划或标记开始；至少 5 条同类人工反馈后才参与规则校准。期间账户变化不等于该任务消耗。")
+                            .font(.callout).foregroundStyle(.secondary)
+                    }
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(store.records) { record in
+                            DisclosureGroup {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("\(record.configuration.model.identifier) · \(record.configuration.effort) · \(record.profile.category.title)")
+                                    Text("用户记录的配置，未自动核验实际执行模型。切换工作区不丢草稿；关闭窗口不保存原始输入。")
+                                        .foregroundStyle(.secondary)
+                                    Text(L(record.attribution)).foregroundStyle(.secondary)
+                                    Text(LF("重试 %lld · %@%@", Int64(record.retries), record.verification.title, record.manualRework ? L(" · 有手工返工") : ""))
+                                    if let tokens = record.tokens { Text(LF("填报 Token：输入 %lld，输出 %lld；%@", tokens.input, tokens.output, L(tokens.source))) }
+                                    HStack {
+                                        if record.outcome == .planned {
+                                            Button("标记开始") { Task { await store.start(record.id, quota: server.plannerQuota()) } }
+                                                .disabled(record.configuration.model.provider != server.service)
+                                        }
+                                        if [.running, .interrupted].contains(record.outcome) {
+                                            Button("记录结果") { feedback = record }
+                                        }
+                                        Spacer()
+                                        Button("删除记录", role: .destructive) { Task { await store.delete(record.id) } }
+                                    }.disabled(store.isSaving)
+                                }.font(.caption).padding(.top, 8)
+                            } label: {
+                                HStack {
+                                    Text(record.title ?? "\(record.profile.category.title) · \(record.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                                    Spacer()
+                                    Text(record.outcome.title).foregroundStyle(.secondary)
+                                }
+                            }
+                            Divider()
+                        }
+                    }
+                }.padding(.top, 10)
+            } label: {
+                HStack {
+                    Text("计划与反馈")
+                    Spacer()
+                    Text(LF("%lld / 500 条 · 仅本机", Int64(store.records.count))).font(.caption).foregroundStyle(.secondary)
                 }
             }
         }
@@ -443,6 +456,7 @@ struct PlannerView: View {
         Task {
             if await store.saveTask(profile: effectiveProfile, preference: preference, configuration: configuration,
                                     title: savesTitle ? taskText : nil, quota: server.plannerQuota(), start: start) {
+                showsHistory = true
                 notice = start ? LF("已标记开始；请在 %@ 中手动执行，结束后记录结果。", configuration.model.provider.title) : L("计划已保存；未启动任务。")
             }
         }

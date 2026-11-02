@@ -28,7 +28,7 @@ fi
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     "$@" Gate/DesktopPanelProbe.swift App/AdaptiveLayout.swift App/DesktopGlassPanelView.swift App/DashboardView.swift \
     App/PlannerView.swift App/PlannerStore.swift Shared/Planner.swift Shared/ClaudeStatusline.swift \
-    App/InsightsView.swift App/InsightsStore.swift Shared/ObservationHistory.swift Shared/UsageInsights.swift \
+    App/InsightsView.swift App/InsightsStore.swift Shared/ObservationHistory.swift Shared/UsageInsights.swift Shared/UsageExport.swift \
     Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/Localization.swift \
     -lsqlite3 -framework UserNotifications -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI \
     -o "$probe_executable"

@@ -541,6 +541,17 @@ await MainActor.run {
         "glass dispersion is imperceptible or clipped outside the glass"
     )
     let interior = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
+    for mode in DesktopPanelMode.allCases {
+        let none = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
+        let spectral = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3).background(Color.black), width: mode.size.width, height: mode.size.height)
+        precondition(changedPixels(none, spectral, in: fullFrame) > 100, "spectral glass rim is invisible")
+        precondition(changedPixels(none, spectral, in: interior) == 0, "dispersion recolors the panel interior")
+        let leftOff = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3, vector: CGSize(width: -1, height: 0), active: true, pointerIntensity: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
+        let rightOff = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3, vector: CGSize(width: 1, height: 0), active: true, pointerIntensity: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
+        precondition(changedPixels(leftOff, rightOff, in: fullFrame) == 0, "spectral rim ignores zero pointer intensity")
+        saveTrendPreview(spectral, name: "spectral-rim-\(mode.rawValue)")
+    }
+    print("Spectral rim: visible, confined, three sizes and pointer-zero isolation: PASS")
     let leftGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     let rightGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     precondition(changedPixels(leftGlow, rightGlow, in: interior) > 1_000, "pointer lighting does not follow across the panel interior")

@@ -140,9 +140,15 @@ final class InsightsStore: ObservableObject {
         } catch { message = error.localizedDescription }
     }
 
-    func export(allHistory: Bool = true) async -> Data? {
+    func export(allHistory: Bool = true, format: UsageExportFormat = .json) async -> Data? {
         let date = now()
-        do { return try await io.export(since: allHistory ? nil : date.addingTimeInterval(-Double(range.rawValue) * 3_600), now: date) }
+        do {
+            let json = try await io.export(since: allHistory ? nil : date.addingTimeInterval(-Double(range.rawValue) * 3_600), now: date)
+            if format == .json { return json }
+            return try await Task.detached(priority: .utility) {
+                try UsageExport.convert(json: json, format: format, generatedAt: date)
+            }.value
+        }
         catch { message = error.localizedDescription; return nil }
     }
 

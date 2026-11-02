@@ -127,6 +127,7 @@ section "Panel source, parser, and visual render checks"
 sh scripts/check-localization.sh "$app"
 sh scripts/check-observation-history.sh
 sh scripts/check-usage-insights.sh
+sh scripts/check-usage-export.sh
 sh scripts/check-panel-trend.sh
 sh scripts/check-planner.sh
 sh scripts/check-agent-providers.sh

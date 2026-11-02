@@ -336,7 +336,7 @@
 "读取中…" = "Loading…";
 "调整桌面玻璃面板" = "Adjust Desktop Glass Panel";
 "调整表面雾化；原生清透还同步调整原生材质浓度。背景模糊由 macOS 决定，不是可调模糊半径。" = "Adjust surface haze and, in Native Clear, native material strength. macOS controls background blur; this is not a blur-radius control.";
-"调整边缘红青分光高光，不改变文字和进度条颜色，也不对壁纸做真实 RGB 折射。" = "Adjust red/cyan edge highlights. Text and bar colors are unchanged; this does not physically refract wallpaper RGB channels.";
+"调整沿玻璃轮廓柔和衰减的光谱高光；不改变文字、进度条或壁纸的 RGB 像素。" = "Adjust softly fading spectral highlights along the glass contour. Text, quota bars and wallpaper RGB pixels remain unchanged.";
 "账户/会话范围未知，不能把本次额度变化归因给任务。" = "Account/session scope is unknown; this quota change cannot be attributed to the task.";
 "账户信息变化，目录需要重新读取" = "Account changed; reload the model catalog";
 "账户或会话范围变化/未知" = "Account or session scope changed or unknown";
@@ -441,3 +441,16 @@
 "原生清透独立于深浅色；最低不透明度与磨砂档大幅减轻灰雾，保留壁纸色彩。鼠标高光可独立调整。" = "Native Clear is independent of Light and Dark. Minimum opacity and frost greatly reduce gray haze, preserving wallpaper colors. Pointer highlight strength is adjustable separately.";
 "鼠标高光强度" = "Pointer Highlight";
 "调整面内光晕和边缘追光；0% 关闭鼠标高光，保留固定玻璃反光。" = "Adjust the interior glow and cursor-following rim light. At 0%, pointer highlights are off; static glass reflections remain.";
+"任务选项" = "Task Options";
+"推荐依据与额度" = "Recommendation Details";
+"HTML 图表报告" = "HTML Chart Report";
+"CSV 表格" = "CSV Spreadsheet";
+"JSON 原始记录" = "JSON Raw Records";
+"用量报告" = "Usage Report";
+"导出时间" = "Exported";
+"原始记录数" = "Raw observations";
+"每条曲线按服务、来源、额度窗口及账户或会话范围隔离。空白不代表 0%，不跨重置或缺口连线。" = "Series are separated by provider, source, quota window, and account or session. Gaps are not 0%; lines do not cross resets or missing intervals.";
+"图表已抽样；CSV 和 JSON 保留完整原始记录。" = "Charts are sampled; CSV and JSON retain the complete raw records.";
+"图表报告最多显示 128 组最近有记录的序列；其余完整记录可导出为 CSV 或 JSON。" = "Chart reports show up to 128 recently observed series. Export CSV or JSON for the complete records.";
+"在浏览器中打开即可查看图表；可通过打印保存为 PDF。" = "Open in a browser to view the charts, or print to save as PDF.";
+"导出文件包含匿名账户或会话指纹，请谨慎分享；导出后不会自动删除。" = "Exported files contain pseudonymous account or session fingerprints. Share carefully; exported files are not deleted automatically.";

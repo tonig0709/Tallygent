@@ -38,6 +38,9 @@ shared = source("Shared/QuotaWidgetView.swift")
 
 require(not contains(desktop, r"\b(?:DesktopGlassSurface|DesktopVisualEffectView)\b"),
         "desktop has a duplicate glass renderer")
+require(contains(shared, r"GlassChromaticRim\(cornerRadius:\s*cornerRadius,\s*dispersion:\s*dispersion") and
+        not contains(shared, r"private\s+func\s+chromaticEdge\b"),
+        "shared glass must use the confined spectral rim, not translated red/cyan outlines")
 require(not contains(desktop, r"\.material\s*=\s*\.popover"),
         "desktop overrides the shared native material")
 for text, label in [(desktop, "desktop"), (settings, "settings preview")]:

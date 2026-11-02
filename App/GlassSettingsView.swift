@@ -200,7 +200,7 @@ struct GlassSettingsView: View {
                     .help("调整表面雾化；原生清透还同步调整原生材质浓度。背景模糊由 macOS 决定，不是可调模糊半径。")
                 slider("色彩增益", value: $saturation, range: 1...2.2, format: .multiplier)
                 slider("边缘色散", value: dispersionStrength, range: 0...1, format: .percent)
-                    .help("调整边缘红青分光高光，不改变文字和进度条颜色，也不对壁纸做真实 RGB 折射。")
+                    .help("调整沿玻璃轮廓柔和衰减的光谱高光；不改变文字、进度条或壁纸的 RGB 像素。")
 
                 Text("磨砂深度控制雾化与清透材质浓度；背景模糊由系统决定。边缘色散只作用于玻璃轮廓。")
                     .font(.caption)

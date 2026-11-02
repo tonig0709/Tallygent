@@ -11,6 +11,8 @@ struct InsightsView: View {
     @State private var showsClear = false
     @State private var showsExporter = false
     @State private var document = ObservationDocument(data: Data())
+    @State private var exportFormat = UsageExportFormat.html
+    @State private var isPreparingExport = false
 
     var body: some View {
         GeometryReader { geometry in
@@ -32,9 +34,14 @@ struct InsightsView: View {
                         if store.isLoading { ProgressView().controlSize(.small) }
                         Spacer()
                         Menu("导出记录") {
-                            Button("导出当前范围") { export(allHistory: false) }
-                            Button("导出全部 30 天") { export(allHistory: true) }
+                            ForEach(UsageExportFormat.allCases) { format in
+                                Menu(format.title) {
+                                    Button("导出当前范围") { export(allHistory: false, format: format) }
+                                    Button("导出全部 30 天") { export(allHistory: true, format: format) }
+                                }
+                            }
                         }
+                        .disabled(isPreparingExport || showsExporter)
                         Button("清空历史", role: .destructive) { showsClear = true }
                             .disabled(store.isLoading)
                     }
@@ -74,8 +81,8 @@ struct InsightsView: View {
         } message: {
             Text("不会清除账户、玻璃设置或 Planner 任务记录；操作不可撤销，可先导出。")
         }
-        .fileExporter(isPresented: $showsExporter, document: document, contentType: .json,
-                      defaultFilename: "Tallygent-observations") { result in
+        .fileExporter(isPresented: $showsExporter, document: document, contentType: exportFormat.contentType,
+                      defaultFilename: "Tallygent-observations.\(exportFormat.fileExtension)") { result in
             Task { @MainActor in store.exportFinished(result) }
         }
     }
@@ -238,9 +245,13 @@ struct InsightsView: View {
         return percent >= 60 ? .green : (percent >= 30 ? .orange : .red)
     }
 
-    private func export(allHistory: Bool) {
+    private func export(allHistory: Bool, format: UsageExportFormat) {
+        guard !isPreparingExport && !showsExporter else { return }
+        isPreparingExport = true
         Task {
-            if let data = await store.export(allHistory: allHistory) {
+            defer { isPreparingExport = false }
+            if let data = await store.export(allHistory: allHistory, format: format) {
+                exportFormat = format
                 document = ObservationDocument(data: data)
                 showsExporter = true
             }
@@ -258,9 +269,19 @@ struct InsightsView: View {
 }
 
 private struct ObservationDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
+    static var readableContentTypes: [UTType] { [.html, .commaSeparatedText, .json] }
     var data: Data
     init(data: Data) { self.data = data }
     init(configuration: ReadConfiguration) throws { data = configuration.file.regularFileContents ?? Data() }
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper { FileWrapper(regularFileWithContents: data) }
+}
+
+private extension UsageExportFormat {
+    var contentType: UTType {
+        switch self {
+        case .html: .html
+        case .csv: .commaSeparatedText
+        case .json: .json
+        }
+    }
 }

@@ -64,6 +64,11 @@ struct DesktopPanelProbe {
                      "clear renderer stopped using the native popover backdrop")
         precondition(material.appearance?.name == NSAppearance.Name.vibrantDark && material.layer?.cornerRadius == 51,
                      "clear renderer inherited a tinted theme or lost continuous clipping")
+        for frost in [0.0, 0.5, 1.0, 0.0] {
+            NativeClearMaterial.configure(material, cornerRadius: 51, blurAmount: frost)
+            precondition(abs(material.alphaValue - GlassOptics(blurAmount: frost, dispersion: 0).nativeBackdropOpacity) < 0.0001,
+                         "native material contribution ignores the shared frost curve")
+        }
         setbuf(stdout, nil)
         verifyNativeLocalization()
         verifyLocalizedPanelRenders()
@@ -450,6 +455,19 @@ struct DesktopPanelProbe {
             let root = window.contentView as! DesktopGlassBackdropHost
             precondition(!root.material.isHidden && root.material.appearance?.name == NSAppearance.Name.vibrantDark,
                          "Native Clear did not survive stored Light appearance and mode restoration")
+            for frost in [0.0, 0.5, 1.0, 0.0] {
+                defaults.set(frost, forKey: GlassSettingKeys.blurAmount)
+                let expected = GlassOptics(blurAmount: frost, dispersion: 0).nativeBackdropOpacity
+                let deadline = Date().addingTimeInterval(1)
+                repeat {
+                    root.layoutSubtreeIfNeeded()
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+                } while abs(root.material.alphaValue - expected) > 0.0001 && Date() < deadline
+                precondition(!root.material.isHidden && abs(root.material.alphaValue - expected) < 0.0001,
+                             "placed Native Clear did not receive live frost \(frost) for \(mode.rawValue)")
+                precondition(window.frame.size == mode.size && !window.isOpaque,
+                             "frost changed panel size or opacity")
+            }
             saveLayoutImage(root, name: "native-clear-desktop-\(mode.rawValue)")
             if mode == .medium, let tracking = drag(in: root) {
                 func frame(at fraction: CGFloat) -> NSBitmapImageRep {
@@ -473,7 +491,7 @@ struct DesktopPanelProbe {
                 }
             }
         }
-        print("Native Clear root/material, independent theme, three sizes and full-surface pointer light: PASS")
+        print("Native Clear root/material, live frost 0/0.5/1/0, independent theme, three sizes and full-surface pointer light: PASS")
     }
 
     @MainActor
@@ -484,20 +502,22 @@ struct DesktopPanelProbe {
         defer { window.close() }
         let root = DesktopGlassBackdropHost(content: NSView(frame: window.contentLayoutRect))
         let configuration = DesktopPanelWindowConfigurator.WindowView()
-        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true)
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true, blurAmount: 1)
         configuration.scheduleConfiguration()
         RunLoop.main.run(until: Date().addingTimeInterval(0.05)) // no window attached yet
-        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false)
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false, blurAmount: 0.5)
         root.addSubview(configuration)
         window.contentView = root
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-        precondition(root.material.isHidden, "late-mounted configuration lost the latest material selection")
-        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false)
+        precondition(root.material.isHidden && abs(root.material.alphaValue - 0.54) < 0.0001,
+                     "late-mounted configuration lost the latest material or frost selection")
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: false, blurAmount: 1)
         configuration.scheduleConfiguration()
-        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true)
+        configuration.configuration = DesktopPanelWindowConfigurator(clearMaterial: true, blurAmount: 0)
         configuration.scheduleConfiguration()
         RunLoop.main.run(until: Date().addingTimeInterval(0.1))
-        precondition(!root.material.isHidden, "queued configuration overwrote a newer material selection")
+        precondition(!root.material.isHidden && abs(root.material.alphaValue - 0.08) < 0.0001,
+                     "queued configuration overwrote a newer material or frost selection")
         print("Native glass configuration: late attachment and latest queued settings: PASS")
     }
 
@@ -537,7 +557,8 @@ struct DesktopPanelProbe {
                         // Wait for actual SwiftUI -> native delivery, not a guessed
                         // chart mounting duration. This remains a bounded live-update gate.
                         func delivered() -> Bool {
-                            root.material.isHidden == (style != .nativeClear) && bridges(in: root).contains {
+                            root.material.isHidden == (style != .nativeClear) &&
+                            abs(root.material.alphaValue - GlassOptics(blurAmount: 0, dispersion: 0).nativeBackdropOpacity) < 0.0001 && bridges(in: root).contains {
                                 $0.window === window && $0.configuration?.clearMaterial == (style == .nativeClear) && $0.configuration?.size == mode.size
                             }
                         }

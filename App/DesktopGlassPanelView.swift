@@ -117,7 +117,7 @@ struct DesktopGlassPanelView: View {
             }
             .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: showsChrome)
             .onDisappear { showsChrome = false }
-            .background(DesktopPanelWindowConfigurator(size: mode.size, clearMaterial: surfaceStyle == .nativeClear, cornerRadius: cornerRadius))
+            .background(DesktopPanelWindowConfigurator(size: mode.size, clearMaterial: surfaceStyle == .nativeClear, cornerRadius: cornerRadius, blurAmount: blurAmount))
             .ignoresSafeArea()
     }
 
@@ -262,6 +262,7 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
     var size = DesktopPanelMode.large.size
     var clearMaterial = false
     var cornerRadius: Double = 30
+    var blurAmount: Double = 0
     func makeNSView(context: Context) -> WindowView {
         let view = WindowView()
         view.configuration = self
@@ -298,7 +299,7 @@ struct DesktopPanelWindowConfigurator: NSViewRepresentable {
         window.hasShadow = true
         window.ignoresMouseEvents = false
         window.acceptsMouseMovedEvents = true
-        (window.contentView as? DesktopGlassBackdropHost)?.configure(clear: clearMaterial, cornerRadius: cornerRadius)
+        (window.contentView as? DesktopGlassBackdropHost)?.configure(clear: clearMaterial, cornerRadius: cornerRadius, blurAmount: blurAmount)
         window.isMovable = true
         window.isMovableByWindowBackground = true
         window.titleVisibility = .hidden
@@ -348,10 +349,10 @@ final class DesktopGlassBackdropHost: NSView {
         let outline = RoundedRectangle(cornerRadius: CGFloat(opticalRadius), style: .continuous).path(in: bounds)
         return outline.contains(local) ? super.hitTest(point) : nil
     }
-    func configure(clear: Bool, cornerRadius: Double) {
+    func configure(clear: Bool, cornerRadius: Double, blurAmount: Double) {
         opticalRadius = min(64, max(10, cornerRadius))
         material.isHidden = !clear
-        NativeClearMaterial.configure(material, cornerRadius: cornerRadius)
+        NativeClearMaterial.configure(material, cornerRadius: cornerRadius, blurAmount: blurAmount)
     }
 }
 
@@ -375,7 +376,7 @@ final class DesktopPanelController {
             window.contentView = DesktopGlassBackdropHost(content: NSHostingView(rootView: DesktopGlassPanelView(server: server)))
             if !window.setFrameUsingName(DesktopGlassPanelView.windowID) { window.center() }
             let settings = GlassSettingsSnapshot.load()
-            DesktopPanelWindowConfigurator(size: size, clearMaterial: settings.resolvedSurfaceStyle == .nativeClear, cornerRadius: settings.cornerRadius).configure(window)
+            DesktopPanelWindowConfigurator(size: size, clearMaterial: settings.resolvedSurfaceStyle == .nativeClear, cornerRadius: settings.cornerRadius, blurAmount: settings.blurAmount).configure(window)
             window.setFrameAutosaveName(DesktopGlassPanelView.windowID)
             panel = window
         }

@@ -1,4 +1,4 @@
-# Native Clear — local build 60
+# Native Clear — local build 61
 
 Operate surface: a readable floating quota panel, with the existing three sizes,
 charts, drag/close/settings behavior and continuous native sliders. This is a
@@ -35,6 +35,21 @@ transmission; that last optical check remains a real-desktop acceptance step.
 
 ## Material boundary
 
+Build 61 fixes a perceptual mode inversion, not a swapped label or saved enum.
+The macOS 26 tinted backend could be completely untinted at its minimum, while
+Native Clear always used a full-strength dark popover. Tinted dark now retains
+a minimum 12% black film; its standard/higher opacity curve is unchanged. Native
+Clear keeps zero black film at minimum opacity, and its public native material
+contribution follows frost from 8% at zero to 100% at maximum. This substantially
+reduces the fixed gray veil at the clear endpoint without a private blur API.
+These are layer contribution values, not a claim of an exact screenshot-gray
+reduction. White text over a bright wallpaper can need higher opacity for
+readability; Reduce Transparency still supplies the opaque accessible fallback.
+
+The same `GlassOptics.nativeBackdropOpacity` drives the preview's native view
+and the desktop root, on initial creation and live updates. No saved keys,
+account data, settings, hover/drag handling or geometry are migrated or reset.
+
 The old Clear preset only changed numbers in the tinted renderer. Native Clear
 is now an explicit persisted `glassSurfaceStyle` choice. Selecting **Native
 Clear** or the **Clear** preset resets to 0.35 opacity, zero added haze and neutral
@@ -45,7 +60,7 @@ SwiftUI content host. It uses public `.popover`, `.behindWindow`, `.active` and
 the native vibrant appearance. There is no wallpaper screenshot, screen recording
 permission, private blur API, global desktop preference, React runtime or new
 dependency. At the clear preset's minimum, film, haze and neutral tone add zero
-interior color; the operating system provides backdrop sampling and frosting.
+interior color; the operating system supplies a lightly blended backdrop.
 Higher opacity and explicit custom haze/tone still work. Reduce Transparency is
 respected. Exact pixels vary with the wallpaper, OS and accessibility settings;
 offscreen content renders do not prove actual wallpaper transmission.

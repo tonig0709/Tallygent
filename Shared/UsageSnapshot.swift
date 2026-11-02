@@ -33,13 +33,18 @@ public struct GlassOptics: Sendable {
     public let edgeOpacity: Double
     public let edgeWidth: Double
     public let frostOpacity: Double
+    public let nativeBackdropOpacity: Double
 
     public init(blurAmount: Double, dispersion: Double) {
         dispersionStrength = dispersion.isFinite ? min(1, max(0, dispersion / 0.30)) : 0
         edgeOffset = 3 * dispersionStrength
         edgeOpacity = 0.55 * dispersionStrength
         edgeWidth = 0.7 + 1.3 * dispersionStrength
-        frostOpacity = 0.45 * (blurAmount.isFinite ? min(1, max(0, blurAmount)) : 0)
+        let frost = blurAmount.isFinite ? min(1, max(0, blurAmount)) : 0
+        frostOpacity = 0.45 * frost
+        // Blend the public native material, not its private blur radius. At zero
+        // frost, retain a trace of glass without its full-strength gray coating.
+        nativeBackdropOpacity = 0.08 + 0.92 * frost
     }
 }
 
@@ -272,6 +277,10 @@ public enum WidgetGlassOpacity {
     /// minimum setting.
     public static func darkFilmOpacity(_ value: Double) -> Double {
         pow(normalized(value), 1.15) * 0.94
+    }
+
+    public static func tintedDarkFilmOpacity(_ value: Double) -> Double {
+        max(0.12, darkFilmOpacity(value))
     }
 
     public static func darkGlassTintOpacity(_ value: Double) -> Double {

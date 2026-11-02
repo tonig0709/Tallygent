@@ -398,25 +398,28 @@ public struct GlassRimHighlight: View {
 public struct NativeClearMaterial: NSViewRepresentable {
     public var cornerRadius: Double
     public var blendingMode: NSVisualEffectView.BlendingMode
+    public var blurAmount: Double
 
-    public init(cornerRadius: Double, blendingMode: NSVisualEffectView.BlendingMode = .withinWindow) {
+    public init(cornerRadius: Double, blendingMode: NSVisualEffectView.BlendingMode = .withinWindow, blurAmount: Double = 0) {
         self.cornerRadius = cornerRadius
         self.blendingMode = blendingMode
+        self.blurAmount = blurAmount
     }
     public func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
-        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode)
+        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode, blurAmount: blurAmount)
         return view
     }
     public func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode)
+        Self.configure(view, cornerRadius: cornerRadius, blendingMode: blendingMode, blurAmount: blurAmount)
     }
     public static func configure(_ view: NSVisualEffectView, cornerRadius: Double,
-                                 blendingMode: NSVisualEffectView.BlendingMode = .behindWindow) {
+                                 blendingMode: NSVisualEffectView.BlendingMode = .behindWindow, blurAmount: Double = 0) {
         view.material = .popover
         view.blendingMode = blendingMode
         view.state = .active
         view.isEmphasized = false
+        view.alphaValue = GlassOptics(blurAmount: blurAmount, dispersion: 0).nativeBackdropOpacity
         // Vibrant appearance belongs to native material, not the tinted panel theme.
         view.appearance = NSAppearance(named: .vibrantDark)
         view.wantsLayer = true
@@ -494,7 +497,9 @@ public struct LiquidGlassSurface: View {
 
     private var resolvedOpacity: Double { reduceTransparency ? 1 : WidgetGlassOpacity.clamped(opacity) }
     private var optics: GlassOptics { GlassOptics(blurAmount: blurAmount, dispersion: dispersion) }
-    private var darkFilmOpacity: Double { WidgetGlassOpacity.darkFilmOpacity(resolvedOpacity) }
+    private var darkFilmOpacity: Double {
+        surfaceStyle == .nativeClear ? WidgetGlassOpacity.darkFilmOpacity(resolvedOpacity) : WidgetGlassOpacity.tintedDarkFilmOpacity(resolvedOpacity)
+    }
     private var darkGlassTintOpacity: Double { WidgetGlassOpacity.darkGlassTintOpacity(resolvedOpacity) }
 
     public init(
@@ -570,7 +575,7 @@ public struct LiquidGlassSurface: View {
             ZStack {
                 Color.clear
                 if !nativeClearBackdropProvided {
-                    NativeClearMaterial(cornerRadius: cornerRadius)
+                    NativeClearMaterial(cornerRadius: cornerRadius, blurAmount: blurAmount)
                 }
             }
                 .overlay {

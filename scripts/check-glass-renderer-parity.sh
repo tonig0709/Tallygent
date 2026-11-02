@@ -64,6 +64,13 @@ guarded = region(clear, r"if\s+!nativeClearBackdropProvided\b")
 require(contains(guarded, r"\bNativeClearMaterial\s*\(") and
         len(re.findall(r"\bNativeClearMaterial\s*\(", shared)) == 1,
         "native clear backdrop must exist only inside the root-provider guard")
+require(contains(guarded, r"NativeClearMaterial\s*\(\s*cornerRadius\s*:\s*cornerRadius,\s*blurAmount\s*:\s*blurAmount"),
+        "clear preview must pass the selected frost to its native material")
+native_material = region(shared, r"struct\s+NativeClearMaterial\b")
+require(contains(native_material, r"view\.alphaValue\s*=\s*GlassOptics\(blurAmount:\s*blurAmount,\s*dispersion:\s*0\)\.nativeBackdropOpacity"),
+        "native material must use the shared low-gray contribution curve")
+require(contains(shared, r"surfaceStyle\s*==\s*\.nativeClear\s*\?\s*WidgetGlassOpacity\.darkFilmOpacity\(resolvedOpacity\)\s*:\s*WidgetGlassOpacity\.tintedDarkFilmOpacity"),
+        "clear and tinted dark films must retain their distinct optical semantics")
 require(len(re.findall(r"\bif\s+!?nativeClearBackdropProvided\b", shared)) == 1,
         "root-provider guard must not alter the tinted rendering path")
 require(contains(clear, r"darkFilmOpacity\b"),
@@ -84,7 +91,7 @@ require(contains(settings, r'slider\("鼠标高光强度",\s*value:\s*\$pointerH
 
 host = region(desktop, r"final\s+class\s+DesktopGlassBackdropHost\b")
 require(contains(host, r"material\.isHidden\s*=\s*!clear\b") and
-        contains(host, r"NativeClearMaterial\.configure\s*\(\s*material\b"),
+        contains(host, r"NativeClearMaterial\.configure\s*\(\s*material,\s*cornerRadius:\s*cornerRadius,\s*blurAmount:\s*blurAmount"),
         "desktop root must use the shared clear configuration only for clear style")
 require(len(re.findall(r"NSVisualEffectView\s*\(\s*\)", desktop)) == 1 and
         contains(host, r"NSVisualEffectView\s*\(\s*\)"),
@@ -92,5 +99,8 @@ require(len(re.findall(r"NSVisualEffectView\s*\(\s*\)", desktop)) == 1 and
 for style in [r"surfaceStyle", r"settings\.resolvedSurfaceStyle"]:
     require(contains(desktop, r"clearMaterial\s*:\s*" + style + r"\s*==\s*\.nativeClear\b"),
             "desktop root activation must follow selected style on creation and updates")
+for value in [r"blurAmount", r"settings\.blurAmount"]:
+    require(contains(desktop, r"DesktopPanelWindowConfigurator\([^\n]+blurAmount:\s*" + value + r"\)"),
+            "desktop root frost must follow selected value on creation and updates")
 print("Glass renderer source parity: PASS")
 PY

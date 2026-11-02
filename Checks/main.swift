@@ -67,6 +67,12 @@ precondition(WidgetGlassOpacity.normalized(WidgetGlassOpacity.minimum) == 0)
 precondition(WidgetGlassOpacity.normalized(WidgetGlassOpacity.maximum) == 1)
 precondition(WidgetGlassOpacity.darkFilmOpacity(WidgetGlassOpacity.minimum) == 0)
 precondition(WidgetGlassOpacity.darkGlassTintOpacity(WidgetGlassOpacity.minimum) == 0)
+precondition(WidgetGlassOpacity.tintedDarkFilmOpacity(WidgetGlassOpacity.minimum) == 0.12,
+             "Tinted Glass lost its distinct dark coating at minimum opacity")
+for opacity in [0.5, 0.7, 0.86, 1.0] {
+    precondition(WidgetGlassOpacity.tintedDarkFilmOpacity(opacity) == WidgetGlassOpacity.darkFilmOpacity(opacity),
+                 "Tinted Glass changed its existing coating above the minimum floor")
+}
 for step in 1...100 {
     let a = WidgetGlassOpacity.minimum + Double(step - 1) / 100 * (1 - WidgetGlassOpacity.minimum)
     let b = WidgetGlassOpacity.minimum + Double(step) / 100 * (1 - WidgetGlassOpacity.minimum)
@@ -90,6 +96,10 @@ let clearOptics = GlassOptics(blurAmount: 0, dispersion: 0)
 let fullOptics = GlassOptics(blurAmount: 1, dispersion: 0.30)
 precondition(clearOptics.dispersionStrength == 0 && clearOptics.edgeOffset == 0 && clearOptics.edgeOpacity == 0)
 precondition(clearOptics.frostOpacity == 0 && fullOptics.frostOpacity == 0.45)
+precondition(abs(clearOptics.nativeBackdropOpacity - 0.08) < 1e-12 &&
+             abs(GlassOptics(blurAmount: 0.5, dispersion: 0).nativeBackdropOpacity - 0.54) < 1e-12 &&
+             abs(fullOptics.nativeBackdropOpacity - 1) < 1e-12,
+             "Native Clear must reduce the native gray veil at minimum frost without losing its full-frost endpoint")
 precondition(fullOptics.dispersionStrength == 1 && fullOptics.edgeOffset == 3 && fullOptics.edgeOpacity == 0.55)
 precondition(fullOptics.edgeWidth == 2, "color separation must remain visible at full strength")
 var previousOptics = clearOptics
@@ -98,12 +108,25 @@ for step in 1...10 {
     let optics = GlassOptics(blurAmount: amount, dispersion: amount * 0.30)
     precondition(optics.edgeOffset > previousOptics.edgeOffset && optics.edgeOpacity > previousOptics.edgeOpacity)
     precondition(optics.edgeWidth > previousOptics.edgeWidth && optics.frostOpacity > previousOptics.frostOpacity)
+    precondition(optics.nativeBackdropOpacity > previousOptics.nativeBackdropOpacity,
+                 "Native Clear material contribution must follow the frost slider monotonically")
     previousOptics = optics
 }
 let invalidOptics = GlassOptics(blurAmount: .nan, dispersion: .infinity)
 precondition(invalidOptics.frostOpacity == 0 && invalidOptics.dispersionStrength == 0)
+for amount in [-1.0, .nan, .infinity, -.infinity] {
+    precondition(GlassOptics(blurAmount: amount, dispersion: 0).nativeBackdropOpacity == clearOptics.nativeBackdropOpacity,
+                 "invalid frost input must not restore the gray native-material floor")
+}
+precondition(GlassOptics(blurAmount: 2, dispersion: 0).nativeBackdropOpacity == fullOptics.nativeBackdropOpacity)
 precondition(GlassOptics(blurAmount: -1, dispersion: -1).edgeOpacity == 0)
 precondition(GlassOptics(blurAmount: 2, dispersion: 2).frostOpacity == fullOptics.frostOpacity)
+precondition(GlassSurfaceStyle(rawValue: "nativeClear") == .nativeClear &&
+             GlassSurfaceStyle.nativeClear.title == L("原生清透") &&
+             GlassSurfaceStyle(rawValue: "tinted") == .tinted &&
+             GlassSurfaceStyle.tinted.title == L("染色玻璃"),
+             "glass material labels and saved identifiers must not be swapped to hide an optical mismatch")
+print("Glass material identity, clear-veil endpoints and tinted-coating compatibility: PASS")
 
 #if canImport(AppKit)
 @MainActor

@@ -296,7 +296,7 @@
 "监测服务" = "Provider";
 "目录不做推理调用，也不证明账户已获授权。手动配置需要你确认型号与支持的 effort。" = "Catalog access makes no inference calls and does not prove account authorization. Confirm the model and supported effort values for manual configurations.";
 "磨砂深度" = "Frost Depth";
-"磨砂深度控制表面雾化；背景模糊由系统材质决定。边缘色散只作用于玻璃轮廓。" = "Frost depth controls surface haze; system materials provide background blur. Dispersion affects the glass rim only.";
+"磨砂深度控制雾化与清透材质浓度；背景模糊由系统决定。边缘色散只作用于玻璃轮廓。" = "Frost depth controls haze and Native Clear material strength; macOS provides background blur. Dispersion affects the rim only.";
 "移除接入" = "Remove Bridge";
 "空白不代表 0%，不会补造过去的数据。" = "Blank does not mean 0%. Past data is never fabricated.";
 "窗口待更新" = "Awaiting new window data";
@@ -335,7 +335,7 @@
 "请在浏览器完成登录" = "Complete sign-in in your browser";
 "读取中…" = "Loading…";
 "调整桌面玻璃面板" = "Adjust Desktop Glass Panel";
-"调整玻璃表面的雾化浓度；真实背景模糊由 macOS 系统材质决定，不是可调模糊半径。" = "Adjust surface haze. Actual background blur comes from macOS materials; this is not a blur-radius control.";
+"调整表面雾化；原生清透还同步调整原生材质浓度。背景模糊由 macOS 决定，不是可调模糊半径。" = "Adjust surface haze and, in Native Clear, native material strength. macOS controls background blur; this is not a blur-radius control.";
 "调整边缘红青分光高光，不改变文字和进度条颜色，也不对壁纸做真实 RGB 折射。" = "Adjust red/cyan edge highlights. Text and bar colors are unchanged; this does not physically refract wallpaper RGB channels.";
 "账户/会话范围未知，不能把本次额度变化归因给任务。" = "Account/session scope is unknown; this quota change cannot be attributed to the task.";
 "账户信息变化，目录需要重新读取" = "Account changed; reload the model catalog";
@@ -438,6 +438,6 @@
 "原生清透" = "Native Clear";
 "染色玻璃" = "Tinted Glass";
 "玻璃材质" = "Glass Material";
-"原生清透独立于深浅色；最低档使用原生磨砂，不额外染黑。鼠标经过面板内部会点亮玻璃。" = "Native Clear is independent of Light and Dark. Its minimum setting uses native frosting without added dark tint. Moving the pointer inside the panel lights the glass.";
+"原生清透独立于深浅色；最低不透明度与磨砂档大幅减轻灰雾，保留壁纸色彩。鼠标高光可独立调整。" = "Native Clear is independent of Light and Dark. Minimum opacity and frost greatly reduce gray haze, preserving wallpaper colors. Pointer highlight strength is adjustable separately.";
 "鼠标高光强度" = "Pointer Highlight";
 "调整面内光晕和边缘追光；0% 关闭鼠标高光，保留固定玻璃反光。" = "Adjust the interior glow and cursor-following rim light. At 0%, pointer highlights are off; static glass reflections remain.";

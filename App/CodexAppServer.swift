@@ -493,6 +493,8 @@ final class CodexAppServer: ObservableObject {
             guard let self, self.accountRequestID == requestID,
                   requestID != nil || !self.initialized else { return }
             self.accountRequestID = nil
+            self.initialized = false
+            self.accountReady = false
             self.isRefreshing = false
             self.state = .failed(L("Codex 连接或账户读取超时，请刷新重试。"))
         }

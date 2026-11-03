@@ -47,6 +47,8 @@ for line in sys.stdin:
         continue
     elif method == "account/read":
         account_reads += 1
+        if phase == "account-timeout" and account_reads == 1:
+            continue  # A live process with an unresponsive account read must be replaced.
         if phase == "malformed-account" and account_reads == 1:
             reply(identifier, {})
             continue

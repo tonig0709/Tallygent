@@ -20,6 +20,8 @@ or cache deletion in this fix.
 - Read errors and the 10-second quota timeout retain the last valid data and
   report failure. The next refresh can retry. Initialization/account reads have
   a 12-second timeout instead of remaining stuck on Connecting indefinitely.
+  A timed-out connection is invalidated so the next refresh starts a replacement
+  process rather than repeatedly querying the same unresponsive connection.
 - App and panel refresh actions display a busy state while the quota read is
   outstanding, then become available again on success, failure or timeout.
 - Quota polling sends `excludeResetCreditDetails: true`: the panel needs the

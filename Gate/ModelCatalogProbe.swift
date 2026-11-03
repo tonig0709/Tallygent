@@ -228,7 +228,7 @@ struct ModelCatalogProbe {
 
     @MainActor
     private static func connectionReadFailures() async {
-        for phase in ["malformed-account", "bad-initialize"] {
+        for phase in ["malformed-account", "bad-initialize", "account-timeout"] {
             setenv("TALLYGENT_CATALOG_PROBE_PHASE", phase, 1)
             seedOldAccount()
             let server = CodexAppServer()
@@ -236,7 +236,8 @@ struct ModelCatalogProbe {
             server.onQuotaObservation = { batches.append($0) }
             defer { server.onQuotaObservation = nil; server.disconnect(); unsetenv("TALLYGENT_CATALOG_PROBE_PHASE") }
             server.connect()
-            await wait("invalid connection response did not end refresh with an error: \(phase)") {
+            await wait("invalid connection response did not end refresh with an error: \(phase)",
+                       seconds: phase == "account-timeout" ? 14 : 5) {
                 if case .failed = server.state { return !server.isRefreshing }
                 return false
             }
@@ -244,19 +245,20 @@ struct ModelCatalogProbe {
             if case .failed(let message) = server.state {
                 precondition(!message.contains("secret-marker"), "raw initialization error entered presentation")
             }
-            // Initialization failure needs a new process. Account read failure should
-            // recover in the existing process, not reinterpret malformed data as logout.
-            if phase == "bad-initialize" { setenv("TALLYGENT_CATALOG_PROBE_PHASE", "refresh", 1) }
+            // Invalid initialization or a hung connection needs a new process. A
+            // malformed account response can retry without being treated as logout.
+            let requiresRestart = phase != "malformed-account"
+            if requiresRestart { setenv("TALLYGENT_CATALOG_PROBE_PHASE", "refresh", 1) }
             server.refresh()
             await wait("manual refresh could not recover from \(phase)") {
                 if case .connected = server.state { return batches.count == 1 && !server.isRefreshing }
                 return false
             }
-            let expected = phase == "bad-initialize" ? 20 : 12
+            let expected = requiresRestart ? 20 : 12
             precondition(server.snapshot.fiveHour?.usedPercent == expected &&
                          server.snapshot.email == "catalog-fixture@example.invalid",
                          "connection recovery reused stale quota or unexpectedly requested login")
         }
-        print("Production connection regression: malformed account and failed initialization recover without forced login: PASS")
+        print("Production connection regression: malformed account, failed initialization and hung account read recover without forced login: PASS")
     }
 }

@@ -134,8 +134,14 @@ struct DesktopGlassPanelView: View {
             }
             .frame(height: 500)
 
+            if case .failed(let message) = server.state {
+                Text(message).font(.caption).foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             HStack {
-                Button("立即刷新") { server.refresh() }
+                Button(server.isRefreshing ? L("正在刷新…") : L("立即刷新")) { server.refresh() }
+                    .disabled(server.isRefreshing)
                 Spacer()
                 Button("关闭面板", action: closePanel)
             }

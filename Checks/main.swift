@@ -56,6 +56,24 @@ do {
 let usageData = Data(#"{"id":4,"result":{"summary":{},"dailyUsageBuckets":[{"startDate":"2026-07-17","tokens":12500000}]}}"#.utf8)
 let usage = try AppServerParser.dailyUsage(from: AppServerParser.object(from: usageData))
 precondition(usage == [DailyUsage(startDate: "2026-07-17", tokens: 12_500_000)])
+for json in [#"{"result":{}}"#, #"{"result":{"dailyUsageBuckets":null}}"#,
+             #"{"error":{"message":"failure"},"result":{"dailyUsageBuckets":[]}}"#,
+             #"{"result":{"dailyUsageBuckets":[{"startDate":"2026-01-01","tokens":true}]}}"#,
+             #"{"result":{"dailyUsageBuckets":[{"startDate":"2026-01-01","tokens":1.5}]}}"#] {
+    do {
+        _ = try AppServerParser.dailyUsage(from: AppServerParser.object(from: Data(json.utf8)))
+        preconditionFailure("unavailable or invalid trend response was accepted as current usage")
+    } catch AppServerParserError.invalidEnvelope { }
+}
+for json in [#"{"result":{}}"#, #"{"result":{"account":true}}"#,
+             #"{"error":{"message":"failure"},"result":{"account":null}}"#] {
+    do {
+        _ = try AppServerParser.account(from: AppServerParser.object(from: Data(json.utf8)))
+        preconditionFailure("invalid account response was treated as a successful logout")
+    } catch AppServerParserError.invalidEnvelope { }
+}
+let loggedOut = try AppServerParser.account(from: AppServerParser.object(from: Data(#"{"result":{"account":null}}"#.utf8)))
+precondition(!loggedOut.isLoggedIn)
 
 precondition(QuotaLevel(remainingPercent: 60) == .healthy)
 precondition(QuotaLevel(remainingPercent: 30) == .warning)
@@ -540,18 +558,27 @@ await MainActor.run {
         changedPixels(plainEdge, dispersedEdge, in: fullFrame) > 100,
         "glass dispersion is imperceptible or clipped outside the glass"
     )
+    saveTrendPreview(plainEdge, name: "spectral-surface-zero-light")
+    saveTrendPreview(dispersedEdge, name: "spectral-surface-full-light")
     let interior = CGRect(x: 0.25, y: 0.25, width: 0.5, height: 0.5)
     for mode in DesktopPanelMode.allCases {
+        let black = render(Color.black, width: mode.size.width, height: mode.size.height)
         let none = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
+        let zeroHover = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0, vector: CGSize(width: 1, height: -1), active: true).background(Color.black), width: mode.size.width, height: mode.size.height)
+        precondition(changedPixels(black, none, in: fullFrame, tolerance: 0) == 0 &&
+                     changedPixels(black, zeroHover, in: fullFrame, tolerance: 0) == 0,
+                     "zero dispersion must draw no spectral light, including during hover")
+        let soft = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.15).background(Color.black), width: mode.size.width, height: mode.size.height)
         let spectral = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3).background(Color.black), width: mode.size.width, height: mode.size.height)
-        precondition(changedPixels(none, spectral, in: fullFrame) > 100, "spectral glass rim is invisible")
+        precondition(changedPixels(none, spectral, in: fullFrame, tolerance: 0.4) > 100, "full spectral glass rim remains too faint")
+        precondition(changedPixels(soft, spectral, in: fullFrame) > 100, "dispersion slider has no perceptible upper range")
         precondition(changedPixels(none, spectral, in: interior) == 0, "dispersion recolors the panel interior")
         let leftOff = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3, vector: CGSize(width: -1, height: 0), active: true, pointerIntensity: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
         let rightOff = render(GlassChromaticRim(cornerRadius: 64, dispersion: 0.3, vector: CGSize(width: 1, height: 0), active: true, pointerIntensity: 0).background(Color.black), width: mode.size.width, height: mode.size.height)
         precondition(changedPixels(leftOff, rightOff, in: fullFrame) == 0, "spectral rim ignores zero pointer intensity")
         saveTrendPreview(spectral, name: "spectral-rim-\(mode.rawValue)")
     }
-    print("Spectral rim: visible, confined, three sizes and pointer-zero isolation: PASS")
+    print("Spectral rim: enhanced range, exact zero/off, confined, three sizes and pointer-zero isolation: PASS")
     let leftGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: -0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     let rightGlow = render(GlassPointerGlow(cornerRadius: 30, vector: CGSize(width: 0.6, height: 0), active: true, elasticity: 0.15).background(Color.black), width: 240, height: 120)
     precondition(changedPixels(leftGlow, rightGlow, in: interior) > 1_000, "pointer lighting does not follow across the panel interior")

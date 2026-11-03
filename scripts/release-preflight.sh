@@ -149,7 +149,8 @@ require_text 'override func mouseMoved(with event: NSEvent)' App/DesktopGlassPan
 require_text '.activeAlways' App/DesktopGlassPanelView.swift "inactive desktop panels do not receive pointer feedback"
 require_text 'accessibilityReduceMotion' App/DesktopGlassPanelView.swift "reduced motion is missing"
 require_text 'withTimeInterval: 15' App/CodexAppServer.swift "15-second refresh timer is missing"
-require_text 'if snapshotChanged' App/CodexAppServer.swift "unchanged refreshes still rewrite snapshots"
+require_text 'current.receivedAt = receivedAt' App/CodexAppServer.swift "accepted quota receipt is not published immediately"
+require_text '"excludeResetCreditDetails": true' App/CodexAppServer.swift "quota polling still waits for optional reset-credit inventory"
 require_text 'private func retry()' App/CodexAppServer.swift "snapshot port recovery is missing"
 require_text 'reloadIgnoringLocalCacheData' Shared/UsageSnapshot.swift "snapshot cache bypass is missing"
 forbid_text 'import WidgetKit' App/CodexAppServer.swift "panel-only app still depends on WidgetKit"
@@ -298,9 +299,10 @@ for line in sys.stdin:
             time.sleep(5)
         five_hour_used = {1: 12, 2: 47}.get(generation, 73)
         weekly_used = {1: 11, 2: 46}.get(generation, 72)
+        reset_shift = {1: 0, 2: 7200}.get(generation, 10800)
         response = {"id": request_id, "result": {"rateLimits": {
-            "primary": {"usedPercent": five_hour_used, "windowDurationMins": 300},
-            "secondary": {"usedPercent": weekly_used, "windowDurationMins": 10080}
+            "primary": {"usedPercent": five_hour_used, "windowDurationMins": 300, "resetsAt": 1900000000 + reset_shift},
+            "secondary": {"usedPercent": weekly_used, "windowDurationMins": 10080, "resetsAt": 1900604800 + reset_shift}
         }}}
     elif method == "account/usage/read":
         if generation == 3:
@@ -389,6 +391,8 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=12 \
 CODEX_QUOTA_EXPECT_WEEKLY=11 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=1111 \
+CODEX_QUOTA_EXPECT_FIVE_HOUR_RESET=1900000000 \
+CODEX_QUOTA_EXPECT_WEEKLY_RESET=1900604800 \
     "$tmp/panel-snapshot-probe"
 
 second_snapshot=0
@@ -407,6 +411,8 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=47 \
 CODEX_QUOTA_EXPECT_WEEKLY=46 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=4646 \
+CODEX_QUOTA_EXPECT_FIVE_HOUR_RESET=1900007200 \
+CODEX_QUOTA_EXPECT_WEEKLY_RESET=1900612000 \
     "$tmp/panel-snapshot-probe"
 
 second_updated_at="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["updatedAt"])' "$tmp/snapshot.json")"
@@ -426,9 +432,13 @@ CODEX_QUOTA_EXPECT_FIVE_HOUR=73 \
 CODEX_QUOTA_EXPECT_WEEKLY=72 \
 CODEX_QUOTA_EXPECT_DAILY_COUNT=7 \
 CODEX_QUOTA_EXPECT_LAST_TOKENS=4646 \
+CODEX_QUOTA_EXPECT_FIVE_HOUR_RESET=1900010800 \
+CODEX_QUOTA_EXPECT_WEEKLY_RESET=1900615600 \
     "$tmp/panel-snapshot-probe"
 third_updated_at="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["updatedAt"])' "$tmp/snapshot.json")"
-for _ in {1..20}; do
+# Quota C is now visible immediately, before the optional usage timeout and
+# queued read finish; keep waiting for that separate control, not for publication.
+for _ in {1..80}; do
     [ -f "$tmp/stable-response" ] && break
     sleep 0.25
 done

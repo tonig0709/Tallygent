@@ -18,9 +18,15 @@ def reply(identifier, result):
     print(json.dumps({"id": identifier, "result": result}), flush=True)
 
 
-def quota(five=12, weekly=46):
-    return {"rateLimits": {"primary": {"usedPercent": five, "windowDurationMins": 300, "resetsAt": reset_5h},
-                           "secondary": {"usedPercent": weekly, "windowDurationMins": 10080, "resetsAt": reset_week}}}
+def quota(five=12, weekly=46, shift=0, has_reset=True):
+    return {"rateLimits": {"primary": {"usedPercent": five, "windowDurationMins": 300,
+                                      "resetsAt": reset_5h + shift if has_reset else None},
+                           "secondary": {"usedPercent": weekly, "windowDurationMins": 10080,
+                                         "resetsAt": reset_week + shift if has_reset else None}}}
+
+
+def failure(identifier, message):
+    print(json.dumps({"id": identifier, "error": {"code": -32601, "message": message}}), flush=True)
 
 
 def account(email="catalog-fixture@example.invalid"):
@@ -33,11 +39,17 @@ for line in sys.stdin:
     identifier = request.get("id")
     result = {}
     if method == "initialize":
+        if phase == "bad-initialize":
+            failure(identifier, "fixture secret-marker initialization failure")
+            continue
         pass
     elif method == "initialized":
         continue
     elif method == "account/read":
         account_reads += 1
+        if phase == "malformed-account" and account_reads == 1:
+            reply(identifier, {})
+            continue
         if phase == "account" and account_reads == 2:
             held_account = identifier
             continue
@@ -56,6 +68,35 @@ for line in sys.stdin:
         result = account()
     elif method == "account/rateLimits/read":
         quota_reads += 1
+        assert request.get("params", {}).get("excludeResetCreditDetails") is True, "quota reads must bypass reset-credit-detail metadata"
+        if phase == "refresh":
+            if quota_reads == 4:
+                reply(identifier, {"rateLimits": {"primary": {"usedPercent": True, "windowDurationMins": 300}}})
+                continue
+            if quota_reads == 6:
+                failure(identifier, "fixture secret-marker quota failure")
+                continue
+            if quota_reads == 9:
+                held_quota = identifier
+                continue  # Force the quota timeout, not merely a missing usage response.
+            if quota_reads >= 10:
+                result = quota(77, 78, shift=10_000)
+                reply(identifier, result)
+                if held_quota is not None:
+                    reply(held_quota, quota(99, 99))
+                    held_quota = None
+            elif quota_reads == 7:
+                held_quota = identifier
+                continue  # Explicit model/list signal releases this in-flight request.
+            elif quota_reads == 8:
+                result = quota(24 + quota_reads, 34 + quota_reads, shift=7200)
+                reply(identifier, result)
+            else:
+                result = quota(20, 40, shift=7200 if quota_reads > 1 else 0, has_reset=quota_reads != 3)
+                reply(identifier, result)
+            # Deliberate same-ID replay must not create history or replace a receipt.
+            reply(identifier, result)
+            continue
         if phase == "account" and quota_reads == 2:
             held_quota = identifier
             continue
@@ -65,6 +106,12 @@ for line in sys.stdin:
         reply(identifier, result)  # Exact replay, followed by the normal response below.
     elif method == "account/usage/read":
         usage_reads += 1
+        if phase == "refresh":
+            if usage_reads == 1:
+                reply(identifier, {"dailyUsageBuckets": [{"startDate": "2099-01-01", "tokens": 100}]})
+            else:
+                failure(identifier, "fixture unsupported optional usage method")
+            continue
         if phase == "catalog" and usage_reads == 1:
             held_usage = identifier
             continue  # Released by the probe's next catalog request, not a scheduler race.
@@ -77,6 +124,13 @@ for line in sys.stdin:
             time.sleep(0.8)
         result = {"dailyUsageBuckets": []}
     elif method == "model/list":
+        if phase == "refresh":
+            assert quota_reads == 7 and held_quota is not None, "queued-refresh release arrived out of order"
+            reply(held_quota, quota(31, 41, shift=7200))
+            reply(held_quota, quota(99, 99))  # A replay must not undo the accepted reply.
+            held_quota = None
+            reply(identifier, {"data": [], "nextCursor": None})
+            continue
         if phase == "account":
             if catalog_reads == 0:
                 for _ in range(2):

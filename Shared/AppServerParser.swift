@@ -26,11 +26,16 @@ public enum AppServerParser {
     }
 
     public static func account(from object: [String: Any]) throws -> AccountInfo {
-        guard let result = object["result"] as? [String: Any] else {
+        guard object["error"] == nil,
+              let result = object["result"] as? [String: Any],
+              let rawAccount = result["account"] else {
             throw AppServerParserError.invalidEnvelope
         }
-        guard let account = result["account"] as? [String: Any] else {
+        if rawAccount is NSNull {
             return AccountInfo(email: nil, plan: nil, isLoggedIn: false)
+        }
+        guard let account = rawAccount as? [String: Any] else {
+            throw AppServerParserError.invalidEnvelope
         }
         return AccountInfo(
             email: account["email"] as? String,
@@ -75,14 +80,15 @@ public enum AppServerParser {
     }
 
     public static func dailyUsage(from object: [String: Any]) throws -> [DailyUsage] {
-        guard let result = object["result"] as? [String: Any] else {
+        guard object["error"] == nil,
+              let result = object["result"] as? [String: Any],
+              let buckets = result["dailyUsageBuckets"] as? [[String: Any]] else {
             throw AppServerParserError.invalidEnvelope
         }
-        let buckets = result["dailyUsageBuckets"] as? [[String: Any]] ?? []
-        return buckets.compactMap { bucket in
+        return try buckets.map { bucket in
             guard let startDate = bucket["startDate"] as? String,
-                  let tokens = int64OrNil(bucket["tokens"])
-            else { return nil }
+                  let tokens = int64OrNil(bucket["tokens"]), tokens >= 0
+            else { throw AppServerParserError.invalidEnvelope }
             return DailyUsage(startDate: startDate, tokens: tokens)
         }
         .suffix(7)
@@ -104,8 +110,8 @@ public enum AppServerParser {
     }
 
     private static func int64OrNil(_ value: Any?) -> Int64? {
-        if let value = value as? Int64 { return value }
-        if let value = value as? NSNumber { return value.int64Value }
-        return nil
+        guard let value = value as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+              value.doubleValue.isFinite else { return nil }
+        return Int64(exactly: value.doubleValue)
     }
 }

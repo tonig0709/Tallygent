@@ -13,6 +13,7 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var models: [PlannerModel] = []
     @Published private(set) var modelCatalogMessage = L("尚未读取本机模型目录")
     @Published private(set) var isLoadingModels = false
+    @Published private(set) var isRefreshing = false
     @Published private(set) var codexCollectionEnabled: Bool
     @Published private(set) var claudeCollectionEnabled: Bool
     @Published private(set) var isConfiguringCollection = true
@@ -52,6 +53,10 @@ final class QuotaMonitor: ObservableObject {
         codex.$models.assign(to: &$models)
         codex.$modelCatalogMessage.assign(to: &$modelCatalogMessage)
         codex.$isLoadingModels.assign(to: &$isLoadingModels)
+        codex.$isRefreshing.sink { [weak self] value in
+            guard let self, self.service == .codex else { return }
+            self.isRefreshing = value
+        }.store(in: &subscriptions)
         codex.$snapshot.combineLatest(codex.$state).sink { [weak self] value, state in
             guard let self, self.service == .codex else { return }
             self.snapshot = value
@@ -191,6 +196,7 @@ final class QuotaMonitor: ObservableObject {
     }
 
     private func publishSelection() {
+        isRefreshing = service == .codex && codex.isRefreshing
         if service == .codex {
             snapshot = codex.snapshot
             state = codex.state

@@ -10,6 +10,13 @@ struct PanelSnapshotProbe {
         precondition(snapshot.email == nil && snapshot.plan == nil, "local snapshot exposes account identity")
         precondition(snapshot.fiveHour?.usedPercent == Int(environment["CODEX_QUOTA_EXPECT_FIVE_HOUR"] ?? ""), "5h snapshot is stale")
         precondition(snapshot.weekly?.usedPercent == Int(environment["CODEX_QUOTA_EXPECT_WEEKLY"] ?? ""), "weekly snapshot is stale")
+        for (window, key) in [(snapshot.fiveHour, "CODEX_QUOTA_EXPECT_FIVE_HOUR_RESET"),
+                              (snapshot.weekly, "CODEX_QUOTA_EXPECT_WEEKLY_RESET")] {
+            if let value = environment[key], let seconds = TimeInterval(value) {
+                precondition(window?.resetsAt == Date(timeIntervalSince1970: seconds),
+                             "live snapshot reset time belongs to an older quota response")
+            }
+        }
         precondition(snapshot.dailyUsage.count == Int(environment["CODEX_QUOTA_EXPECT_DAILY_COUNT"] ?? ""), "trend snapshot is incomplete")
         precondition(snapshot.dailyUsage.last?.tokens == Int64(environment["CODEX_QUOTA_EXPECT_LAST_TOKENS"] ?? ""), "trend snapshot is stale")
         for mode in DesktopPanelMode.allCases {

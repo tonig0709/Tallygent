@@ -78,18 +78,15 @@ final class CodexAppServer: ObservableObject {
     @Published private(set) var models: [PlannerModel] = []
     @Published private(set) var modelCatalogMessage = L("尚未读取本机模型目录")
     @Published private(set) var isLoadingModels = false
+    @Published private(set) var isRefreshing = false
     /// Called only for a newly accepted source response, never for a cached repaint.
     var onQuotaObservation: (([QuotaObservation]) -> Void)?
 
     private struct PendingRefresh {
         let rateLimitRequestID: Int
-        let usageRequestID: Int
         let eventID: String
         let accountGeneration: Int
         let accountScope: String?
-        var rateLimits: RateLimitWindows?
-        var receivedAt: Date?
-        var dailyUsage: [DailyUsage]?
     }
 
     private var process: Process?
@@ -100,6 +97,10 @@ final class CodexAppServer: ObservableObject {
     private var pendingRefresh: PendingRefresh?
     private var refreshQueued = false
     private var refreshTimeout: DispatchWorkItem?
+    private var usageRequestID: Int?
+    private var usageAccountGeneration = 0
+    private var usageRefreshQueued = false
+    private var usageTimeout: DispatchWorkItem?
     private var nextRequestID = 3
     private var initialized = false
     private var isConnectionEnabled = false
@@ -108,6 +109,7 @@ final class CodexAppServer: ObservableObject {
     private var wantsModels = false
     private var modelRequestID: Int?
     private var accountRequestID: Int?
+    private var connectionTimeout: DispatchWorkItem?
     private var catalogBuffer: [PlannerModel] = []
     private var catalogCursors = Set<String>()
     private var modelTimeout: DispatchWorkItem?
@@ -148,6 +150,7 @@ final class CodexAppServer: ObservableObject {
         }
 
         state = .connecting
+        isRefreshing = true
         initialized = false
         accountReady = false
         accountRequestID = nil
@@ -170,11 +173,15 @@ final class CodexAppServer: ObservableObject {
                 self.refreshTimeout = nil
                 self.pendingRefresh = nil
                 self.refreshQueued = false
+                self.cancelUsageRead()
+                self.connectionTimeout?.cancel()
+                self.connectionTimeout = nil
+                self.accountRequestID = nil
                 self.initialized = false
+                self.accountReady = false
+                self.isRefreshing = false
                 self.finishModelCatalog(error: L("Codex 已断开，目录未刷新"))
-                if status != 0 {
-                    self.state = .failed(LF("Codex app-server 已退出（%d）", status))
-                }
+                self.state = .failed(LF("Codex app-server 已退出（%d）", status))
             }
         }
 
@@ -199,11 +206,13 @@ final class CodexAppServer: ObservableObject {
                     "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
                 ]
             ])
+            scheduleConnectionTimeout(requestID: nil)
             refreshTimer?.invalidate()
             refreshTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.refresh() }
             }
         } catch {
+            isRefreshing = false
             state = .failed(error.localizedDescription)
         }
     }
@@ -216,11 +225,15 @@ final class CodexAppServer: ObservableObject {
         refreshTimeout = nil
         pendingRefresh = nil
         refreshQueued = false
+        cancelUsageRead()
+        connectionTimeout?.cancel()
+        connectionTimeout = nil
         input?.closeFile()
         process?.terminate()
         process = nil
         input = nil
         state = .disconnected
+        isRefreshing = false
         initialized = false
         accountReady = false
         finishModelCatalog(error: L("Codex 已断开，目录未刷新"))
@@ -264,13 +277,28 @@ final class CodexAppServer: ObservableObject {
 
     func refresh() {
         guard process != nil else { connect(); return }
-        guard initialized else { refreshQueued = true; return }
+        guard initialized else {
+            if case .failed = state { disconnect(); connect() }
+            else { refreshQueued = true }
+            return
+        }
         if case .failed = state {
+            guard accountRequestID == nil else { return }
+            pendingRefresh = nil
+            refreshQueued = false
+            refreshTimeout?.cancel()
+            refreshTimeout = nil
+            accountReady = false
             state = .connecting
+            isRefreshing = true
             requestAccount()
             return
         }
-        guard accountReady else { refreshQueued = true; return }
+        guard accountReady else {
+            refreshQueued = true
+            if accountRequestID == nil { requestAccount() }
+            return
+        }
         guard pendingRefresh == nil else {
             refreshQueued = true
             return
@@ -280,31 +308,65 @@ final class CodexAppServer: ObservableObject {
     }
 
     private func beginRefresh() {
+        isRefreshing = true
         let rateLimitRequestID = nextRequestID
-        let usageRequestID = nextRequestID + 1
-        nextRequestID += 2
+        nextRequestID += 1
         pendingRefresh = PendingRefresh(
             rateLimitRequestID: rateLimitRequestID,
-            usageRequestID: usageRequestID,
             eventID: UUID().uuidString,
             accountGeneration: accountGeneration,
             accountScope: snapshot.email.map { email in
                 SHA256.hash(data: Data(email.lowercased().utf8)).map { String(format: "%02x", $0) }.joined()
             }
         )
-        send(method: "account/rateLimits/read", id: rateLimitRequestID)
-        send(method: "account/usage/read", id: usageRequestID)
+        // Quota monitoring does not need the separate reset-credit inventory lookup.
+        send(method: "account/rateLimits/read", id: rateLimitRequestID,
+             params: ["excludeResetCreditDetails": true])
+        requestUsage()
 
         let timeout = DispatchWorkItem { [weak self] in
             self?.finishPendingRefresh(
                 rateLimitRequestID: rateLimitRequestID,
-                usageRequestID: usageRequestID,
-                allowPartial: true
+                timedOut: true
             )
         }
         refreshTimeout?.cancel()
         refreshTimeout = timeout
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+    }
+
+    private func requestUsage() {
+        guard usageRequestID == nil else { usageRefreshQueued = true; return }
+        let id = nextRequestID
+        nextRequestID += 1
+        usageRequestID = id
+        usageAccountGeneration = accountGeneration
+        send(method: "account/usage/read", id: id)
+        let timeout = DispatchWorkItem { [weak self] in self?.finishUsageRead(id: id, usage: nil) }
+        usageTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+    }
+
+    private func finishUsageRead(id: Int, usage: [DailyUsage]?) {
+        guard usageRequestID == id, usageAccountGeneration == accountGeneration else { return }
+        usageRequestID = nil
+        usageTimeout?.cancel()
+        usageTimeout = nil
+        if let usage, usage != snapshot.dailyUsage {
+            snapshot.dailyUsage = usage
+            persist(markDataRefresh: true)
+        }
+        if usageRefreshQueued {
+            usageRefreshQueued = false
+            if accountReady && initialized && isConnectionEnabled { requestUsage() }
+        }
+    }
+
+    private func cancelUsageRead() {
+        usageRequestID = nil
+        usageRefreshQueued = false
+        usageTimeout?.cancel()
+        usageTimeout = nil
     }
 
     func setAppearance(_ appearance: WidgetAppearance) {
@@ -350,6 +412,10 @@ final class CodexAppServer: ObservableObject {
         }
 
         guard let id = (object["id"] as? NSNumber)?.intValue else { return }
+        if id == usageRequestID {
+            finishUsageRead(id: id, usage: try? AppServerParser.dailyUsage(from: object))
+            return
+        }
         if id == accountRequestID {
             accountRequestID = nil
             handleAccount(object)
@@ -369,6 +435,13 @@ final class CodexAppServer: ObservableObject {
         }
         switch id {
         case 0:
+            connectionTimeout?.cancel()
+            connectionTimeout = nil
+            guard object["error"] == nil, object["result"] is [String: Any] else {
+                isRefreshing = false
+                state = .failed(L("Codex 初始化失败，请刷新重试。"))
+                return
+            }
             send(method: "initialized")
             initialized = true
             requestAccount()
@@ -378,23 +451,31 @@ final class CodexAppServer: ObservableObject {
                 NSWorkspace.shared.open(url)
             }
         default:
-            guard var pending = pendingRefresh else { return }
+            guard let pending = pendingRefresh, id == pending.rateLimitRequestID else { return }
             guard pending.accountGeneration == accountGeneration else { return }
-            if id == pending.rateLimitRequestID, pending.rateLimits == nil,
-               let rateLimits = try? AppServerParser.rateLimitWindows(from: object) {
-                pending.rateLimits = rateLimits
-                let receivedAt = Date()
-                pending.receivedAt = receivedAt
-                onQuotaObservation?(QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
-                    receivedAt: receivedAt, fiveHour: rateLimits.fiveHour, weekly: rateLimits.weekly,
-                    accountScope: pending.accountScope, eventID: pending.eventID))
-            } else if id == pending.usageRequestID, let usage = try? AppServerParser.dailyUsage(from: object) {
-                pending.dailyUsage = usage
-            } else {
-                return
+            do {
+                isRefreshing = false
+                if let rateLimits = try? AppServerParser.rateLimitWindows(from: object) {
+                    let receivedAt = Date()
+                    var current = snapshot
+                    current.fiveHour = rateLimits.fiveHour
+                    current.weekly = rateLimits.weekly
+                    current.receivedAt = receivedAt
+                    if current.fiveHour != snapshot.fiveHour || current.weekly != snapshot.weekly {
+                        current.updatedAt = receivedAt
+                    }
+                    snapshot = current
+                    // Persist the accepted receipt too: unchanged data is still a fresh read.
+                    persist(markDataRefresh: false)
+                    state = .connected(snapshot.email)
+                    onQuotaObservation?(QuotaObservation.batch(provider: .codex, source: .codexRateLimits,
+                        receivedAt: receivedAt, fiveHour: rateLimits.fiveHour, weekly: rateLimits.weekly,
+                        accountScope: pending.accountScope, eventID: pending.eventID))
+                } else {
+                    state = .failed(L("额度读取失败，保留上次数据。请刷新重试。"))
+                }
             }
-            pendingRefresh = pending
-            commitPendingRefreshIfReady()
+            finishPendingRefresh(rateLimitRequestID: id)
         }
     }
 
@@ -403,13 +484,29 @@ final class CodexAppServer: ObservableObject {
         nextRequestID += 1
         accountRequestID = id
         send(method: "account/read", id: id, params: ["refreshToken": false])
+        scheduleConnectionTimeout(requestID: id)
+    }
+
+    private func scheduleConnectionTimeout(requestID: Int?) {
+        connectionTimeout?.cancel()
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self, self.accountRequestID == requestID,
+                  requestID != nil || !self.initialized else { return }
+            self.accountRequestID = nil
+            self.isRefreshing = false
+            self.state = .failed(L("Codex 连接或账户读取超时，请刷新重试。"))
+        }
+        connectionTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 12, execute: timeout)
     }
 
     private func handleAccount(_ object: [String: Any]) {
+        connectionTimeout?.cancel()
+        connectionTimeout = nil
         guard let account = try? AppServerParser.account(from: object) else {
+            isRefreshing = false
             invalidateAccountRequests()
-            let message = (object["error"] as? [String: Any])?["message"] as? String
-            state = .failed(message.map { LF("无法读取 Codex 账户：%@", $0) } ?? L("无法读取 Codex 账户，请重试"))
+            state = .failed(L("无法读取 Codex 账户，请重试"))
             return
         }
         if account.isLoggedIn {
@@ -431,6 +528,7 @@ final class CodexAppServer: ObservableObject {
             refresh()
         } else {
             invalidateAccountRequests()
+            isRefreshing = false
             state = .signingIn
             send(method: "account/login/start", id: 2, params: [
                 "type": "chatgpt",
@@ -446,6 +544,7 @@ final class CodexAppServer: ObservableObject {
         accountReady = false
         pendingRefresh = nil
         refreshQueued = false
+        cancelUsageRead()
         refreshTimeout?.cancel()
         refreshTimeout = nil
         if isLoadingModels { finishModelCatalog(error: L("账户信息变化，目录需要重新读取")) }
@@ -459,53 +558,21 @@ final class CodexAppServer: ObservableObject {
         snapshotServer.start()
     }
 
-    private func commitPendingRefreshIfReady() {
-        guard let pending = pendingRefresh,
-              pending.rateLimits != nil,
-              pending.dailyUsage != nil
-        else { return }
-        finishPendingRefresh(
-            rateLimitRequestID: pending.rateLimitRequestID,
-            usageRequestID: pending.usageRequestID,
-            allowPartial: false
-        )
-    }
-
     private func finishPendingRefresh(
         rateLimitRequestID: Int,
-        usageRequestID: Int,
-        allowPartial: Bool
+        timedOut: Bool = false
     ) {
         guard let pending = pendingRefresh,
-              pending.rateLimitRequestID == rateLimitRequestID,
-              pending.usageRequestID == usageRequestID,
-              allowPartial || (pending.rateLimits != nil && pending.dailyUsage != nil)
+              pending.rateLimitRequestID == rateLimitRequestID
         else { return }
 
         pendingRefresh = nil
         refreshTimeout?.cancel()
         refreshTimeout = nil
 
-        var snapshotChanged = false
-        if let rateLimits = pending.rateLimits {
-            // A successful read can confirm unchanged values. Keep this separate
-            // from updatedAt, which tracks actual data changes and disk writes.
-            snapshot.receivedAt = pending.receivedAt
-            if rateLimits.fiveHour != snapshot.fiveHour {
-                snapshot.fiveHour = rateLimits.fiveHour
-                snapshotChanged = true
-            }
-            if rateLimits.weekly != snapshot.weekly {
-                snapshot.weekly = rateLimits.weekly
-                snapshotChanged = true
-            }
-        }
-        if let dailyUsage = pending.dailyUsage, dailyUsage != snapshot.dailyUsage {
-            snapshot.dailyUsage = dailyUsage
-            snapshotChanged = true
-        }
-        if snapshotChanged {
-            persist(markDataRefresh: true)
+        isRefreshing = false
+        if timedOut {
+            state = .failed(L("额度读取超时，保留上次数据。请刷新重试。"))
         }
 
         if refreshQueued {

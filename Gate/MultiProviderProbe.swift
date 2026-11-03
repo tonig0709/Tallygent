@@ -14,6 +14,7 @@ final class CodexAppServer: ObservableObject {
     @Published var models: [PlannerModel] = []
     @Published var modelCatalogMessage = "test"
     @Published var isLoadingModels = false
+    @Published var isRefreshing = false
     var onQuotaObservation: (([QuotaObservation]) -> Void)?
     private(set) var connectCount = 0
     private(set) var refreshCount = 0

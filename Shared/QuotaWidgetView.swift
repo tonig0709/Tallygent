@@ -493,17 +493,32 @@ public struct GlassChromaticRim: View {
     }
 
     public var body: some View {
+        Group {
+            if strength > 0 {
+                spectralRim
+            } else {
+                Color.clear
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var spectralRim: some View {
         GeometryReader { proxy in
             let shape = RoundedRectangle(cornerRadius: CGFloat(cornerRadius), style: .continuous)
-            let colors = [Color(red: 1, green: 0.50, blue: 0.43), Color(red: 1, green: 0.78, blue: 0.48),
-                          Color(red: 0.65, green: 0.88, blue: 0.72), Color(red: 0.43, green: 0.80, blue: 0.96),
-                          Color(red: 0.66, green: 0.61, blue: 1)]
+            let colors = [Color(red: 1, green: 0.40, blue: 0.30), Color(red: 1, green: 0.72, blue: 0.33),
+                          Color(red: 0.42, green: 0.86, blue: 0.60), Color(red: 0.25, green: 0.76, blue: 1),
+                          Color(red: 0.60, green: 0.50, blue: 1)]
             ZStack {
                 ForEach(0..<colors.count, id: \.self) { index in
-                    shape.inset(by: CGFloat(0.45 + Double(index) * (0.12 + strength * 0.55)))
-                        .strokeBorder(colors[index], lineWidth: CGFloat(0.45 + strength * 0.45))
+                    // Overlapping wavelengths soften the bevel without separated neon outlines.
+                    shape.inset(by: CGFloat(0.35 + Double(index) * (0.10 + strength * 0.47)))
+                        .strokeBorder(colors[index], lineWidth: CGFloat(0.65 + strength * 0.47))
                 }
             }
+            .blur(radius: 0.20)
+            .mask(shape)
             .mask {
                 ZStack {
                     AngularGradient(stops: [.init(color: .white.opacity(0.12), location: 0),
@@ -521,11 +536,9 @@ public struct GlassChromaticRim: View {
                         .opacity(active ? pointerIntensity : 0)
                 }
             }
-            .opacity(0.55 * pow(strength, 1.25))
+            .opacity(0.90 * pow(strength, 0.85))
             .animation(reduceMotion ? nil : .easeOut(duration: 0.14), value: active)
         }
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
     }
 }
 

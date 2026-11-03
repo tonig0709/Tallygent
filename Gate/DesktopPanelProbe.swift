@@ -15,6 +15,7 @@ final class QuotaMonitor: ObservableObject {
     @Published var models: [PlannerModel] = []
     @Published var modelCatalogMessage = "测试目录（无推理）"
     @Published var isLoadingModels = false
+    @Published var isRefreshing = false
     @Published var codexCollectionEnabled = true
     @Published var claudeCollectionEnabled = true
     @Published var isConfiguringCollection = false

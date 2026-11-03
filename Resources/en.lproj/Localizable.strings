@@ -454,3 +454,10 @@
 "图表报告最多显示 128 组最近有记录的序列；其余完整记录可导出为 CSV 或 JSON。" = "Chart reports show up to 128 recently observed series. Export CSV or JSON for the complete records.";
 "在浏览器中打开即可查看图表；可通过打印保存为 PDF。" = "Open in a browser to view the charts, or print to save as PDF.";
 "导出文件包含匿名账户或会话指纹，请谨慎分享；导出后不会自动删除。" = "Exported files contain pseudonymous account or session fingerprints. Share carefully; exported files are not deleted automatically.";
+"正在刷新…" = "Refreshing…";
+"最近读取：%@" = "Last read: %@";
+"正在读取账户最新额度…" = "Reading the latest account quota…";
+"Codex 初始化失败，请刷新重试。" = "Codex initialization failed. Refresh to retry.";
+"Codex 连接或账户读取超时，请刷新重试。" = "Codex connection or account read timed out. Refresh to retry.";
+"额度读取失败，保留上次数据。请刷新重试。" = "Quota read failed. Previous data is retained. Refresh to retry.";
+"额度读取超时，保留上次数据。请刷新重试。" = "Quota read timed out. Previous data is retained. Refresh to retry.";

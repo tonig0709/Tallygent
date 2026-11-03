@@ -274,7 +274,8 @@ struct DashboardView: View {
         }
         Button("桌面玻璃面板") { DesktopPanelController.shared.show(server: server) }
             .help("打开一个独立透明、不会改变其他图标外观的桌面面板")
-        Button("刷新") { server.refresh() }.disabled(server.state == .connecting)
+        Button(server.isRefreshing ? L("正在刷新…") : L("刷新")) { server.refresh() }
+            .disabled(server.isRefreshing || server.state == .connecting)
         if server.service == .codex, case .disconnected = server.state {
             Button("连接 Codex") { Task { await server.connect() } }.buttonStyle(.borderedProminent)
         }
@@ -322,6 +323,7 @@ struct DashboardView: View {
     }
 
     private var statusText: String {
+        if server.isRefreshing { return L("正在读取账户最新额度…") }
         if server.service == .claude {
             if case .failed(let message) = server.state { return message }
             return server.snapshot.hasQuota
@@ -332,7 +334,7 @@ struct DashboardView: View {
         case .disconnected: L("尚未连接")
         case .connecting: L("正在连接 Codex…")
         case .signingIn: L("请在浏览器完成登录")
-        case .connected(let email): email.map { LF("已连接 · %@", $0) } ?? L("已连接")
+        case .connected(let email): "\(email.map { LF("已连接 · %@", $0) } ?? L("已连接"))\n\(LF("最近读取：%@", server.snapshot.lastReceivedAt.formatted(date: .abbreviated, time: .standard)))"
         case .failed(let message): message
         }
     }

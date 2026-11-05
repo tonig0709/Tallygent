@@ -32,3 +32,9 @@ layouts in the isolated CI user. The existing language, theme, large-font,
 resize/restoration, non-black, live-data, panel ownership and package checks
 remain mandatory. Passing a headless gate does not replace actual pointer,
 keyboard and compositor checks on a user's Mac.
+
+The existing gallery alignment check caught an old resize ordering hazard on
+macOS 15: after the system constrained a window below the inspector breakpoint,
+an imperative scroll still used the previous page width. The gallery now uses
+one native, explicitly centered scroll-position binding; no delayed timer,
+larger window minimum or weakened alignment assertion is used.

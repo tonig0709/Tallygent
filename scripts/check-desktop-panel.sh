@@ -71,6 +71,7 @@ grep -q 'DesktopPanelController.shared.close()' App/DesktopGlassPanelView.swift
 grep -Eq 'Button\((L\()?"关闭桌面玻璃面板"' App/CodexQuotaApp.swift
 grep -q 'window.styleMask.remove(.titled)' App/DesktopGlassPanelView.swift
 grep -q '.scrollTargetBehavior(.viewAligned)' App/DashboardView.swift
+grep -Fq '.scrollPosition(id: $selectedMode, anchor: .center)' App/DashboardView.swift
 grep -Fq '.accessibilityHidden(section != .planner)' App/DashboardView.swift
 if grep -Fq 'if section == .planner {' App/DashboardView.swift; then
     echo 'Workspace branching destroys the unsaved in-memory Planner draft' >&2

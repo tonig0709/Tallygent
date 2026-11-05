@@ -165,7 +165,6 @@ struct DashboardView: View {
                     .disabled(mode == .large)
             }
             GeometryReader { geometry in
-              ScrollViewReader { proxy in
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 0) {
                         ForEach(DesktopPanelMode.allCases) { page in
@@ -200,13 +199,10 @@ struct DashboardView: View {
                 }
                 .scrollTargetBehavior(.viewAligned)
                 .coordinateSpace(name: "panel-gallery")
-                .scrollPosition(id: $selectedMode)
-                .onAppear {
-                    selectedMode = mode
-                    proxy.scrollTo(mode, anchor: .center)
-                }
-                .onChange(of: geometry.size.width) { _, _ in proxy.scrollTo(mode, anchor: .center) }
-              }
+                // One native owner preserves the selected page as the viewport changes.
+                // Imperative scrollTo during resize can still see the old page width.
+                .scrollPosition(id: $selectedMode, anchor: .center)
+                .onAppear { selectedMode = mode }
             }
             .frame(height: 300)
             .environment(\.colorScheme, colorScheme)

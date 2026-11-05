@@ -199,10 +199,10 @@ public struct QuotaWidgetView: View {
                         Text(L("Token（百万）")).font(.caption2).foregroundStyle(secondaryText)
                     }
                     Chart(snapshot.dailyUsage) { point in
-                        if trend?.style == .line {
+                        if trend?.style == .line || trend?.style == .curve {
                             LineMark(x: .value(L("日期"), shortDate(point.startDate)),
                                      y: .value("Tokens (M)", point.millions))
-                                .interpolationMethod(.linear)
+                                .interpolationMethod(trend?.style == .curve ? .monotone : .linear)
                                 .foregroundStyle(chartColor)
                             PointMark(x: .value(L("日期"), shortDate(point.startDate)),
                                       y: .value("Tokens (M)", point.millions))

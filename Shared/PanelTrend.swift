@@ -34,10 +34,12 @@ public enum PanelChartSource: String, CaseIterable, Identifiable, Codable, Senda
 }
 
 public enum PanelChartStyle: String, CaseIterable, Identifiable, Codable, Sendable {
-    case bars, line
+    case bars, line, curve
     public static let defaultsKey = "desktopPanelChartStyle"
     public var id: Self { self }
-    public var title: String { self == .bars ? L("柱状图") : L("折线图") }
+    public var title: String {
+        switch self { case .bars: L("柱状图"); case .line: L("折线图"); case .curve: L("曲线图") }
+    }
     public static func stored(in defaults: UserDefaults = .standard) -> Self {
         Self(rawValue: defaults.string(forKey: defaultsKey) ?? "") ?? .bars
     }
@@ -59,6 +61,7 @@ public struct PanelTrendSeries: Identifiable, Equatable, Sendable {
     public let windowID: String
     public let title: String
     public let points: [UsageHistoryPoint]
+    public let curves: [QuotaCurveRun]
     public let bars: [PanelTrendHour]
     public let isFresh: Bool
     public let latest: QuotaObservation?
@@ -84,7 +87,7 @@ public struct PanelTrendPresentation: Equatable, Sendable {
             let value = report?.windows.first { $0.provider == provider && $0.windowID == windowID }
             let title = windowID == "fiveHour" ? L("5h 额度") : L("周额度")
             func empty(_ message: String) -> PanelTrendSeries {
-                PanelTrendSeries(windowID: windowID, title: title, points: [], bars: [], isFresh: false,
+                PanelTrendSeries(windowID: windowID, title: title, points: [], curves: [], bars: [], isFresh: false,
                                  latest: nil, currentRemainingPercent: nil, observedCount: 0, message: message)
             }
             guard let scope, !scope.isEmpty else { return empty(L("当前身份范围未知，暂无可核实历史")) }
@@ -108,6 +111,7 @@ public struct PanelTrendPresentation: Equatable, Sendable {
             else if !fresh { message = L("历史记录较旧，等待新观测") }
             else { message = nil }
             return PanelTrendSeries(windowID: windowID, title: title, points: sampledPoints(visible),
+                curves: style == .curve ? QuotaCurve.fit(visible) : [],
                 bars: hourlyBuckets(visible, domain: domain), isFresh: fresh, latest: latest,
                 currentRemainingPercent: valid && !expired ? latest.usedPercent.map { 100 - $0 } : nil,
                 observedCount: visible.count, message: message)

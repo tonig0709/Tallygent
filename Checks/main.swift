@@ -427,6 +427,8 @@ await MainActor.run {
                         if source == .quota12Hours, style == .line, !light { saveTrendPreview(image, name: "panel-trend-12h-line-dark") }
                         if source == .quota24Hours, style == .bars, light { saveTrendPreview(image, name: "panel-trend-24h-bars-light") }
                         if source == .sevenDayTokens, style == .line, !light { saveTrendPreview(image, name: "panel-trend-seven-day-line-dark") }
+                        if source == .quota12Hours, style == .curve { saveTrendPreview(image, name: "panel-trend-12h-curve-\(light ? "light" : "dark")") }
+                        if source == .quota24Hours, style == .curve { saveTrendPreview(image, name: "panel-trend-24h-curve-\(light ? "light" : "dark")") }
                     }
                 }
                 if source.hours != nil {
@@ -455,10 +457,32 @@ await MainActor.run {
             let upperPlot = CGRect(x: 0.52, y: 0.40, width: 0.42, height: 0.20)
             precondition(changedPixels(barImage, lineImage, in: upperPlot) > 50,
                          "\(source.rawValue) ignores the bar/line selection")
+            if source.hours != nil {
+                let curve = PanelTrendPresentation.make(report: trendReport, provider: .codex, scope: panelTrendFixtureScope,
+                    source: source, style: .curve, now: trendNow)
+                precondition(curve.series.contains { $0.curves.contains { $0.isEstimated } },
+                             "curve fixture lost its explicitly estimated time gap")
+                let curveImage = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1, trend: curve), width: 680, height: 300)
+                precondition(changedPixels(lineImage, curveImage, in: historicalPlot) > 20,
+                             "curve mode must visibly interpolate eligible gaps, not repeat the segmented line")
+            }
             if source == .sevenDayTokens {
                 let legacy = render(QuotaPanelContent(mode: .large, snapshot: snapshot, glassOpacity: 1), width: 680, height: 300)
                 precondition(changedPixels(legacy, barImage, in: historicalPlot) == 0,
                              "default chart preferences changed the existing seven-day bars")
+                var tokens = snapshot
+                let amounts: [Int64] = [2, 7, 3, 9, 5, 12, 6]
+                tokens.dailyUsage = amounts.enumerated().map {
+                    DailyUsage(startDate: String(trendNow.addingTimeInterval(Double($0.offset - 6) * 86_400).ISO8601Format().prefix(10)),
+                               tokens: $0.element * 1_000_000)
+                }
+                let curve = PanelTrendPresentation.make(report: trendReport, provider: .codex, scope: panelTrendFixtureScope,
+                    source: source, style: .curve, now: trendNow)
+                let curvedTokens = render(QuotaPanelContent(mode: .large, snapshot: tokens, glassOpacity: 1, trend: curve), width: 680, height: 300)
+                let straightTokens = render(QuotaPanelContent(mode: .large, snapshot: tokens, glassOpacity: 1, trend: line), width: 680, height: 300)
+                precondition(changedPixels(curvedTokens, straightTokens, in: historicalPlot) > 50,
+                             "seven-day curve must not silently reuse bars or linear interpolation")
+                saveTrendPreview(curvedTokens, name: "panel-trend-seven-day-curve-\(light ? "light" : "dark")")
             }
         }
         for (source, style) in [(PanelChartSource.quota12Hours, PanelChartStyle.line), (.quota24Hours, .bars)] {

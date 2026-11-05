@@ -22,9 +22,9 @@ enum PanelTrendProbe {
 
     static func make(_ rows: [QuotaObservation], source: PanelChartSource = .quota24Hours,
                      provider: AgentService = .codex, scope: String? = account,
-                     at date: Date = now) -> PanelTrendPresentation {
+                     at date: Date = now, style: PanelChartStyle = .line) -> PanelTrendPresentation {
         PanelTrendPresentation.make(report: UsageInsights.analyze(observations: rows, now: date),
-            provider: provider, scope: scope, source: source, style: .line, now: date)
+            provider: provider, scope: scope, source: source, style: style, now: date)
     }
 
     static func point(_ id: String, date: Date, percent: Int = 80, segment: String = "segment") -> UsageHistoryPoint {
@@ -57,6 +57,8 @@ enum PanelTrendProbe {
         defaults.set("future-style", forKey: PanelChartStyle.defaultsKey)
         precondition(PanelChartSource.stored(in: defaults) == .sevenDayTokens)
         precondition(PanelChartStyle.stored(in: defaults) == .bars)
+        defaults.set("curve", forKey: PanelChartStyle.defaultsKey)
+        precondition(PanelChartStyle.stored(in: defaults) == .curve && PanelChartStyle.allCases.count == 3)
         defaults.set("quota12Hours", forKey: PanelChartSource.defaultsKey)
         defaults.set("line", forKey: PanelChartStyle.defaultsKey)
         precondition(PanelChartSource.stored(in: defaults) == .quota12Hours && PanelChartStyle.stored(in: defaults) == .line)
@@ -88,9 +90,26 @@ enum PanelTrendProbe {
                      row("missing", seconds: -40, unavailable: true), row("after-missing", seconds: -30, used: 7)]
         let splitPoints = make(split).series[0].points
         precondition(splitPoints.count == 5 && Set(splitPoints.map(\.segmentID)).count == 4)
+        precondition(splitPoints[0].curveGroupID != nil && splitPoints[0].curveGroupID == splitPoints[2].curveGroupID,
+                     "Only the time gap should retain its confirmed curve cycle")
+        precondition(splitPoints[2].curveGroupID != splitPoints[3].curveGroupID &&
+                     splitPoints[3].curveGroupID != splitPoints[4].curveGroupID,
+                     "Refill/reset or unavailable receipts must break curve continuity")
         precondition(PanelTrendPresentation.isolatedSegmentIDs(in: splitPoints).count == 3)
         let changedReset = make([row("r1", seconds: -60), row("r2", reset: now.addingTimeInterval(7_200))])
         precondition(Set(changedReset.series[0].points.map(\.segmentID)).count == 2)
+        precondition(Set(changedReset.series[0].points.compactMap(\.curveGroupID)).count == 2)
+        let fitted = make(split, style: .curve)
+        precondition(fitted.series[0].points == splitPoints && !fitted.series[0].curves.isEmpty,
+                     "Curve mode must not change observed points")
+        precondition(fitted.series[0].curves.contains { $0.isEstimated },
+                     "An eligible confirmed time gap never reached the fitted curve")
+        precondition(make(split).series.allSatisfy { $0.curves.isEmpty }, "Old styles must not run curve fitting")
+        let unknownCycle = make([row("unknown-a", seconds: -600, reset: nil),
+                                 row("unknown-b", used: 21, reset: nil)], style: .curve)
+        precondition(unknownCycle.series[0].points.allSatisfy { $0.curveGroupID == nil } &&
+                     unknownCycle.series[0].curves.allSatisfy { !$0.isEstimated },
+                     "An unconfirmed cycle must not authorize gap interpolation")
         let unavailable = make([row("valid", seconds: -60), row("unavailable", unavailable: true)])
         precondition(unavailable.series[0].points.count == 1 && unavailable.series[0].currentRemainingPercent == nil)
         precondition(!unavailable.series[0].isFresh)

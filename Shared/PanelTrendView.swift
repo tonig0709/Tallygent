@@ -3,7 +3,7 @@ import SwiftUI
 
 // THESIS: The large panel can show the same observed quota history as Insights.
 // OWN-WORLD: Existing native glass, system type, restrained provider color and fixed panel geometry.
-// STORY: Choose a period and chart form; gaps stay gaps and percentages never become tokens.
+// STORY: Observations stay truthful; only the curve mode marks eligible time-gap interpolation as estimated.
 // FIRST VIEWPORT: Two compact, aligned quota plots replace only the right-hand trend area.
 // FORM: An extension of the current panel, with no new visual identity or motion layer.
 struct PanelTrendView: View, Equatable {
@@ -38,13 +38,16 @@ struct PanelTrendView: View, Equatable {
                 ForEach(presentation.series) { series in
                     quotaPlot(series)
                 }
-                Text(presentation.style == .bars ? L("横轴：本地时间 · 每小时末次有效观测") : L("横轴：本地时间 · 缺口不连线"))
+                Text(presentation.style == .curve ? L("曲线拟合 · 虚线为缺口估计 · 重置处断开") :
+                     (presentation.style == .bars ? L("横轴：本地时间 · 每小时末次有效观测") : L("横轴：本地时间 · 缺口不连线")))
                     .font(.system(size: 9)).foregroundStyle(secondaryText)
                     .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .help(L("与 Insights 相同的剩余百分比历史，不是 Token 或小时消耗。折线保留重置和缺失区段；柱状图取每小时最后一次有效观测，不填补没有观测的小时。"))
+        .help(presentation.style == .curve
+              ? L("曲线图使用保形三次插值；虚线仅估计同一已确认额度周期内的时间缺口，不是新增观测，不跨重置、身份、来源或无效记录，也不向首尾外推。")
+              : L("与 Insights 相同的剩余百分比历史，不是 Token 或小时消耗。折线保留重置和缺失区段；柱状图取每小时最后一次有效观测，不填补没有观测的小时。"))
     }
 
     private func quotaPlot(_ series: PanelTrendSeries) -> some View {
@@ -64,7 +67,23 @@ struct PanelTrendView: View, Equatable {
                     .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
             } else {
                 Chart {
-                    if presentation.style == .line {
+                    if presentation.style == .curve {
+                        ForEach(series.curves) { run in
+                            ForEach(run.points) { point in
+                                LineMark(x: .value(L("收到时间"), point.date),
+                                         y: .value(L("剩余比例"), point.remainingPercent),
+                                         series: .value(L("曲线区段"), run.id))
+                                    .interpolationMethod(.linear)
+                                    .lineStyle(StrokeStyle(lineWidth: 1.7, dash: run.isEstimated ? [3, 2] : []))
+                                    .foregroundStyle(plotColor.opacity(run.isEstimated ? 0.65 : 1))
+                                if run.points.count == 1 {
+                                    PointMark(x: .value(L("收到时间"), point.date),
+                                              y: .value(L("剩余比例"), point.remainingPercent))
+                                        .symbolSize(9).foregroundStyle(plotColor)
+                                }
+                            }
+                        }
+                    } else if presentation.style == .line {
                         ForEach(series.points) { point in
                             LineMark(x: .value(L("收到时间"), point.date),
                                      y: .value(L("剩余比例"), point.remainingPercent),
@@ -119,7 +138,9 @@ struct PanelTrendView: View, Equatable {
                     }
                 }
                 .frame(height: 54)
-                .accessibilityLabel(LF("%@ %@ 剩余百分比历史，%@，横轴为本地时间，纵轴为剩余额度百分比，重置和缺口处分段", provider.title, series.title, presentation.style.title))
+                .accessibilityLabel(presentation.style == .curve
+                    ? LF("%@ %@ 曲线图，横轴为本地时间，纵轴为剩余额度百分比；虚线是缺口估计，重置处断开", provider.title, series.title)
+                    : LF("%@ %@ 剩余百分比历史，%@，横轴为本地时间，纵轴为剩余额度百分比，重置和缺口处分段", provider.title, series.title, presentation.style.title))
             }
         }
     }

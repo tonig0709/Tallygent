@@ -382,6 +382,12 @@ struct DesktopPanelProbe {
         defaults.set(PanelChartStyle.bars.rawValue, forKey: PanelChartStyle.defaultsKey)
         let bars = capture()
         precondition(changedPlotPixels(line, bars) > 50, "placed panel ignores live bar/line preferences")
+        defaults.set(PanelChartStyle.curve.rawValue, forKey: PanelChartStyle.defaultsKey)
+        let curve = capture()
+        precondition(changedPlotPixels(bars, curve) > 50, "placed panel ignores the live curve selection")
+        saveLayoutImage(view, name: "placed-panel-curve-12h")
+        defaults.set(PanelChartStyle.bars.rawValue, forKey: PanelChartStyle.defaultsKey)
+        _ = capture()
         defaults.set(PanelChartSource.quota24Hours.rawValue, forKey: PanelChartSource.defaultsKey)
         let day = capture()
         precondition(changedPlotPixels(bars, day) > 50, "placed panel ignores the live 12h/24h selection")
@@ -405,6 +411,7 @@ struct DesktopPanelProbe {
         precondition(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID && $0.isVisible }.count == 1,
                      "chart changes created a second desktop panel")
 
+        defaults.set(PanelChartStyle.curve.rawValue, forKey: PanelChartStyle.defaultsKey)
         let settings = NSHostingView(rootView: ScrollView {
             GlassSettingsView(compact: true).padding(20)
         }.preferredColorScheme(.light).background(Color(nsColor: .windowBackgroundColor)))
@@ -417,6 +424,7 @@ struct DesktopPanelProbe {
         settings.layoutSubtreeIfNeeded()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         saveLayoutImage(settings, name: "panel-settings-compact")
+        saveLayoutImage(settings, name: "panel-settings-curve-compact")
         settingsWindow.close()
         print("Placed-panel trend preferences and observed history refresh: PASS")
     }

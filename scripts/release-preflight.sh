@@ -130,6 +130,7 @@ sh scripts/check-observation-history.sh
 sh scripts/check-usage-insights.sh
 sh scripts/check-usage-export.sh
 sh scripts/check-panel-trend.sh
+sh scripts/check-quota-curve.sh
 sh scripts/check-planner.sh
 sh scripts/check-agent-providers.sh
 sh scripts/check-codex-discovery.sh
@@ -139,7 +140,7 @@ sh scripts/check-desktop-panel.sh
 swift run -c release quota-self-check
 xcrun swiftc -parse-as-library -target "$(uname -m)-apple-macos14.0" \
     Gate/PanelSnapshotProbe.swift Shared/Localization.swift Shared/QuotaWidgetView.swift Shared/UsageSnapshot.swift \
-    Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/UsageInsights.swift \
+    Shared/PanelTrend.swift Shared/PanelTrendView.swift Shared/QuotaCurve.swift Shared/UsageInsights.swift \
     Shared/ObservationHistory.swift Shared/ClaudeStatusline.swift \
     -lsqlite3 -framework CryptoKit -framework AppKit -framework Charts -framework SwiftUI -o "$tmp/panel-snapshot-probe"
 require_text 'NSVisualEffectView' App/DesktopGlassPanelView.swift "native desktop material is missing"

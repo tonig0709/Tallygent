@@ -152,6 +152,13 @@ struct GlassSettingsView: View {
                 Text("12h / 24h 使用 Insights 的剩余百分比历史，不是 Token 消耗；无观测时保留空白。")
                     .font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                if chartStyle.wrappedValue == .curve {
+                    Text(L(chartSource.wrappedValue.hours == nil
+                           ? "七日曲线对每日 Token 汇总作保形插值，圆点为每日汇总，不代表日内消耗轨迹。"
+                           : "曲线图仅作显示拟合：虚线估计同周期的时间缺口；重置或来源变化处断开，不改变原始记录和预测。"))
+                        .font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             GlassOpticsPreview(settings: currentSettings, tone: tone.wrappedValue.color)

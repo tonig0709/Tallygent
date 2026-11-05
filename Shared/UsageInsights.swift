@@ -4,8 +4,15 @@ public struct UsageHistoryPoint: Identifiable, Equatable, Sendable {
     public let id: String
     public let date: Date
     public let remainingPercent: Int
-    /// Different segments must not be joined by a chart line.
+    /// Different segments must not be joined as an observed chart line.
     public let segmentID: String
+    /// Explicitly confirmed cycle/context continuity; only estimated curves may bridge its time gaps.
+    public let curveGroupID: String?
+
+    public init(id: String, date: Date, remainingPercent: Int, segmentID: String, curveGroupID: String? = nil) {
+        self.id = id; self.date = date; self.remainingPercent = remainingPercent
+        self.segmentID = segmentID; self.curveGroupID = curveGroupID
+    }
 }
 
 public struct UsageDepletionEstimate: Equatable, Sendable {
@@ -127,11 +134,17 @@ public enum UsageInsights {
 
     private static func joins(_ previous: QuotaObservation, _ current: QuotaObservation) -> Bool {
         let gap = current.receivedAt.timeIntervalSince(previous.receivedAt)
+        return sameWindow(previous, current) && gap <= (current.provider == .codex ? 300 : 900)
+    }
+
+    /// A time gap alone may be interpolated, never a reset, identity switch or invalid receipt.
+    private static func sameWindow(_ previous: QuotaObservation, _ current: QuotaObservation) -> Bool {
+        let gap = current.receivedAt.timeIntervalSince(previous.receivedAt)
         return isValid(previous) && isValid(current) &&
             (current.accountScope != nil || current.sessionScope != nil) &&
             seriesKey(previous) == seriesKey(current) && previous.durationMinutes == current.durationMinutes &&
             previous.quotaPool == current.quotaPool && previous.resetsAt == current.resetsAt &&
-            gap > 0 && gap <= (current.provider == .codex ? 300 : 900) &&
+            gap > 0 &&
             (previous.resetsAt.map { $0 > current.receivedAt } ?? true) &&
             current.usedPercent! >= previous.usedPercent!
     }
@@ -149,12 +162,15 @@ public enum UsageInsights {
         var history: [UsageHistoryPoint] = []
         var segment: [QuotaObservation] = []
         var previous: QuotaObservation?
+        var curveGroupID: String?
         for row in context {
-            guard isValid(row) else { previous = nil; segment = []; continue }
+            guard isValid(row) else { previous = nil; curveGroupID = nil; segment = []; continue }
+            if previous.map({ !sameWindow($0, row) }) ?? true { curveGroupID = row.id }
             if previous.map({ !joins($0, row) }) ?? true { segment = [] }
             segment.append(row)
             history.append(UsageHistoryPoint(id: row.id, date: row.receivedAt,
-                remainingPercent: 100 - row.usedPercent!, segmentID: segment[0].id))
+                remainingPercent: 100 - row.usedPercent!, segmentID: segment[0].id,
+                curveGroupID: row.resetsAt != nil && row.durationMinutes != nil ? curveGroupID : nil))
             previous = row
         }
         let valid = isValid(latest)

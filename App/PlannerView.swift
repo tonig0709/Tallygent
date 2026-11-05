@@ -8,6 +8,8 @@ import SwiftUI
 struct PlannerView: View {
     @ObservedObject var server: QuotaMonitor
     @ObservedObject var store: PlannerStore
+    @Environment(\.appUISettings) private var appUI
+    @FocusState private var taskInputFocused: Bool
     var isActive = true
     @State private var taskText = ""
     @State private var context = ""
@@ -52,7 +54,7 @@ struct PlannerView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: CGFloat(appUI.spacing)) {
                 header
                 composer
                 if let advice { recommendation(advice) }
@@ -61,7 +63,7 @@ struct PlannerView: View {
                 Text("仅提供建议与本地记录：不发送任务内容、不修改项目或 Codex 设置、不启动付费任务。")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            .padding(24)
+            .padding(CGFloat(appUI.spacing))
             .frame(maxWidth: 980, alignment: .leading)
             .frame(maxWidth: .infinity)
             .controlLayoutContainer("planner.content.container")
@@ -109,7 +111,9 @@ struct PlannerView: View {
     }
 
     private var heading: some View {
-        Text("下一项任务，用什么配置？").font(.title2.weight(.semibold))
+        Label("下一项任务，用什么配置？", systemImage: "sparkles")
+            .font(.title2.weight(.semibold))
+            .symbolRenderingMode(.hierarchical)
     }
 
     private var providerPicker: some View {
@@ -121,11 +125,18 @@ struct PlannerView: View {
     }
 
     private var composer: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: appUI.isCompact ? 12 : 16) {
             Text("任务描述").font(.headline)
             TextEditor(text: $taskText)
-                .font(.body).frame(height: 82).padding(8)
-                .background(.background, in: RoundedRectangle(cornerRadius: 10))
+                .font(.body).frame(height: appUI.isCompact ? 82 : 104).padding(8)
+                .scrollContentBackground(.hidden)
+                .focused($taskInputFocused)
+                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: CGFloat(max(8, appUI.cornerRadius - 4)), style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: CGFloat(max(8, appUI.cornerRadius - 4)), style: .continuous)
+                        .strokeBorder(taskInputFocused ? appUI.accent(for: .planner) : Color.primary.opacity(0.18), lineWidth: taskInputFocused ? 2 : 1)
+                        .allowsHitTesting(false)
+                }
                 .overlay(alignment: .topLeading) {
                     if taskText.isEmpty {
                         Text("例如：修复偶发的登录崩溃，并补充回归测试")
@@ -166,6 +177,7 @@ struct PlannerView: View {
                         profile = PlannerProfile.resolved(taskText + " " + context, previous: profile, manual: false)
                         profile.urgent = urgencyOverride ?? profile.urgent
                     }
+                    .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                     Stepper(LF("每个窗口保留 %lld%%", Int64(reserve)), value: $reserve, in: 0...50, step: 5)
                 }.padding(.top, 10)
             } label: {
@@ -181,14 +193,15 @@ struct PlannerView: View {
                     urgencyOverride = $0; profile.urgent = $0
                 })).toggleStyle(.checkbox)
                 Spacer()
-                Button("生成建议") {
+                Button(advice?.recommended == nil ? L("生成建议") : L("重新生成")) {
                     override = nil; recommend()
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(AppActionStyle(kind: advice?.recommended == nil ? .primary : .secondary, role: .planner))
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
         }
+        .appSectionSurface(role: .planner)
     }
 
     @ViewBuilder
@@ -209,9 +222,10 @@ struct PlannerView: View {
     }
 
     private func recommendation(_ advice: PlannerAdvice) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: appUI.isCompact ? 12 : 16) {
             VStack(alignment: .leading, spacing: 6) {
-                Text(advice.decision.title).font(.headline)
+                Label(advice.decision.title, systemImage: "slider.horizontal.3")
+                    .font(.headline)
                 Text(LF("规则置信度：%@（非成功概率）", advice.confidence.title))
                     .font(.caption).foregroundStyle(.secondary)
             }
@@ -232,18 +246,12 @@ struct PlannerView: View {
                 }
                 Toggle("保存任务短标题到本机（默认不保存描述或背景）", isOn: $savesTitle)
                     .font(.caption)
-                HStack {
-                    Button("复制配置") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(selected.copyText, forType: .string)
-                        notice = LF("已复制模型与 effort；请自行在 %@ 中应用。", selected.model.provider.title)
-                    }
-                    Button("保存为计划") { save(selected, start: false) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Button("标记开始") { save(selected, start: true) }
-                        .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    Spacer()
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) { recommendationActions(selected) }
+                        .fixedSize(horizontal: true, vertical: false)
+                    VStack(alignment: .leading, spacing: 10) { recommendationActions(selected) }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
                 DisclosureGroup("推荐依据与额度") {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(advice.evidence).font(.caption).foregroundStyle(.secondary)
@@ -275,6 +283,7 @@ struct PlannerView: View {
                                 }
                                 Spacer()
                                 Button("采用") { override = alternative; recommend() }
+                                    .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                             }
                         }
                         AdaptivePicker("模型", id: "planner.model", selection: Binding(get: { selected.model.id }, set: { id in
@@ -290,6 +299,7 @@ struct PlannerView: View {
                             ForEach(selected.model.efforts, id: \.self) { Text($0).tag($0) }
                         }
                         Button("恢复规则建议") { override = nil; recommend() }
+                            .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                     }.padding(.top, 10)
                 }
             } else {
@@ -301,8 +311,23 @@ struct PlannerView: View {
             }
             if let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
         }
-        .padding(20)
-        .background(.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 14))
+        .appSectionSurface(role: .planner)
+    }
+
+    @ViewBuilder
+    private func recommendationActions(_ selected: PlannerConfiguration) -> some View {
+        Button("复制配置") {
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(selected.copyText, forType: .string)
+            notice = LF("已复制模型与 effort；请自行在 %@ 中应用。", selected.model.provider.title)
+        }
+        .buttonStyle(AppActionStyle(kind: .primary, role: .planner))
+        Button("保存为计划") { save(selected, start: false) }
+            .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
+            .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        Button("标记开始") { save(selected, start: true) }
+            .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
+            .disabled(!store.isLoaded || store.isSaving || store.records.count >= 500 || taskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 
     private var quotaReadout: some View {
@@ -330,6 +355,7 @@ struct PlannerView: View {
                     Spacer()
                     if server.service == .codex {
                         Button(L(server.isLoadingModels ? "读取中…" : "刷新目录")) { server.refreshModelCatalog() }
+                            .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                             .disabled(server.isLoadingModels)
                     }
                 }
@@ -340,7 +366,7 @@ struct PlannerView: View {
                         override = PlannerConfiguration(model: model, effort: model.defaultEffort)
                         recommend()
                     }
-                }.disabled(models.isEmpty)
+                }.buttonStyle(AppActionStyle(kind: .secondary, role: .planner)).disabled(models.isEmpty)
                 TextField("模型 ID（必须来自你已确认的本机配置）", text: $manualIdentifier)
                 TextField("支持的 effort，用逗号分隔；第一项为默认档", text: $manualEfforts)
                 AdaptivePicker("角色（用户声明）", id: "planner.role", selection: $manualRole, prefersSegments: false) {
@@ -359,6 +385,7 @@ struct PlannerView: View {
                     override = PlannerConfiguration(model: model, effort: model.defaultEffort)
                     recommend()
                 }
+                .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                 if let manualModel { Text(LF("已加入：%@（未核验）", manualModel.name)).font(.caption).foregroundStyle(.secondary) }
                 if advice == nil, let notice { Text(notice).font(.caption).foregroundStyle(.secondary) }
             }.padding(.top, 12)
@@ -403,20 +430,27 @@ struct PlannerView: View {
                                     HStack {
                                         if record.outcome == .planned {
                                             Button("标记开始") { Task { await store.start(record.id, quota: server.plannerQuota()) } }
+                                                .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                                                 .disabled(record.configuration.model.provider != server.service)
                                         }
                                         if [.running, .interrupted].contains(record.outcome) {
                                             Button("记录结果") { feedback = record }
+                                                .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                                         }
                                         Spacer()
                                         Button("删除记录", role: .destructive) { Task { await store.delete(record.id) } }
                                     }.disabled(store.isSaving)
                                 }.font(.caption).padding(.top, 8)
                             } label: {
-                                HStack {
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
                                     Text(record.title ?? "\(record.profile.category.title) · \(record.createdAt.formatted(date: .abbreviated, time: .shortened))")
-                                    Spacer()
-                                    Text(record.outcome.title).foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                    Spacer(minLength: 0)
+                                    Text(record.outcome.title)
+                                        .font(.caption.weight(.medium))
+                                        .padding(.horizontal, 8).padding(.vertical, 4)
+                                        .background(appUI.accent(for: .planner).opacity(0.08), in: Capsule())
+                                        .fixedSize(horizontal: true, vertical: true)
                                 }
                             }
                             Divider()
@@ -507,6 +541,7 @@ private struct PlannerFeedbackView: View {
             if let error = store.error { Text(error).foregroundStyle(.red).font(.caption) }
             HStack {
                 Button("取消") { dismiss() }
+                    .buttonStyle(AppActionStyle(kind: .secondary, role: .planner))
                 Spacer()
                 Button("保存反馈") {
                     Task {
@@ -515,7 +550,7 @@ private struct PlannerFeedbackView: View {
                         if store.error == nil { dismiss() }
                     }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(AppActionStyle(kind: .primary, role: .planner))
                 .disabled(store.isSaving || ((!inputTokens.isEmpty || !outputTokens.isEmpty) && tokens == nil))
             }
         }.padding(24).frame(width: 480)

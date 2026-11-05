@@ -74,7 +74,9 @@ struct DesktopPanelProbe {
         verifyNativeLocalization()
         verifyLocalizedPanelRenders()
         if ProcessInfo.processInfo.environment["TALLYGENT_LAYOUT_ONLY"] == "1" {
-            verifyMeaningfulControlLayouts(server: QuotaMonitor())
+            let server = QuotaMonitor()
+            verifyAppAppearanceRuntime(server: server)
+            verifyMeaningfulControlLayouts(server: server)
             print("Native localized layout probe passed: \(probeLanguage)")
             return
         }
@@ -181,6 +183,7 @@ struct DesktopPanelProbe {
         verifyLiveGlassAppearance(server: server)
         verifyPointerHighlightSetting(server: server)
         verifyLiveTrendPanel(server: server)
+        verifyAppAppearanceRuntime(server: server)
         for width in [760.0, 1_030, 1_120, 1_400] {
             var frames: [DesktopPanelMode: CGRect] = [:]
             let dashboard = NSHostingView(rootView: DashboardView(server: server, onGalleryLayout: { frames[$0] = $1 })
@@ -682,6 +685,158 @@ struct DesktopPanelProbe {
     private struct MeasuredControl {
         let frame: CGRect
         let ideal: CGSize
+    }
+
+    /// Run only in the isolated native probe. App preferences must hot-update one
+    /// hosting tree without changing provider data, glass preferences or panel ownership.
+    @MainActor
+    private static func verifyAppAppearanceRuntime(server: QuotaMonitor) {
+        let defaults = UserDefaults.standard
+        let original = defaults.object(forKey: AppUISettings.defaultsKey)
+        defer {
+            if let original { defaults.set(original, forKey: AppUISettings.defaultsKey) }
+            else { defaults.removeObject(forKey: AppUISettings.defaultsKey) }
+        }
+        let isolatedKeys = [GlassSettingKeys.surfaceStyle, GlassSettingKeys.appearance, GlassSettingKeys.opacity,
+            GlassSettingKeys.edgeStrength, GlassSettingKeys.pointerHighlightIntensity, GlassSettingKeys.elasticity,
+            GlassSettingKeys.displacement, GlassSettingKeys.blurAmount, GlassSettingKeys.saturation,
+            GlassSettingKeys.dispersion, GlassSettingKeys.cornerRadius, GlassSettingKeys.tone,
+            GlassSettingKeys.refractionMode, DesktopPanelMode.defaultsKey,
+            PanelChartSource.defaultsKey, PanelChartStyle.defaultsKey]
+        func panelPreferences() -> [String: Any] {
+            isolatedKeys.reduce(into: [:]) { values, key in
+                if let value = defaults.object(forKey: key) { values[key] = value }
+            }
+        }
+        func panelWindows() -> Set<ObjectIdentifier> {
+            Set(NSApp.windows.filter { $0.identifier?.rawValue == DesktopGlassPanelView.windowID }.map(ObjectIdentifier.init))
+        }
+        var compact = AppUISettings.standard
+        compact.appearance = .light; compact.palette = .mint; compact.buttonTreatment = .solid
+        compact.density = .compact; compact.cornerRadius = 8; compact.motionIntensity = 0; compact.hoverHighlights = false
+        var vivid = AppUISettings.standard
+        vivid.appearance = .dark; vivid.palette = .rose; vivid.cornerRadius = 16; vivid.motionIntensity = 1
+        let profiles = [("system", AppUISettings.standard), ("light-compact", compact), ("dark-vivid", vivid)]
+        let planner = PlannerStore()
+        var measured: [String: MeasuredControl] = [:]
+        defaults.set(AppUISettings.standard.encoded, forKey: AppUISettings.defaultsKey)
+        let dashboard = NSHostingController(rootView: DashboardView(server: server, planner: planner, section: .planner,
+            onControlLayout: { id, frame, ideal in measured[id] = MeasuredControl(frame: frame, ideal: ideal) }))
+        let view = dashboard.view
+        view.frame = NSRect(x: 0, y: 0, width: 760, height: 760)
+        let window = NSWindow(contentRect: view.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = view
+        window.makeKeyAndOrderFront(nil)
+        defer { window.close() }
+        view.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+        view.layoutSubtreeIfNeeded()
+        // Gallery selection and existing @AppStorage initialization settle before
+        // taking the isolation baseline; only subsequent profile changes are tested.
+        let baselinePreferences = panelPreferences()
+        let baselineSnapshot = server.snapshot
+        let baselineService = server.service
+        let baselineWindows = panelWindows()
+        let baselinePanelVisible = DesktopPanelController.shared.isVisible
+        func verifyIsolation() {
+            precondition(NSDictionary(dictionary: baselinePreferences).isEqual(to: panelPreferences()),
+                         "App appearance changed existing panel/glass preferences")
+            precondition(server.snapshot == baselineSnapshot && server.service == baselineService,
+                         "App appearance changed the provider or usage snapshot")
+            precondition(panelWindows() == baselineWindows && DesktopPanelController.shared.isVisible == baselinePanelVisible,
+                         "App appearance recreated, opened or closed a desktop panel")
+        }
+        let identity = ObjectIdentifier(view)
+        let windowIdentity = ObjectIdentifier(window)
+        var baselineImage: NSBitmapImageRep?
+        for (name, profile) in profiles {
+            let encoded = profile.encoded
+            defaults.set(encoded, forKey: AppUISettings.defaultsKey)
+            precondition(defaults.data(forKey: AppUISettings.defaultsKey) == encoded &&
+                         AppUISettings.decode(defaults.data(forKey: AppUISettings.defaultsKey) ?? Data()) == profile.sanitized,
+                         "native App appearance did not persist its sanitized profile")
+            for width in [760.0, 1_120] {
+                window.setContentSize(NSSize(width: width, height: 760))
+                view.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                view.layoutSubtreeIfNeeded()
+                precondition(ObjectIdentifier(view) == identity && ObjectIdentifier(window) == windowIdentity &&
+                             dashboard.rootView.planner === planner, "appearance update replaced the window or Planner store")
+                let proposed = dashboard.sizeThatFits(in: CGSize(width: width, height: 760))
+                precondition(abs(view.frame.width - width) < 2 && fitsProposedWidth(proposed, width: width),
+                             "App appearance ignores its proposed dashboard width")
+                let required: Set<String> = ["workspace.label", "workspace.container", "workspace.toolbar.container",
+                    "planner.content.container", "planner.header.container", "planner.provider.label", "planner.provider.container"]
+                let failures = layoutViolations(measured, width: width, prefixes: ["workspace", "planner"], required: required)
+                precondition(failures.isEmpty, "App appearance compressed internal controls: \(name) \(width): \(failures)")
+                precondition(abs((measured["workspace.toolbar.container"]?.frame.width ?? 0) - (width - profile.spacing * 2)) < 2,
+                             "App density did not update the existing toolbar's spacing")
+                saveLayoutImage(view, name: "appUI-\(name)-\(Int(width))")
+                if width == 760 {
+                    guard let image = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+                        preconditionFailure("App appearance native window produced no image")
+                    }
+                    view.cacheDisplay(in: view.bounds, to: image)
+                    if let baselineImage {
+                        var changed = 0
+                        for y in stride(from: 0, to: image.pixelsHigh, by: 4) {
+                            for x in stride(from: 0, to: image.pixelsWide, by: 4) {
+                                guard let a = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                                      let b = baselineImage.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                                if abs(a.redComponent - b.redComponent) + abs(a.greenComponent - b.greenComponent) +
+                                    abs(a.blueComponent - b.blueComponent) > 0.12 { changed += 1 }
+                            }
+                        }
+                        precondition(changed > 20, "saved App profile did not visibly update the same native Dashboard")
+                    } else { baselineImage = image }
+                }
+                verifyIsolation()
+            }
+        }
+
+        // Render the production settings controls in this process's real bundle language.
+        // No substitute form or mock controls: use the same label geometry validator.
+        for (name, profile) in profiles {
+            defaults.set(profile.encoded, forKey: AppUISettings.defaultsKey)
+            var fields: [String: MeasuredControl] = [:]
+            let root = AppAppearanceSettingsView()
+                .environment(\.recordsControlLayout, true)
+                .coordinateSpace(name: ControlLayoutSpace.name)
+                .onPreferenceChange(ControlLayoutPreference.self) { records in
+                    for (id, record) in records {
+                        if let frame = record.frame, let ideal = record.idealSize {
+                            fields[id] = MeasuredControl(frame: frame, ideal: ideal)
+                        }
+                    }
+                }
+            let settings = NSHostingController(rootView: root)
+            let settingsView = settings.view
+            settingsView.frame = NSRect(x: 0, y: 0, width: 540, height: 760)
+            let settingsWindow = NSWindow(contentRect: settingsView.frame, styleMask: applicationWindowStyle, backing: .buffered, defer: false)
+            settingsWindow.isReleasedWhenClosed = false
+            settingsWindow.contentView = settingsView
+            settingsWindow.makeKeyAndOrderFront(nil)
+            for width in [480.0, 540, 760] {
+                settingsWindow.setContentSize(NSSize(width: width, height: 760))
+                settingsView.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                settingsView.layoutSubtreeIfNeeded()
+                let proposed = settings.sizeThatFits(in: CGSize(width: width, height: 760))
+                precondition(abs(settingsView.frame.width - width) < 2 && fitsProposedWidth(proposed, width: width),
+                             "App appearance settings overflow their proposed native window")
+                var required: Set<String> = ["appUI.appearance.label", "appUI.palette.label", "appUI.buttons.label", "appUI.density.label"]
+                for id in Array(required) { required.insert(String(id.dropLast(".label".count)) + ".container") }
+                let failures = layoutViolations(fields, width: width, prefixes: ["appUI"], required: required)
+                precondition(failures.isEmpty, "App appearance settings clipped native fields: \(name) \(width): \(failures)")
+                saveLayoutImage(settingsView, name: "app-appearance-settings-\(name)-\(Int(width))")
+                if name == "system", width == 540 { saveLayoutImage(settingsView, name: "app-appearance-settings") }
+                verifyIsolation()
+            }
+            settingsWindow.close()
+        }
+        print("Live App appearance: PASS (3 profiles, same Dashboard/Planner store, 2 dashboard and 3 settings widths, \(probeLanguage), provider/glass/panel isolation)")
     }
 
     /// Hosting-view fittingSize is an unconstrained ideal, not a proposed-viewport measurement.

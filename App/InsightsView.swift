@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 /// Existing system type/controls remain the visual authority; desktop glass is untouched.
 @MainActor
 struct InsightsView: View {
+    @Environment(\.appUISettings) private var appUI
     @ObservedObject var server: QuotaMonitor
     @ObservedObject var store: InsightsStore
     @State private var showsClear = false
@@ -13,38 +14,17 @@ struct InsightsView: View {
     @State private var document = ObservationDocument(data: Data())
     @State private var exportFormat = UsageExportFormat.html
     @State private var isPreparingExport = false
+    // A view filter is not a provider selection or a collection permission.
+    @State private var providerFilter: AgentService?
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .top, spacing: 20) {
-                            heading.fixedSize(horizontal: true, vertical: true)
-                            Spacer(minLength: 0)
-                            rangePicker.fixedSize(horizontal: true, vertical: true)
-                        }
-                        VStack(alignment: .leading, spacing: 16) { heading; rangePicker }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .controlLayoutContainer("insights.header.container")
-                    HStack {
-                        Button("重新读取历史", systemImage: "arrow.clockwise") { Task { await store.reload(force: true) } }
-                            .disabled(store.isLoading)
-                        if store.isLoading { ProgressView().controlSize(.small) }
-                        Spacer()
-                        Menu("导出记录") {
-                            ForEach(UsageExportFormat.allCases) { format in
-                                Menu(format.title) {
-                                    Button("导出当前范围") { export(allHistory: false, format: format) }
-                                    Button("导出全部 30 天") { export(allHistory: true, format: format) }
-                                }
-                            }
-                        }
-                        .disabled(isPreparingExport || showsExporter)
-                        Button("清空历史", role: .destructive) { showsClear = true }
-                            .disabled(store.isLoading)
-                    }
+                VStack(alignment: .leading, spacing: CGFloat(appUI.spacing)) {
+                    heading
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .controlLayoutContainer("insights.header.container")
+                    toolbar
                     if let message = store.message {
                         Label(message, systemImage: "exclamationmark.triangle")
                             .font(.callout).foregroundStyle(.orange).textSelection(.enabled)
@@ -53,12 +33,19 @@ struct InsightsView: View {
                         Text("当前显示最近 20,000 条观测，可能未覆盖整个所选范围；更早的 30 天原始记录仍可导出。")
                             .font(.callout).foregroundStyle(.orange)
                     }
-                    ForEach(AgentService.allCases) { provider in
+                    ForEach(visibleProviders) { provider in
                         providerSection(provider, wide: geometry.size.width >= 940)
-                        Divider()
                     }
                     resetTimeline
-                    evaluation
+                    DisclosureGroup("分析方法与规则回放") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            if providerFilter != nil {
+                                Text("规则回放使用所选时间范围的全部服务，不随视图筛选变化。")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            evaluation
+                        }.padding(.top, 12)
+                    }
                     VStack(alignment: .leading, spacing: 10) {
                         Toggle("低额度与预计重置提醒", isOn: Binding(get: { store.notificationsEnabled }, set: { value in
                             Task { await store.setNotifications(value) }
@@ -70,7 +57,7 @@ struct InsightsView: View {
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                .padding(24)
+                .padding(appUI.isCompact ? 18 : 24)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .controlLayoutContainer("insights.content.container")
             }
@@ -95,6 +82,73 @@ struct InsightsView: View {
         }
     }
 
+    private var visibleProviders: [AgentService] {
+        AgentService.allCases.filter { providerFilter == nil || providerFilter == $0 }
+    }
+
+    private var toolbar: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    rangePicker.fixedSize(horizontal: true, vertical: true)
+                    providerFilterPicker.fixedSize(horizontal: true, vertical: true)
+                    Spacer(minLength: 12)
+                    toolbarActions
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 16) {
+                        rangePicker
+                        providerFilterPicker
+                    }
+                    HStack { Spacer(minLength: 0); toolbarActions }
+                }
+            }
+            Text("视图筛选不影响采集；导出包含所选范围的全部服务。")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .controlLayoutContainer("insights.tools.container")
+    }
+
+    private var providerFilterPicker: some View {
+        AdaptivePicker("显示服务", id: "insights.provider", selection: $providerFilter, showsTitle: false) {
+            Text("全部服务").tag(AgentService?.none)
+            ForEach(AgentService.allCases) { provider in
+                Text(provider.title).tag(Optional(provider))
+            }
+        }
+    }
+
+    private var toolbarActions: some View {
+        HStack(spacing: 10) {
+            Button("重新读取历史", systemImage: "arrow.clockwise") { Task { await store.reload(force: true) } }
+                .buttonStyle(AppActionStyle(kind: .secondary, role: .insights))
+                .disabled(store.isLoading)
+            if store.isLoading { ProgressView().controlSize(.small) }
+            Menu {
+                ForEach(UsageExportFormat.allCases) { format in
+                    Menu(format.title) {
+                        Button("导出当前范围") { export(allHistory: false, format: format) }
+                        Button("导出全部 30 天") { export(allHistory: true, format: format) }
+                    }
+                }
+            } label: {
+                Label(isPreparingExport ? L("正在准备导出…") : L("导出记录"), systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(AppActionStyle(kind: .primary, role: .insights))
+            .disabled(isPreparingExport || showsExporter)
+            Menu {
+                Button("清空历史", role: .destructive) { showsClear = true }
+                    .disabled(store.isLoading)
+            } label: {
+                Label("更多操作", systemImage: "ellipsis")
+            }
+            .buttonStyle(AppActionStyle(kind: .secondary, role: .insights))
+        }
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
     private var rangePicker: some View {
         AdaptivePicker("历史范围", id: "insights.range",
                        selection: Binding(get: { store.range }, set: store.selectRange),
@@ -105,7 +159,7 @@ struct InsightsView: View {
     }
 
     private func providerSection(_ provider: AgentService, wide: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text(provider == .claude ? L("Claude Code · 实验性") : provider.title).font(.headline)
                 Spacer()
@@ -121,9 +175,9 @@ struct InsightsView: View {
                 .font(.caption).foregroundStyle(.secondary)
             let windows = store.report.windows.filter { $0.provider == provider }
             if wide {
-                HStack(alignment: .top, spacing: 32) { ForEach(windows) { window($0) } }
+                HStack(alignment: .top, spacing: 16) { ForEach(windows) { window($0) } }
             } else {
-                VStack(alignment: .leading, spacing: 24) { ForEach(windows) { window($0) } }
+                VStack(alignment: .leading, spacing: 16) { ForEach(windows) { window($0) } }
             }
         }
     }
@@ -177,7 +231,7 @@ struct InsightsView: View {
                 .chartYAxisLabel(position: .leading) {
                     Text("剩余额度（%）").font(.caption2).foregroundStyle(.secondary)
                 }
-                .frame(height: 120)
+                .frame(height: appUI.isCompact ? 132 : 160)
                 .accessibilityLabel(LF("%@ %@ 剩余额度历史，横轴为本地时间或日期，纵轴为剩余额度百分比，重置和缺口处分段", value.provider.title, value.title))
                 if value.history.count > 720 {
                     Text("图形已抽样；速度分析仍使用全部已加载观测。")
@@ -203,25 +257,42 @@ struct InsightsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .appSectionSurface(role: .insights)
     }
 
     private var resetTimeline: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let events = store.report.resetTimeline.filter { providerFilter == nil || providerFilter == $0.provider }
+        return VStack(alignment: .leading, spacing: 12) {
             Text("重置时间轴").font(.headline)
-            if store.report.resetTimeline.isEmpty {
+            if events.isEmpty {
                 Text("尚无可用的未来重置时间。缺失不会被当作已重置。")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            ForEach(store.report.resetTimeline) { event in
-                HStack {
-                    Text("\(event.provider.title) · \(event.title)")
-                    Spacer()
-                    Text(event.resetsAt, format: .dateTime.month().day().hour().minute())
-                        .monospacedDigit()
-                    Text(L(event.isFresh ? "预计" : "旧记录 · 待确认")).foregroundStyle(.secondary)
-                }.font(.callout)
+            ForEach(events) { event in
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        Text("\(event.provider.title) · \(event.title)")
+                        Spacer(minLength: 12)
+                        resetTime(event)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(event.provider.title) · \(event.title)")
+                        resetTime(event)
+                    }
+                }
+                .font(.callout)
+                .padding(.vertical, 3)
             }
             Text(store.report.pacingExplanation).font(.caption).foregroundStyle(.secondary)
+        }
+        .appSectionSurface(role: .insights)
+    }
+
+    private func resetTime(_ event: UsageResetEvent) -> some View {
+        HStack(spacing: 8) {
+            Text(event.resetsAt, format: .dateTime.month().day().hour().minute())
+                .monospacedDigit()
+            Text(L(event.isFresh ? "预计" : "旧记录 · 待确认")).foregroundStyle(.secondary)
         }
     }
 

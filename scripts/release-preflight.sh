@@ -125,6 +125,7 @@ pass "the last mutable artifact is gated before a draft release can be created"
 
 section "Panel source, parser, and visual render checks"
 sh scripts/check-localization.sh "$app"
+sh scripts/check-app-appearance.sh
 sh scripts/check-observation-history.sh
 sh scripts/check-usage-insights.sh
 sh scripts/check-usage-export.sh

@@ -21,6 +21,8 @@ struct DashboardView: View {
     @ObservedObject var server: QuotaMonitor
     @ObservedObject private var insights: InsightsStore
     @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppUISettings.defaultsKey) private var appUIData = Data()
+    private var appUI: AppUISettings { .decode(appUIData) }
     @AppStorage(GlassSettingKeys.appearance) private var appearanceRaw = GlassAppearanceMode.dark.rawValue
     @AppStorage(GlassSettingKeys.surfaceStyle) private var surfaceStyleRaw = GlassSurfaceStyle.tinted.rawValue
     @AppStorage(GlassSettingKeys.opacity) private var glassOpacity = WidgetGlassOpacity.defaultValue
@@ -62,15 +64,15 @@ struct DashboardView: View {
             VStack(spacing: 0) {
                 ViewThatFits(in: .horizontal) {
                     HStack {
-                        workspacePicker.fixedSize(horizontal: true, vertical: true)
+                        workspacePicker
                         Spacer(minLength: 16)
-                        Text("Make Every Token Count").font(.callout).foregroundStyle(.secondary).fixedSize()
+                        appAppearanceLink
                     }
-                    workspacePicker
+                    VStack(alignment: .leading, spacing: 10) { workspacePicker; appAppearanceLink }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .controlLayoutContainer("workspace.toolbar.container")
-                .padding(.horizontal, 24).padding(.vertical, 16)
+                .padding(.horizontal, appUI.spacing).padding(.vertical, appUI.isCompact ? 10 : 16)
                 Divider()
                 ZStack {
                     HStack(spacing: 0) {
@@ -83,6 +85,7 @@ struct DashboardView: View {
                             ScrollView {
                                 GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings)
                                     .padding(20)
+                                    .environment(\.colorScheme, colorScheme)
                             }
                             .frame(width: DashboardLayout.inspectorWidth)
                             .background(.primary.opacity(0.025))
@@ -102,6 +105,9 @@ struct DashboardView: View {
                     }
                 }
             }
+            .background(.background)
+            .environment(\.appUISettings, appUI)
+            .environment(\.colorScheme, appUI.colorScheme ?? colorScheme)
         }
         .coordinateSpace(name: ControlLayoutSpace.name)
         .environment(\.recordsControlLayout, onControlLayout != nil)
@@ -120,6 +126,7 @@ struct DashboardView: View {
                 ScrollView { GlassSettingsView(compact: false, onSettingsChange: server.updateGlassSettings).padding(20) }
             }
             .frame(width: 380, height: 600)
+            .environment(\.colorScheme, colorScheme)
         }
         .task { await server.connect(); await planner.load() }
         .onChange(of: selectedMode) { _, value in
@@ -131,17 +138,18 @@ struct DashboardView: View {
     private func monitorContent(wide: Bool) -> some View {
         let trend = panelTrend
         return VStack(spacing: 20) {
+            monitorStatus(wide: wide)
             VStack(alignment: .leading, spacing: 8) {
-                AdaptivePicker("监测服务", id: "monitor.service",
-                               selection: Binding(get: { server.service }, set: server.selectService)) {
-                    ForEach(AgentService.allCases) { service in
-                        Text(service == .claude ? L("Claude Code · 实验性") : service.title).tag(service)
-                    }
+                Text("监测服务").fixedSize().controlLayoutProbe("monitor.service.label")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) { serviceButtons }.fixedSize()
+                    VStack(alignment: .leading, spacing: 10) { serviceButtons }
                 }
-                .frame(maxWidth: 440, alignment: .leading)
+                .controlLayoutContainer("monitor.service.picker.container")
                 if server.service == .claude { Text("本地会话接入").font(.caption).foregroundStyle(.secondary) }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .controlLayoutContainer("monitor.service.container")
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("桌面面板").font(.title2.weight(.semibold))
@@ -201,11 +209,12 @@ struct DashboardView: View {
               }
             }
             .frame(height: 300)
+            .environment(\.colorScheme, colorScheme)
 
             HStack(spacing: 16) {
                 ForEach(DesktopPanelMode.allCases) { page in
                     Button {
-                        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 1)) {
+                        withAnimation(reduceMotion || appUI.motionIntensity == 0 ? nil : .spring(response: 0.35, dampingFraction: 1)) {
                             selectedMode = page
                         }
                     } label: {
@@ -220,7 +229,38 @@ struct DashboardView: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 12) {
+            if server.service == .claude {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("需要 Claude Code 提供订阅额度。会话退出后保留记录，过期窗口显示待更新。仅绑定一个会话，不读取登录凭证。")
+                    HStack {
+                        Button("启用本地接入") { server.enableClaudeBridge() }
+                        Button("移除接入") { server.removeClaudeBridge() }
+                        Button("重新绑定会话") { server.resetClaudeSession() }
+                    }.buttonStyle(AppActionStyle())
+                    if let message = server.connectionMessage { Text(message).textSelection(.enabled) }
+                }
+                .font(.caption).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(appUI.spacing)
+        .frame(maxWidth: .infinity)
+        .controlLayoutContainer("monitor.content.container")
+    }
+
+    @ViewBuilder private var serviceButtons: some View {
+        ForEach(AgentService.allCases) { service in
+            Button { server.selectService(service) } label: {
+                Label(service == .claude ? L("Claude Code · 实验性") : service.title,
+                      systemImage: service == .codex ? "terminal" : "bubble.left.and.bubble.right")
+            }
+            .buttonStyle(AppActionStyle(kind: server.service == service ? .primary : .secondary))
+            .accessibilityAddTraits(server.service == service ? .isSelected : [])
+        }
+    }
+
+    private func monitorStatus(wide: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
                 Label(statusText, systemImage: statusIcon)
                     .foregroundStyle(statusColor)
                     .font(.callout.weight(.medium))
@@ -235,36 +275,26 @@ struct DashboardView: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .controlLayoutContainer("monitor.actions.container")
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            if server.service == .claude {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("需要 Claude Code 提供订阅额度。会话退出后保留记录，过期窗口显示待更新。仅绑定一个会话，不读取登录凭证。")
-                    HStack {
-                        Button("启用本地接入") { server.enableClaudeBridge() }
-                        Button("移除接入") { server.removeClaudeBridge() }
-                        Button("重新绑定会话") { server.resetClaudeSession() }
-                    }
-                    if let message = server.connectionMessage { Text(message).textSelection(.enabled) }
-                }
-                .font(.caption).foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity)
-        .controlLayoutContainer("monitor.content.container")
+        .appSectionSurface(role: .monitor)
     }
 
     private var workspacePicker: some View {
         HStack(spacing: 12) {
             Text("工作区").fixedSize().controlLayoutProbe("workspace.label")
             AdaptivePicker("工作区", id: "workspace.choice", selection: $section, showsTitle: false) {
-                ForEach(WorkspaceSection.allCases) { Text($0.title).tag($0) }
+                ForEach(WorkspaceSection.allCases) { section in
+                    Label(section.title, systemImage: section == .monitor ? "gauge.with.dots.needle.50percent" : section == .insights ? "chart.xyaxis.line" : "checklist")
+                        .tag(section)
+                }
             }
+            .tint(appUI.primaryColor)
         }
         .controlLayoutContainer("workspace.container")
+    }
+
+    private var appAppearanceLink: some View {
+        SettingsLink { Label(L("应用外观"), systemImage: "paintpalette") }
+            .buttonStyle(AppActionStyle())
     }
 
     @ViewBuilder
@@ -272,10 +302,13 @@ struct DashboardView: View {
         Button("玻璃设置", systemImage: "slider.horizontal.3") {
             if wide { showsGlassInspector.toggle() } else { showsGlassSheet = true }
         }
+        .buttonStyle(AppActionStyle())
         Button("桌面玻璃面板") { DesktopPanelController.shared.show(server: server) }
             .help("打开一个独立透明、不会改变其他图标外观的桌面面板")
+            .buttonStyle(AppActionStyle())
         Button(server.isRefreshing ? L("正在刷新…") : L("刷新")) { server.refresh() }
             .disabled(server.isRefreshing || server.state == .connecting)
+            .buttonStyle(AppActionStyle(kind: .primary))
         if server.service == .codex, case .disconnected = server.state {
             Button("连接 Codex") { Task { await server.connect() } }.buttonStyle(.borderedProminent)
         }
@@ -293,7 +326,7 @@ struct DashboardView: View {
     private func select(_ offset: Int) {
         let modes = DesktopPanelMode.allCases
         guard let index = modes.firstIndex(of: mode), modes.indices.contains(index + offset) else { return }
-        withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 1)) {
+        withAnimation(reduceMotion || appUI.motionIntensity == 0 ? nil : .spring(response: 0.35, dampingFraction: 1)) {
             selectedMode = modes[index + offset]
         }
     }

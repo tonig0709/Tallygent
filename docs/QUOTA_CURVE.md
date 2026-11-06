@@ -1,4 +1,4 @@
-# Curve chart — build 65
+# Curve chart — build 66
 
 Choose **Curve** in Panel Settings → Large Panel Chart → Chart Style. The
 existing Bar and Line modes, their stored values and their defaults stay intact.
@@ -23,11 +23,12 @@ interval, so it is not presented as a measurement or a prediction.
 
 1. A first independent Swift/Foundation implementation was completed and passed
    the pure numerical probe **before** GitHub inspiration was researched.
-2. The fitter uses local shape-preserving cubic Hermite interpolation: weighted
-   harmonic interior tangents, constrained endpoint slopes, zero slopes at
-   plateaus, and per-interval value bounds. Retained input knots are interpolated
-   exactly. Unlike one global high-order polynomial, local changes do not
-   produce unbounded oscillations throughout the chart.
+2. Build 66 uses local shape-preserving quintic Bézier pieces. Shared weighted
+   harmonic knot slopes are limited to 1.25 times the smaller adjacent secant;
+   plateau slopes remain zero. Zero endpoint accelerations give C2 joins, so
+   both velocity and acceleration agree between pieces. The six ordered control
+   values prevent overshoot or invented quota increases. Retained input knots
+   are still interpolated exactly; this is not a global high-order polynomial.
 3. A screen-sized display budget bounds work. Redundant flat knots are removed
    without changing solid/estimated provenance. Dense chains are downsampled
    before fitting with largest-triangle bucket selection to retain knees better
@@ -35,6 +36,12 @@ interval, so it is not presented as a measurement or a prediction.
    First and last retained observations remain endpoints. This is a visual
    approximation heuristic, not a global error minimum. Display approximation at a small
    budget is not a claim to pass every omitted observation exactly.
+   Drawing samples now follow a bound on each piece's curvature, rather than
+   elapsed time. Straight spans need no extra samples, so a short, steep change
+   no longer loses its curve while flat hours consume the budget. The chord-error
+   target is 0.025 percentage points when the shared sample budget permits, not
+   an unconditional error guarantee under extreme display thinning. Stable
+   de Casteljau evaluation stays inside the control polygon.
 4. Research then compared the approach with the original
    [D3 monotone implementation](https://github.com/d3/d3-shape/blob/main/src/curve/monotone.js),
    [SciPy PCHIP implementation](https://github.com/scipy/scipy/blob/main/scipy/interpolate/_cubic.py),
@@ -42,6 +49,11 @@ interval, so it is not presented as a measurement or a prediction.
    These corroborate local shape constraints and motivate area-preserving
    sampling under a render budget. Tallygent uses actual normalized receipt
    times, not row indices, because its sampling intervals are irregular.
+
+Exact integer-percent plateaus necessarily remain flat. C2 joins and better
+tessellation reduce abrupt turns, but do not invent a continuous decline between
+equal measurements or smooth away true resets. No new smoothing preference,
+runtime dependency, source-data mutation or forecasting behavior is introduced.
 
 The seven-day Token chart has different units and only daily aggregates. Its
 Curve mode uses native Charts monotone interpolation and retains the daily
@@ -59,6 +71,8 @@ settings keep their existing behavior.
 0–100% bounds, irregular/extreme times, estimated-gap endpoints, hard boundaries,
 invalid/reversed/duplicate timestamps, empty/singleton cases and 20k input rows
 under a bounded display budget. Negative controls must fail the same validator.
+The smoother also checks matching endpoint velocity/acceleration and a one-second
+drop between very long plateaus, which duration-only drawing samples missed.
 The time-aware sampling probe includes a sharp-knee fixture missed by uniform
 selection, a case distinguishing real time from row index, and a skipped-gap
 provenance check. Extreme finite/subnormal intervals must remain bounded.

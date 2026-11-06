@@ -12,7 +12,7 @@ public struct QuotaCurveRun: Identifiable, Equatable, Sendable {
     public let points: [QuotaCurvePoint]
 }
 
-/// Display-only, shape-preserving local interpolation, not a quota forecast.
+/// Display-only, C2 shape-preserving local interpolation, not a quota forecast.
 /// Exact at retained observations; no values outside their time/value bounds.
 public enum QuotaCurve {
     public static func fit(_ points: [UsageHistoryPoint], maximumPoints: Int = 720) -> [QuotaCurveRun] {
@@ -84,11 +84,25 @@ public enum QuotaCurve {
             let estimated = zip(selected, selected.dropFirst()).map { gapPrefix[$1] > gapPrefix[$0] }
             reduced.append((selected.map { values[$0] }, estimated))
         }
-        let durationScale = max(1, reduced.map { $0.points.last!.date.timeIntervalSince($0.points.first!.date) }.max() ?? 1)
-        let scaledDuration = reduced.reduce(0.0) { $0 + $1.points.last!.date.timeIntervalSince($1.points.first!.date) / durationScale }
+        let prepared = reduced.map { value -> (points: [UsageHistoryPoint], estimated: [Bool], controls: [[Double]], demand: [Int]) in
+            let knots = value.points
+            let intervals = zip(knots, knots.dropFirst()).map { $1.date.timeIntervalSince($0.date) }
+            let secants = intervals.indices.map {
+                Double(knots[$0 + 1].remainingPercent - knots[$0].remainingPercent) / intervals[$0]
+            }
+            guard !intervals.isEmpty else { return (knots, value.estimated, [], []) }
+            let tangents = slopes(intervals: intervals, secants: secants)
+            let controls = intervals.indices.map { index in
+                smoothControls(from: Double(knots[index].remainingPercent), to: Double(knots[index + 1].remainingPercent),
+                               interval: intervals[index], leftSlope: tangents[index], rightSlope: tangents[index + 1])
+            }
+            return (knots, value.estimated, controls, controls.map(sampleDemand))
+        }
+        let totalSampleDemand = prepared.reduce(0) { $0 + $1.demand.reduce(0, +) }
+        let sampleBudget = min(budget, totalSampleDemand)
         var result: [QuotaCurveRun] = []
-        var remainingSamples = budget
-        for (chainIndex, value) in reduced.enumerated() {
+        var cumulativeSamples = 0, allocatedSamples = 0
+        for (chainIndex, value) in prepared.enumerated() {
             let knots = value.points
             let prefix = "curve:\(chainIndices[chainIndex]):\(knots[0].id)"
             if knots.count == 1 {
@@ -98,9 +112,6 @@ public enum QuotaCurve {
                 continue
             }
             let intervals = zip(knots, knots.dropFirst()).map { $1.date.timeIntervalSince($0.date) }
-            let differences = zip(knots, knots.dropFirst()).map { Double($1.remainingPercent - $0.remainingPercent) }
-            let secants = zip(differences, intervals).map(/)
-            let tangents = slopes(intervals: intervals, secants: secants)
             var runPoints: [QuotaCurvePoint] = []
             var runEstimated = value.estimated[0]
             var runIndex = 0
@@ -121,13 +132,14 @@ public enum QuotaCurve {
                 }
                 let a = Double(knots[index].remainingPercent), b = Double(knots[index + 1].remainingPercent)
                 if runPoints.isEmpty { append(index, fraction: 0, value: a) }
-                let extra = scaledDuration > 0 ? min(remainingSamples, Int((Double(budget) * (intervals[index] / durationScale) / scaledDuration).rounded(.down))) : 0
-                remainingSamples -= extra
+                cumulativeSamples += value.demand[index]
+                let target = totalSampleDemand == 0 ? 0 : Int(Double(sampleBudget) * Double(cumulativeSamples) / Double(totalSampleDemand))
+                let extra = target - allocatedSamples
+                allocatedSamples = target
                 if extra > 0 {
                     for sample in 1...extra {
-                        let t = Double(sample) / Double(extra + 1), t2 = t * t, t3 = t2 * t
-                        let y = (2 * t3 - 3 * t2 + 1) * a + (t3 - 2 * t2 + t) * intervals[index] * tangents[index] +
-                            (-2 * t3 + 3 * t2) * b + (t3 - t2) * intervals[index] * tangents[index + 1]
+                        let t = Double(sample) / Double(extra + 1)
+                        let y = ordinate(value.controls[index], at: t)
                         append(index, fraction: t, value: min(a, max(b, y)))
                     }
                 }
@@ -136,6 +148,35 @@ public enum QuotaCurve {
             emit()
         }
         return result
+    }
+
+    // Shared knot slopes and zero endpoint accelerations give C2 joins. Limiting
+    // each slope to 1.25 times either adjacent secant orders all six controls,
+    // so the local quintic cannot overshoot or invent a quota increase.
+    static func smoothControls(from a: Double, to b: Double, interval: Double,
+                               leftSlope: Double, rightSlope: Double) -> [Double] {
+        let left = interval * leftSlope / 5, right = interval * rightSlope / 5
+        return [a, a + left, a + 2 * left, b - 2 * right, b - right, b]
+    }
+
+    private static func ordinate(_ controls: [Double], at t: Double) -> Double {
+        // de Casteljau evaluation stays within the monotone control polygon.
+        var values = controls
+        for count in stride(from: values.count - 1, through: 1, by: -1) {
+            for index in 0..<count { values[index] += (values[index + 1] - values[index]) * t }
+        }
+        return values[0]
+    }
+
+    private static func sampleDemand(_ controls: [Double]) -> Int {
+        let curvature = (0..<(controls.count - 2)).map {
+            abs(controls[$0 + 2] - 2 * controls[$0 + 1] + controls[$0])
+        }.max() ?? 0
+        // Linear-chord error <= max|y''(t)| / (8*n*n). Allocate by curvature,
+        // not elapsed time: a one-second drop needs more detail than a flat hour.
+        // ponytail: 0.025 percentage-point target when the shared budget permits;
+        // extreme density remains a bounded display approximation, not raw data.
+        return max(0, Int(ceil(sqrt(20 * curvature / (8 * 0.025)))) - 1)
     }
 
     private static func spacedIndices(_ count: Int, count limit: Int) -> [Int] {
@@ -203,6 +244,10 @@ public enum QuotaCurve {
         values[0] = endpoint(intervals[0], intervals[1], secants[0], secants[1])
         let last = secants.count - 1
         values[last + 1] = endpoint(intervals[last], intervals[last - 1], secants[last], secants[last - 1])
+        for index in values.indices {
+            let adjacent = min(abs(secants[max(0, index - 1)]), abs(secants[min(last, index)]))
+            values[index] = max(values[index], -1.25 * adjacent)
+        }
         return values
     }
 }

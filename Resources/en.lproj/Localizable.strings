@@ -500,7 +500,7 @@
 "规则回放使用所选时间范围的全部服务，不随视图筛选变化。" = "Rule replay uses all services in the selected time range, independent of the view filter.";
 "曲线图" = "Curve";
 "曲线拟合 · 虚线为缺口估计 · 重置处断开" = "Fitted curve · dashed gaps are estimates · resets split";
-"曲线图使用保形三次插值；虚线仅估计同一已确认额度周期内的时间缺口，不是新增观测，不跨重置、身份、来源或无效记录，也不向首尾外推。" = "Shape-preserving cubic interpolation. Dashed spans estimate time gaps within one confirmed quota cycle; they are not observations. No bridging across resets, identity, source or invalid receipts, and no extrapolation.";
+"曲线图使用保形平滑插值；虚线仅估计同一已确认额度周期内的时间缺口，不是新增观测，不跨重置、身份、来源或无效记录，也不向首尾外推。" = "Shape-preserving smooth interpolation. Dashed spans estimate time gaps within one confirmed quota cycle; they are not observations. No bridging across resets, identity, source or invalid receipts, and no extrapolation.";
 "曲线区段" = "Curve span";
 "%@ %@ 曲线图，横轴为本地时间，纵轴为剩余额度百分比；虚线是缺口估计，重置处断开" = "%@ %@ curve: local time on the horizontal axis, remaining quota percent on the vertical axis. Dashed spans estimate gaps; resets split the curve.";
 "曲线图仅作显示拟合：虚线估计同周期的时间缺口；重置或来源变化处断开，不改变原始记录和预测。" = "Display-only fitting: dashed spans estimate time gaps in the same cycle. Resets or source changes split the curve. Raw records and forecasts are unchanged.";

@@ -46,7 +46,7 @@ struct PanelTrendView: View, Equatable {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .help(presentation.style == .curve
-              ? L("曲线图使用保形三次插值；虚线仅估计同一已确认额度周期内的时间缺口，不是新增观测，不跨重置、身份、来源或无效记录，也不向首尾外推。")
+              ? L("曲线图使用保形平滑插值；虚线仅估计同一已确认额度周期内的时间缺口，不是新增观测，不跨重置、身份、来源或无效记录，也不向首尾外推。")
               : L("与 Insights 相同的剩余百分比历史，不是 Token 或小时消耗。折线保留重置和缺失区段；柱状图取每小时最后一次有效观测，不填补没有观测的小时。"))
     }
 

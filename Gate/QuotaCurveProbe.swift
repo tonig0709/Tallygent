@@ -26,6 +26,47 @@ enum QuotaCurveProbe {
         }
         let flat = QuotaCurve.fit((0..<100).map { point(Double($0), 80) })
         precondition(values(flat).allSatisfy { $0.remainingPercent == 80 })
+        let shortDrop = values(QuotaCurve.fit([point(0, 90), point(36_000, 90),
+                                               point(36_001, 10), point(72_000, 10)]))
+        precondition(shortDrop.filter { $0.date > origin.addingTimeInterval(36_000) &&
+            $0.date < origin.addingTimeInterval(36_001) }.count >= 20,
+            "short sharp drop lost its curve to duration-only sampling")
+        precondition(descending(shortDrop) && shortDrop.allSatisfy { (10...90).contains($0.remainingPercent) })
+        let quarter = origin.addingTimeInterval(36_000.25)
+        let near = zip(shortDrop, shortDrop.dropFirst()).first { $0.date <= quarter && $1.date >= quarter }!
+        let fraction = quarter.timeIntervalSince(near.0.date) / near.1.date.timeIntervalSince(near.0.date)
+        let quarterValue = near.0.remainingPercent + fraction * (near.1.remainingPercent - near.0.remainingPercent)
+        precondition(abs(quarterValue - 81.71875) < 0.025,
+                     "rendered short drop does not follow its C2 quintic within the available error budget")
+        let left = QuotaCurve.smoothControls(from: 90, to: 60, interval: 3, leftSlope: -10, rightSlope: -2)
+        let right = QuotaCurve.smoothControls(from: 60, to: 10, interval: 20, leftSlope: -2, rightSlope: -2)
+        func ordered(_ controls: [Double]) -> Bool { zip(controls, controls.dropFirst()).allSatisfy { $1 <= $0 } }
+        func velocity(_ controls: [Double], duration: Double, atEnd: Bool) -> Double {
+            atEnd ? 5 * (controls[5] - controls[4]) / duration : 5 * (controls[1] - controls[0]) / duration
+        }
+        func acceleration(_ controls: [Double], duration: Double, atEnd: Bool) -> Double {
+            atEnd ? 20 * (controls[5] - 2 * controls[4] + controls[3]) / (duration * duration) :
+                20 * (controls[2] - 2 * controls[1] + controls[0]) / (duration * duration)
+        }
+        precondition(ordered(left) && ordered(right))
+        precondition(abs(velocity(left, duration: 3, atEnd: true) - velocity(right, duration: 20, atEnd: false)) < 1e-10,
+                     "smooth pieces do not share their knot velocity")
+        precondition(abs(acceleration(left, duration: 3, atEnd: true)) < 1e-10 &&
+                     abs(acceleration(right, duration: 20, atEnd: false)) < 1e-10,
+                     "smooth pieces have an acceleration jump at their shared knot")
+        precondition(!ordered([90, 91, 85, 80, 75, 60]), "ordered-control negative check accepted an overshoot")
+        for variant in 0..<32 {
+            var time = 0.0, remaining = 100
+            let varying = (0..<64).map { index -> UsageHistoryPoint in
+                time += Double(1 + (index * 137 + variant * 19) % 1_000)
+                remaining = max(0, remaining - (index * 7 + variant) % 4)
+                return point(time, remaining)
+            }
+            let samples = values(QuotaCurve.fit(varying))
+            precondition(descending(samples) && samples.allSatisfy { $0.remainingPercent.isFinite &&
+                Double(varying.last!.remainingPercent)...Double(varying.first!.remainingPercent) ~= $0.remainingPercent },
+                "irregular C2 curve escaped its monotone observed bounds")
+        }
         let gap = QuotaCurve.fit([point(0, 90, segment: "a"), point(5, 89, segment: "a"),
                                  point(3_600, 40, segment: "b"), point(3_605, 39, segment: "b")])
         precondition(gap.map(\.isEstimated) == [false, true, false])
@@ -90,6 +131,6 @@ enum QuotaCurveProbe {
         let bad = [QuotaCurvePoint(id: "a", date: origin, remainingPercent: 50),
                    QuotaCurvePoint(id: "b", date: origin.addingTimeInterval(1), remainingPercent: 51)]
         precondition(!descending(bad), "monotonicity negative control accepted a known-bad overshoot")
-        print("Quota curve: PASS (exact retained knots, monotone bounds, time-aware area sampling, retained knees, plateaus, authorized estimated gaps, hard boundaries, invalid input, 20k bounded display and negative control)")
+        print("Quota curve: PASS (C2 joins, curvature-aware short-drop detail, exact retained knots, monotone bounds, time-aware area sampling, retained knees, plateaus, authorized estimated gaps, hard boundaries, invalid input, 20k bounded display and negative controls)")
     }
 }

@@ -55,8 +55,9 @@ Official interface: https://code.claude.com/docs/en/statusline
 3. Branding: the approved product name is Tallygent. A new candidate must retain
    the bundle ID and preference keys, account for Claude's absolute bridge path,
    and test upgrades before replacing the already-checked Codex Quota binary.
-4. Release: universal full-Xcode builds on macOS 14/15/26, existing full release
-   preflight plus provider checks, then desktop drag/close/reopen/hover smoke test.
+4. Release: universal full-Xcode builds on the [current CI matrix](../RELEASE_CHECKLIST.md),
+   existing full release preflight plus provider checks, then desktop drag/close/reopen/hover smoke test.
+   Deployment-target compatibility is not a claim of runtime acceptance on an untested OS.
    Until real-account validation, Claude remains experimental.
 
 For this delivery, stop before publication: prepare the candidate, test results

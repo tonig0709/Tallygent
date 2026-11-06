@@ -45,7 +45,7 @@ App 新增 **Insights** 工作区：来源采集开关、逐窗口历史、近�
 - `Gate/UsageInsightsProbe.swift`：冷启动、低分辨率、陈旧、重置/负跳变/缺口/身份变化、未来数据排除、回放与通知去重。
 - `Gate/ModelCatalogProbe.swift`：生产连接上的真实响应入口、迟到/重复响应与账户/子进程隔离。
 
-新增两个纯检查进入既有 `release-preflight.sh`；原有 Planner、三尺寸、单面板、非黑屏、同步、签名、双架构及最终 DMG 检查全部保留。完整运行只在隔离的 macOS 14/15/26 Xcode CI 用户；本机不运行假账户服务器或改变系统组件登记。
+新增两个纯检查进入既有 `release-preflight.sh`；原有 Planner、三尺寸、单面板、非黑屏、同步、签名、双架构及最终 DMG 检查全部保留。完整运行只在[当前测试矩阵](../RELEASE_CHECKLIST.md)的隔离 Xcode CI 用户，最低部署目标不等于该系统已运行验收；本机不运行假账户服务器或改变系统组件登记。
 
 ## 尚未宣称完成
 

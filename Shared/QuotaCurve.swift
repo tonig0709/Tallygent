@@ -169,9 +169,12 @@ public enum QuotaCurve {
     }
 
     private static func sampleDemand(_ controls: [Double]) -> Int {
-        let curvature = (0..<(controls.count - 2)).map {
-            abs(controls[$0 + 2] - 2 * controls[$0 + 1] + controls[$0])
-        }.max() ?? 0
+        var curvature = 0.0
+        for index in 0..<(controls.count - 2) {
+            let middle = 2.0 * controls[index + 1]
+            let secondDifference = controls[index + 2] - middle + controls[index]
+            curvature = max(curvature, abs(secondDifference))
+        }
         // Linear-chord error <= max|y''(t)| / (8*n*n). Allocate by curvature,
         // not elapsed time: a one-second drop needs more detail than a flat hour.
         // ponytail: 0.025 percentage-point target when the shared budget permits;

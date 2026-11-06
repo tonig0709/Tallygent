@@ -27,6 +27,16 @@ Keep stable Liquid Glass releases separate from the particle experiment. When
 a production bug is fixed, add the smallest regression to the release gate so
 the same failure cannot pass a later release.
 
+## Current CI matrix (2026-11-06)
+
+The user approved macOS 15, 26 and 27 runtime gates after GitHub retired macOS 14
+runners on November 2. Use labels `macos-15`, `macos-26`, `xcode-27` consistently
+in both workflows and the topology assertion. `xcode-27` runs macOS 27; it is
+not a lower deployment target. Keep the App and Swift package minimum at macOS
+14. New candidates are not runtime-verified on macOS 14 unless a separate real
+macOS 14 run is recorded. Historical build notes do not override this policy.
+Do not remove native probes or treat compilation for 14 as runtime acceptance.
+
 ## Product direction (2026-10-24)
 
 The approved product name is **Tallygent**. See `docs/TALLYGENT_ROADMAP.md` before

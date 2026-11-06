@@ -13,7 +13,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15, macos-26]
+        # xcode-27 is GitHub's macOS 27 runner label; macOS 14 runners retired.
+        os: [macos-15, macos-26, xcode-27]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

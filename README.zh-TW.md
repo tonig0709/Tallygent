@@ -59,7 +59,7 @@ Tallygent 是本機優先的 macOS App，監測 **Codex** 與實驗性 **Claude 
 
 需要完整 Xcode 16+。開啟保留歷史名稱的 `CodexQuotaWidget.xcodeproj`，選擇 `CodexQuota` scheme。語言資源、字體與邊界回歸見[本地化說明](docs/LOCALIZATION.md)及[版面約束](docs/LAYOUT_INVARIANTS.md)。
 
-完整發行門禁僅能於隔離 CI 使用者執行，涵蓋 macOS 14、15、26。真實滑鼠拖移、停留、透光與連續滑桿仍需桌面驗收，詳見[發行清單](RELEASE_CHECKLIST.md)。
+完整發行門禁僅能於隔離 CI 使用者執行，涵蓋 macOS 15、26、27。App 最低仍支援 macOS 14，但 GitHub 停用該環境後，新候選未於 macOS 14 執行回歸檢查。真實滑鼠拖移、停留、透光與連續滑桿仍需桌面驗收，詳見[發行清單](RELEASE_CHECKLIST.md)。
 
 [英文完整說明](README.md) · [Monitor / Insights](docs/MONITOR_INSIGHTS.md) · [Planner](docs/PLANNER.md) · [產品路線圖](docs/TALLYGENT_ROADMAP.md) · [問題回報](https://github.com/tonig0709/Tallygent/issues)
 

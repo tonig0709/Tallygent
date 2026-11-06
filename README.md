@@ -128,7 +128,7 @@ swift run quota-self-check
 sh scripts/check-panel-trend.sh
 ```
 
-CI builds universal apps and runs the full release gate on **macOS 14, 15, and 26**. Native runtime probes must run in an **isolated CI user**, not a personal account: they launch a fake account server, use port 48193, and create a temporary installation. See the [release checklist](RELEASE_CHECKLIST.md) before packaging or tagging. Real-desktop dragging, hover controls, wallpaper blending, and continuous sliders still need human acceptance; headless checks do not replace it.
+CI builds universal apps and runs the full release gate on **macOS 15, 26, and 27**. The app still targets macOS 14+, but new candidates are not runtime-verified on macOS 14 after GitHub retired those runners. Native runtime probes must run in an **isolated CI user**, not a personal account: they launch a fake account server, use port 48193, and create a temporary installation. See the [release checklist](RELEASE_CHECKLIST.md) before packaging or tagging. Real-desktop dragging, hover controls, wallpaper blending, and continuous sliders still need human acceptance; headless checks do not replace it.
 
 Found a bug? [Open an issue](https://github.com/tonig0709/Tallygent/issues) with the app version/build, macOS version, and reproduction steps. Redact account details and credentials. Report security issues through the guidance in [SECURITY.md](SECURITY.md), not a public log dump.
 

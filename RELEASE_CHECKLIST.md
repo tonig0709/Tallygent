@@ -59,7 +59,13 @@ its runtime requires an isolated CI user, not a personal desktop session.
   original Codex icon, no embedded extension, no old widget intents, verified DMG,
   correct Applications shortcut, no unexpected payloads, and identical app bytes/modes.
 
-CI runs on macOS 14, 15 and 26. A version tag creates a **draft** Release only.
+CI runs on macOS 15, 26 and 27 (`macos-15`, `macos-26`, `xcode-27`). GitHub
+[retired macOS 14 runners on November 2, 2026](https://github.blog/changelog/2026-10-01-github-actions-macos-14-runner-image-retirement/).
+The minimum deployment target remains macOS 14, but newer candidates have no
+macOS 14 runtime acceptance unless a separate real macOS 14 run is recorded.
+Compiling for 14 does not replace that test. All existing native/runtime probes
+remain mandatory on every current runner. A version tag creates a **draft**
+Release only.
 
 ## Required real-desktop smoke test before publishing
 

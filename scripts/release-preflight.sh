@@ -92,7 +92,7 @@ ruby -r yaml - .github/workflows/release.yml .github/workflows/test.yml <<'RUBY'
 release = YAML.load_file(ARGV[0]).fetch("jobs")
 test = YAML.load_file(ARGV[1]).fetch("jobs")
 raise "release must depend on preflight" unless release.fetch("release").fetch("needs") == "preflight"
-expected_os = ["macos-14", "macos-15", "macos-26"]
+expected_os = ["macos-15", "macos-26", "xcode-27"]
 release_os = release.fetch("preflight").fetch("strategy").fetch("matrix").fetch("os")
 test_os = test.fetch("release-gate").fetch("strategy").fetch("matrix").fetch("os")
 raise "release preflight OS matrix is incomplete" unless release_os == expected_os
